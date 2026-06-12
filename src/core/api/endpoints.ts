@@ -1069,6 +1069,29 @@ export function useDeleteStudyMaterial() {
   });
 }
 
+export function useFacultyClassAnalytics(batchName: string) {
+  return useQuery({
+    queryKey: ['facultyClassAnalytics', batchName],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.analytics.facultyClass, {
+        params: { batchName },
+      });
+      return response.data;
+    },
+    enabled: !!batchName,
+  });
+}
+
+export function useAdminBatchComparisons() {
+  return useQuery({
+    queryKey: ['adminBatchComparisons'],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.analytics.adminBatches);
+      return response.data;
+    },
+  });
+}
+
 
 
 

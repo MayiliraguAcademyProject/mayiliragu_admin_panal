@@ -71,4 +71,8 @@ export const ApiConstants = {
     categoryDetail: (id: string) => `/study-materials/categories/${id}`,
     detail: (id: string) => `/study-materials/${id}`,
   },
+  analytics: {
+    facultyClass: '/analytics/faculty/class',
+    adminBatches: '/analytics/admin/batches',
+  },
 } as const;

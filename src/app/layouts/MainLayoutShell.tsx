@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Image,
   Newspaper,
-  Library
+  Library,
+  TrendingUp
 } from 'lucide-react';
 
 interface NavItem {
@@ -37,6 +38,7 @@ export default function MainLayoutShell() {
     { name: 'Banners', path: '/banners', icon: Image },
     { name: 'Current Affairs', path: '/current-affairs', icon: Newspaper },
     { name: 'Study Library', path: '/study-materials', icon: Library },
+    { name: 'Performance Analytics', path: '/performance-analytics', icon: TrendingUp },
   ];
 
   const handleLogout = () => {
