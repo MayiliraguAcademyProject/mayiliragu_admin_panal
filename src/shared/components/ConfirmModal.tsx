@@ -42,8 +42,8 @@ export default function ConfirmModal({
     danger: {
       bg: 'bg-red-50',
       border: 'border-red-100',
-      icon: 'text-red-650',
-      button: 'bg-red-650 hover:bg-red-700 text-white shadow-red-100',
+      icon: 'text-red-600',
+      button: 'bg-red-600 hover:bg-red-700 text-white shadow-red-100',
     },
     warning: {
       bg: 'bg-amber-50',

@@ -1,4 +1,4 @@
-import { useAdminStats } from '../api/dashboard';
+import { useAdminStats } from '../../../core/api/endpoints';
 import { 
   Users, 
   BookOpen, 
@@ -192,7 +192,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="pt-6 border-t border-white/10 text-[11px] text-gray-400 font-medium">
-            Mayiliragu LMS Panel v1.0 • React Web Migration
+            EducationApp LMS Panel v1.0 • React Web Migration
           </div>
         </div>
 

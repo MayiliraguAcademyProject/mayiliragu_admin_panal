@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useTestsStore } from '../store/tests-store';
+import { useState, useEffect, useMemo } from 'react';
+import { useExamCategories } from '../../../core/api/endpoints';
 import { type Question } from '../../../core/types';
 import { X, Plus, Trash2 } from 'lucide-react';
 
@@ -20,7 +20,15 @@ export default function QuestionFormModal({
   defaultCategoryId,
   defaultSubjectName,
 }: QuestionFormModalProps) {
-  const { categories, subjects, topics } = useTestsStore();
+  const { data: categories = [] } = useExamCategories();
+
+  const subjects = useMemo(() => {
+    return categories.flatMap((cat) => cat.subjects || []);
+  }, [categories]);
+
+  const topics = useMemo(() => {
+    return subjects.flatMap((sub) => sub.topics || []);
+  }, [subjects]);
 
   // Basic fields state
   const [type, setType] = useState('single_choice');
@@ -51,6 +59,8 @@ export default function QuestionFormModal({
   const [acceptedAnswers, setAcceptedAnswers] = useState<Array<{ value: string; case_sensitive: boolean }>>([
     { value: '', case_sensitive: false }
   ]);
+  const [modelAnswer, setModelAnswer] = useState('');
+  const [wordLimit, setWordLimit] = useState(200);
 
   // Set defaults and populated edit values
   useEffect(() => {
@@ -93,6 +103,8 @@ export default function QuestionFormModal({
       if (question.accepted_answers) {
         setAcceptedAnswers(Array.isArray(question.accepted_answers) ? question.accepted_answers : []);
       }
+      setModelAnswer(question.model_answer || '');
+      setWordLimit(question.word_limit ?? 200);
     } else {
       // Create Mode
       setQuestionTextEn('');
@@ -113,6 +125,8 @@ export default function QuestionFormModal({
       ]);
       setCorrectAnswer(true);
       setAcceptedAnswers([{ value: '', case_sensitive: false }]);
+      setModelAnswer('');
+      setWordLimit(200);
 
       if (defaultCategoryId) {
         setCategoryId(defaultCategoryId);
@@ -252,6 +266,9 @@ export default function QuestionFormModal({
       payload.correct_answer = correctAnswer;
     } else if (type === 'fill_in_blank') {
       payload.accepted_answers = acceptedAnswers.filter(ans => ans.value.trim() !== '');
+    } else if (type === 'descriptive') {
+      payload.model_answer = modelAnswer || undefined;
+      payload.word_limit = Number(wordLimit) || undefined;
     }
 
     onSubmit(payload);
@@ -355,6 +372,7 @@ export default function QuestionFormModal({
                 <option value="multi_choice">Multi Choice</option>
                 <option value="true_false">True / False</option>
                 <option value="fill_in_blank">Fill in the Blank</option>
+                <option value="descriptive">Descriptive</option>
               </select>
             </div>
 
@@ -540,6 +558,36 @@ export default function QuestionFormModal({
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Alternative Phrase</span>
                 </button>
+              </div>
+            )}
+
+            {/* DESCRIPTIVE */}
+            {type === 'descriptive' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1.5">
+                    Word Limit (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 200"
+                    value={wordLimit}
+                    onChange={(e) => setWordLimit(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent font-medium text-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1.5">
+                    Model Answer / Grading Rubric (Optional)
+                  </label>
+                  <textarea
+                    placeholder="Enter reference model answer or grading rubric guidelines"
+                    value={modelAnswer}
+                    onChange={(e) => setModelAnswer(e.target.value)}
+                    rows={4}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent font-medium text-slate-700"
+                  />
+                </div>
               </div>
             )}
           </div>

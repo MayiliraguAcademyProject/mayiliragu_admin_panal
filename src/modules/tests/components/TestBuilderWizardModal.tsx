@@ -16,8 +16,7 @@ import {
   Award,
   Sparkles
 } from 'lucide-react';
-import { useQuestionsList } from '../../../core/api/endpoints';
-import { useTestsStore } from '../store/tests-store';
+import { useQuestionsList, useExamCategories } from '../../../core/api/endpoints';
 import type { Question, Test } from '../../../core/types';
 
 interface TestBuilderWizardModalProps {
@@ -34,7 +33,15 @@ export default function TestBuilderWizardModal({
   test
 }: TestBuilderWizardModalProps) {
   const [step, setStep] = useState(1);
-  const { categories, subjects, topics } = useTestsStore();
+  const { data: categories = [] } = useExamCategories();
+
+  const subjects = useMemo(() => {
+    return categories.flatMap((cat) => cat.subjects || []);
+  }, [categories]);
+
+  const topics = useMemo(() => {
+    return subjects.flatMap((sub) => sub.topics || []);
+  }, [subjects]);
 
   // Step 1: Metadata State
   const [title, setTitle] = useState('');
@@ -45,6 +52,7 @@ export default function TestBuilderWizardModal({
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
   const [isPublished, setIsPublished] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
 
   // Step 2: Selected Questions State
   // Array of questions in order
@@ -87,6 +95,7 @@ export default function TestBuilderWizardModal({
       setSubjectId(test.subject_id || '');
       setTopicId(test.topic_id || '');
       setIsPublished(test.is_published);
+      setScheduledAt(test.scheduled_at ? test.scheduled_at.substring(0, 16) : '');
       if (test.questions) {
         // Sort by order and set
         const sorted = [...test.questions].sort((a, b) => a.order - b.order);
@@ -102,6 +111,7 @@ export default function TestBuilderWizardModal({
       setSubjectId('');
       setTopicId('');
       setIsPublished(false);
+      setScheduledAt('');
       setSelectedQuestions([]);
       setStep(1);
     }
@@ -184,6 +194,7 @@ export default function TestBuilderWizardModal({
       subject_id: subjectId || null,
       topic_id: topicId || null,
       is_published: isPublished,
+      scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
       questions: questionsPayload
     };
 
@@ -298,6 +309,23 @@ export default function TestBuilderWizardModal({
                   </div>
                 </div>
 
+                {/* Scheduled Date & Time */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider flex items-center">
+                    <Clock className="w-3.5 h-3.5 mr-1 text-accent" />
+                    <span>Scheduled Date & Time (Optional)</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
+                  />
+                  <p className="text-[10px] text-text-secondary font-medium">
+                    Leave blank to make this test immediately available to students.
+                  </p>
+                </div>
+
                 {/* Scope connections */}
                 <div className="border-t border-border/40 pt-4 space-y-4">
                   <h4 className="text-xs font-extrabold text-text-primary uppercase tracking-wider flex items-center">
@@ -410,6 +438,7 @@ export default function TestBuilderWizardModal({
                       <option value="multi_choice">Multi-Select</option>
                       <option value="true_false">True / False</option>
                       <option value="fill_in_blank">Fill in Blank</option>
+                      <option value="descriptive">Descriptive</option>
                     </select>
 
                     <select
@@ -619,6 +648,15 @@ export default function TestBuilderWizardModal({
                     <span className="block text-[10px] font-bold text-text-secondary uppercase">Passing Score</span>
                     <span className="font-extrabold text-text-primary">
                       {((cutoffMarks / 100) * totalMarks).toFixed(1)} / {totalMarks} Marks
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-bold text-text-secondary uppercase">Scheduled Date</span>
+                    <span className="font-extrabold text-text-primary text-accent">
+                      {scheduledAt ? new Date(scheduledAt).toLocaleString(undefined, {
+                        dateStyle: 'medium',
+                        timeStyle: 'short'
+                      }) : 'Instant / Always Available'}
                     </span>
                   </div>
                 </div>

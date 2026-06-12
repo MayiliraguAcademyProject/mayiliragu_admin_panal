@@ -59,6 +59,10 @@ export function validateQuestionPayload(payload: any): { isValid: boolean; error
     if (hasEmptyAnswer) {
       return { isValid: false, error: 'Accepted answer phrases cannot be empty' };
     }
+  } else if (payload.type === 'descriptive') {
+    if (payload.word_limit !== undefined && (isNaN(payload.word_limit) || payload.word_limit <= 0)) {
+      return { isValid: false, error: 'Word limit must be a positive number' };
+    }
   }
   return { isValid: true };
 }

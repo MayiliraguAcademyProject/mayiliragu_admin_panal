@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import type { Student } from '../api/enrollments';
+import type { Student } from '../../../core/types';
 
 interface StudentFormModalProps {
   isOpen: boolean;

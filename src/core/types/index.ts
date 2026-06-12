@@ -58,6 +58,124 @@ export interface Student {
   createdAt: string;
 }
 
+export interface StudentPayment {
+  id: string;
+  studentProfileId: string;
+  amountPaid: number;
+  paymentMethod: string;
+  paymentDate: string;
+  receiptNumber: string;
+  installmentInfo?: string;
+}
+
+export interface StudentCounselingSession {
+  id: string;
+  studentProfileId: string;
+  sessionDate: string;
+  mentorName: string;
+  notes: string;
+  remarks?: string;
+  followUpDate?: string;
+}
+
+export interface StudentExamApplication {
+  id: string;
+  studentProfileId: string;
+  examName: string;
+  notificationDate?: string;
+  applied: boolean;
+  applicationNo?: string;
+  hallTicketNo?: string;
+  examDate?: string;
+  resultStatus?: string;
+  finalSelection?: string;
+}
+
+export interface StudentDocument {
+  id: string;
+  studentProfileId: string;
+  documentType: string;
+  fileUrl: string;
+  uploadedAt: string;
+}
+
+export interface StudentCommunicationLog {
+  id: string;
+  studentProfileId: string;
+  type: string;
+  content: string;
+  sentAt: string;
+  sentBy: string;
+}
+
+export interface StudentProfile {
+  id: string;
+  userId: string;
+  studentId: string;
+  photoUrl?: string;
+  gender?: string;
+  dob?: string;
+  bloodGroup?: string;
+  aadhaarNumber?: string;
+  nationality: string;
+  category?: string;
+  mobileNumber?: string;
+  whatsappNumber?: string;
+  parentName?: string;
+  parentMobile?: string;
+  emergencyContact?: string;
+  currentAddress?: string;
+  permanentAddress?: string;
+  city?: string;
+  district?: string;
+  state: string;
+  pinCode?: string;
+  highestQualification?: string;
+  degree?: string;
+  college?: string;
+  yearOfPassing?: number;
+  percentage?: number;
+  mediumOfEducation?: string;
+  targetExams: string[];
+  preparationMode?: string;
+  preferredLanguage?: string;
+  preparationLevel?: string;
+  attemptNumber?: string;
+  admissionDate?: string;
+  batchName?: string;
+  batchTiming?: string;
+  courseDuration?: string;
+  facultyAssigned?: string;
+  courseFee?: number;
+  discount?: number;
+  scholarshipDetails?: string;
+  enrollmentStatus: string;
+  studyHoursPerDay?: number;
+  placementSelected: boolean;
+  placementDetails?: any;
+  payments?: StudentPayment[];
+  counselingSessions?: StudentCounselingSession[];
+  examApplications?: StudentExamApplication[];
+  documents?: StudentDocument[];
+  communications?: StudentCommunicationLog[];
+  user?: {
+    attempts: {
+      id: string;
+      testId: string;
+      totalScore: number;
+      accuracy: number;
+      timeTaken: number;
+      passed: boolean;
+      createdAt: string;
+      test: {
+        title: string;
+        cutoff_marks: number;
+        total_marks: number;
+      };
+    }[];
+  };
+}
+
 export interface EnrollmentCourse {
   id: string;
   title: string;
@@ -103,6 +221,8 @@ export interface Question {
   accepted_answers?: any;
   hint?: string;
   max_characters?: number;
+  model_answer?: string;
+  word_limit?: number;
 }
 
 export interface QuestionStats {
@@ -125,6 +245,7 @@ export interface Test {
   subject_id?: string;
   topic_id?: string;
   is_published: boolean;
+  scheduled_at?: string | null;
   created_at: string;
   updated_at: string;
   question_count?: number;
@@ -141,3 +262,152 @@ export interface Banner {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ExamTopic {
+  id: string;
+  name: string;
+  subjectId: string;
+}
+
+export interface ExamSubject {
+  id: string;
+  name: string;
+  categoryId: string;
+  topics?: ExamTopic[];
+}
+
+export interface ExamCategory {
+  id: string;
+  name: string;
+  description: string;
+  iconName: string;
+  subjects?: ExamSubject[];
+}
+
+export interface TestAnalyticsStats {
+  total_submissions: number;
+  avg_accuracy: number;
+  active_takers: number;
+}
+
+export interface StudentTestAttempt {
+  id: string;
+  testId: string;
+  testTitle: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  totalScore: number;
+  accuracy: number;
+  timeTaken: number;
+  passed: boolean;
+  createdAt: string;
+}
+
+export interface CurrentAffairQuiz {
+  id: string;
+  currentAffairId: string;
+  questionEn: string;
+  questionTa?: string;
+  optionsEn: string[];
+  optionsTa?: string[];
+  correctAnswer: string;
+  explanationEn?: string;
+  explanationTa?: string;
+}
+
+export interface CurrentAffair {
+  id: string;
+  titleEn: string;
+  titleTa?: string;
+  summaryEn: string;
+  summaryTa?: string;
+  contentEn: string;
+  contentTa?: string;
+  examImportanceEn?: string;
+  examImportanceTa?: string;
+  keyFactsEn?: string;
+  keyFactsTa?: string;
+  prelimsNotesEn?: string;
+  prelimsNotesTa?: string;
+  mainsNotesEn?: string;
+  mainsNotesTa?: string;
+  videoUrl?: string;
+  category: string;
+  publishedDate: string;
+  isPublished: boolean;
+  createdAt: string;
+  updatedAt: string;
+  quizzes?: CurrentAffairQuiz[];
+  _count?: {
+    quizzes: number;
+  };
+}
+
+export interface MonthlyMagazine {
+  id: string;
+  title: string;
+  month: number;
+  year: number;
+  pdfUrl: string;
+  publishedAt: string;
+}
+
+export interface GovernmentScheme {
+  id: string;
+  titleEn: string;
+  titleTa?: string;
+  descriptionEn: string;
+  descriptionTa?: string;
+  type: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImportantDate {
+  id: string;
+  titleEn: string;
+  titleTa?: string;
+  date: string;
+  type: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudyMaterialCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface StudyMaterialVersion {
+  id: string;
+  materialId: string;
+  version: number;
+  fileUrl: string;
+  fileSize: number;
+  fileType: string;
+  createdAt: string;
+}
+
+export interface StudyMaterial {
+  id: string;
+  title: string;
+  description?: string;
+  categoryId: string;
+  subjectId?: string | null;
+  topicId?: string | null;
+  fileUrl: string;
+  fileSize: number;
+  fileType: string;
+  accessType: 'FREE' | 'PREMIUM' | 'COURSE_RESTRICTED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  uploadedById?: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  category?: StudyMaterialCategory;
+  versions?: StudyMaterialVersion[];
+}
+
+

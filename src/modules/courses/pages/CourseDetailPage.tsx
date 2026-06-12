@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import {
   useCourseDetail,
   useCreateModule,
@@ -9,10 +7,9 @@ import {
   useDeleteModule,
   useCreateLesson,
   useUpdateLesson,
-  useDeleteLesson,
-  type Module,
-  type Lesson
-} from '../api/courses';
+  useDeleteLesson
+} from '../../../core/api/endpoints';
+import type { Module, Lesson } from '../../../core/types';
 import {
   ArrowLeft,
   BookOpen,
@@ -25,12 +22,12 @@ import {
   Loader2,
   Clock,
   ChevronRight,
-  AlertCircle,
-  Copy,
-  Check
+  AlertCircle
 } from 'lucide-react';
 
-import { moduleSchema, type ModuleFormValues, lessonSchema, type LessonFormValues } from '../../../core/validation';
+import type { ModuleFormValues, LessonFormValues } from '../../../core/validation';
+import ModuleModal from '../components/ModuleModal';
+import LessonModal from '../components/LessonModal';
 
 export default function CourseDetailPage() {
   const { id: courseId = '' } = useParams<{ id: string }>();
@@ -47,7 +44,7 @@ export default function CourseDetailPage() {
   const [copiedEmail, setCopiedEmail] = useState(false);
 
   const handleCopyEmail = () => {
-    navigator.clipboard.writeText('mayiliragu@mayiliragu.iam.gserviceaccount.com');
+    navigator.clipboard.writeText('education-app@mayiliragu.iam.gserviceaccount.com');
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
   };
@@ -62,34 +59,6 @@ export default function CourseDetailPage() {
   const createLessonMutation = useCreateLesson(courseId, targetModuleId);
   const updateLessonMutation = useUpdateLesson(courseId);
   const deleteLessonMutation = useDeleteLesson(courseId);
-
-  // Forms
-  const {
-    register: registerModule,
-    handleSubmit: handleSubmitModule,
-    setValue: setModuleValue,
-    reset: resetModule,
-    formState: { errors: moduleErrors, isSubmitting: isModuleSubmitting },
-  } = useForm<ModuleFormValues>({
-    resolver: zodResolver(moduleSchema),
-    defaultValues: { title: '' },
-  });
-
-  const {
-    register: registerLesson,
-    handleSubmit: handleSubmitLesson,
-    setValue: setLessonValue,
-    reset: resetLesson,
-    formState: { errors: lessonErrors, isSubmitting: isLessonSubmitting },
-  } = useForm<LessonFormValues>({
-    resolver: zodResolver(lessonSchema),
-    defaultValues: {
-      title: '',
-      description: '',
-      driveFileId: '',
-      durationMinutes: 5,
-    },
-  });
 
   // Module submit handler
   const onModuleSubmit = async (values: ModuleFormValues) => {
@@ -108,7 +77,6 @@ export default function CourseDetailPage() {
       }
       setIsModuleDialogOpen(false);
       setEditingModule(null);
-      resetModule();
     } catch (err) {
       console.error(err);
     }
@@ -141,7 +109,6 @@ export default function CourseDetailPage() {
       }
       setIsLessonDialogOpen(false);
       setEditingLesson(null);
-      resetLesson();
     } catch (err) {
       console.error(err);
     }
@@ -189,13 +156,11 @@ export default function CourseDetailPage() {
 
   const handleOpenCreateModule = () => {
     setEditingModule(null);
-    resetModule();
     setIsModuleDialogOpen(true);
   };
 
   const handleOpenEditModule = (module: Module) => {
     setEditingModule(module);
-    setModuleValue('title', module.title);
     setIsModuleDialogOpen(true);
   };
 
@@ -213,17 +178,12 @@ export default function CourseDetailPage() {
   const handleOpenCreateLesson = (moduleId: string) => {
     setEditingLesson(null);
     setTargetModuleId(moduleId);
-    resetLesson();
     setIsLessonDialogOpen(true);
   };
 
   const handleOpenEditLesson = (moduleId: string, lesson: Lesson) => {
     setEditingLesson(lesson);
     setTargetModuleId(moduleId);
-    setLessonValue('title', lesson.title);
-    setLessonValue('description', lesson.description);
-    setLessonValue('driveFileId', lesson.driveFileId);
-    setLessonValue('durationMinutes', Math.round(lesson.duration / 60));
     setIsLessonDialogOpen(true);
   };
 
@@ -265,7 +225,7 @@ export default function CourseDetailPage() {
 
   return (
     <div className="p-6 sm:p-8 space-y-6 animate-fade-in relative">
-      
+
       {/* Back to courses */}
       <Link
         to="/courses"
@@ -351,7 +311,7 @@ export default function CourseDetailPage() {
                     className="p-4 sm:p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/40 select-none transition-colors"
                   >
                     <div className="flex items-center space-x-3 min-w-0">
-                      
+
                       {/* Sorting controls for Module */}
                       <div className="flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
                         <button
@@ -434,7 +394,7 @@ export default function CourseDetailPage() {
                               className="bg-cardBg border border-border/50 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs hover:border-slate-300 transition-all duration-200"
                             >
                               <div className="flex items-start space-x-3 min-w-0">
-                                
+
                                 {/* Lesson Sorting controls */}
                                 <div className="flex flex-col items-center justify-center pt-0.5">
                                   <button
@@ -467,7 +427,7 @@ export default function CourseDetailPage() {
                                   <p className="text-xs text-text-secondary leading-normal line-clamp-2">
                                     {lesson.description}
                                   </p>
-                                  
+
                                   {/* Lesson meta counts */}
                                   <div className="flex items-center space-x-4 pt-1 text-[10px] text-text-secondary font-semibold">
                                     <span className="flex items-center space-x-1">
@@ -512,193 +472,22 @@ export default function CourseDetailPage() {
       </div>
 
       {/* Module dialog */}
-      {isModuleDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden">
-            <div className="p-6 sm:p-8 space-y-6">
-              <div>
-                <h3 className="text-lg font-extrabold text-text-primary tracking-tight">
-                  {editingModule ? 'Rename Module' : 'Add Module'}
-                </h3>
-              </div>
-
-              <form onSubmit={handleSubmitModule(onModuleSubmit)} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                    Module Title
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Getting Started & Setup"
-                    {...registerModule('title')}
-                    disabled={isModuleSubmitting}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
-                      moduleErrors.title ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
-                    } text-text-primary bg-slate-50/20`}
-                  />
-                  {moduleErrors.title && (
-                    <p className="text-[11px] text-error font-semibold pl-1">{moduleErrors.title.message}</p>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-end space-x-3 pt-4 border-t border-border/40">
-                  <button
-                    type="button"
-                    onClick={() => setIsModuleDialogOpen(false)}
-                    disabled={isModuleSubmitting}
-                    className="px-4 py-2 text-sm font-bold text-text-secondary hover:text-text-primary transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isModuleSubmitting}
-                    className="flex items-center space-x-2 bg-accent hover:bg-accent-onContainer text-white font-bold py-2 px-4 rounded-xl shadow-md"
-                  >
-                    {isModuleSubmitting ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                    ) : (
-                      <span>{editingModule ? 'Save' : 'Add'}</span>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+      <ModuleModal
+        isOpen={isModuleDialogOpen}
+        onClose={() => setIsModuleDialogOpen(false)}
+        onSubmit={onModuleSubmit}
+        editingModule={editingModule}
+      />
 
       {/* Lesson dialog */}
-      {isLessonDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-lg bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden">
-            <div className="p-6 sm:p-8 space-y-6">
-              <div>
-                <h3 className="text-lg font-extrabold text-text-primary tracking-tight">
-                  {editingLesson ? 'Edit Lesson Details' : 'Add Lesson'}
-                </h3>
-              </div>
-
-              <form onSubmit={handleSubmitLesson(onLessonSubmit)} className="space-y-4">
-                {/* Title */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                    Lesson Title
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Installing Flutter Development Tools"
-                    {...registerLesson('title')}
-                    disabled={isLessonSubmitting}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
-                      lessonErrors.title ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
-                    } text-text-primary bg-slate-50/20`}
-                  />
-                  {lessonErrors.title && (
-                    <p className="text-[11px] text-error font-semibold pl-1">{lessonErrors.title.message}</p>
-                  )}
-                </div>
-
-                {/* Description */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                    Description
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Provide detailed description explaining topic contents..."
-                    {...registerLesson('description')}
-                    disabled={isLessonSubmitting}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all resize-none ${
-                      lessonErrors.description ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
-                    } text-text-primary bg-slate-50/20`}
-                  />
-                  {lessonErrors.description && (
-                    <p className="text-[11px] text-error font-semibold pl-1">{lessonErrors.description.message}</p>
-                  )}
-                </div>
-
-                {/* Drive File ID */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                    Google Drive File ID
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 1a2b3c4d5e6f7g8h9i0j"
-                    {...registerLesson('driveFileId')}
-                    disabled={isLessonSubmitting}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
-                      lessonErrors.driveFileId ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
-                    } text-text-primary bg-slate-50/20`}
-                  />
-                  {lessonErrors.driveFileId && (
-                    <p className="text-[11px] text-error font-semibold pl-1">{lessonErrors.driveFileId.message}</p>
-                  )}
-                  
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] font-semibold text-text-secondary mt-1.5 p-2 bg-slate-50 border border-border/50 rounded-xl">
-                    <span>Share view access to service account:</span>
-                    <button
-                      type="button"
-                      onClick={handleCopyEmail}
-                      className="inline-flex items-center space-x-1.5 text-accent hover:text-accent-onContainer bg-white px-2 py-1 rounded-lg border border-border/80 transition-all font-mono text-[10px] select-all cursor-pointer shadow-sm hover:shadow active:scale-[0.98]"
-                      title="Copy Service Account Email"
-                    >
-                      <span className="truncate max-w-[200px] sm:max-w-none">mayiliragu@mayiliragu.iam.gserviceaccount.com</span>
-                      {copiedEmail ? (
-                        <Check className="w-3 h-3 text-green-650 flex-shrink-0" />
-                      ) : (
-                        <Copy className="w-3 h-3 flex-shrink-0 text-gray-400" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Duration */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                    Duration (in minutes)
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 15"
-                    {...registerLesson('durationMinutes', { valueAsNumber: true })}
-                    disabled={isLessonSubmitting}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
-                      lessonErrors.durationMinutes ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
-                    } text-text-primary bg-slate-50/20`}
-                  />
-                  {lessonErrors.durationMinutes && (
-                    <p className="text-[11px] text-error font-semibold pl-1">{lessonErrors.durationMinutes.message}</p>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-end space-x-3 pt-4 border-t border-border/40">
-                  <button
-                    type="button"
-                    onClick={() => setIsLessonDialogOpen(false)}
-                    disabled={isLessonSubmitting}
-                    className="px-4 py-2 text-sm font-bold text-text-secondary hover:text-text-primary transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isLessonSubmitting}
-                    className="flex items-center space-x-2 bg-accent hover:bg-accent-onContainer text-white font-bold py-2 px-4 rounded-xl shadow-md"
-                  >
-                    {isLessonSubmitting ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                    ) : (
-                      <span>{editingLesson ? 'Save' : 'Add'}</span>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+      <LessonModal
+        isOpen={isLessonDialogOpen}
+        onClose={() => setIsLessonDialogOpen(false)}
+        onSubmit={onLessonSubmit}
+        editingLesson={editingLesson}
+        copiedEmail={copiedEmail}
+        onCopyEmail={handleCopyEmail}
+      />
 
     </div>
   );

@@ -44,8 +44,11 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // Prevent infinite loop if request to refresh token itself fails
-    if (originalRequest.url?.includes(ApiConstants.auth.refresh)) {
+    // Prevent interception/infinite loop on auth endpoints (login, refresh)
+    if (
+      originalRequest.url?.includes(ApiConstants.auth.login) ||
+      originalRequest.url?.includes(ApiConstants.auth.refresh)
+    ) {
       return Promise.reject(error);
     }
 

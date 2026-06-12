@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   useQuestionsList, 
@@ -12,13 +12,20 @@ import {
   useCreateTest,
   useUpdateTest,
   useDeleteTest,
-  useTestDetail
+  useTestDetail,
+  useExamCategories,
+  useCreateCategory,
+  useTestAnalytics,
+  useAllTestAttempts
 } from '../../../core/api/endpoints';
-import { useTestsStore } from '../store/tests-store';
+import { exportQuestionsToExcel } from '../../../core/api/endpoints';
 import { type Question, type Test } from '../../../core/types';
 import QuestionFormModal from '../components/QuestionFormModal';
+import BulkImportModal from '../components/BulkImportModal';
 import TestBuilderWizardModal from '../components/TestBuilderWizardModal';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
+import ConnectionModal from '../components/ConnectionModal';
+import CategoryModal from '../components/CategoryModal';
 import { 
   FileText, 
   Search, 
@@ -26,8 +33,9 @@ import {
   Plus, 
   Trash2, 
   BookOpen, 
-  ChevronRight, 
-  X, 
+  ChevronRight,
+  Upload,
+  Download, 
   GraduationCap, 
   Landmark, 
   Award,
@@ -50,16 +58,17 @@ export default function TestsPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'bank' | 'connect' | 'builder' | 'analytics'>('bank');
 
-  // Zustand Store
-  const { 
-    categories, 
-    subjects, 
-    topics, 
-    connections, 
-    addCategory, 
-    addConnection, 
-    deleteConnection 
-  } = useTestsStore();
+  // Zustand Store replaced with API queries/mutations
+  const { data: categories = [] } = useExamCategories();
+  const createCategoryMutation = useCreateCategory();
+
+  const subjects = useMemo(() => {
+    return categories.flatMap((cat) => cat.subjects || []);
+  }, [categories]);
+
+  const topics = useMemo(() => {
+    return subjects.flatMap((sub) => sub.topics || []);
+  }, [subjects]);
 
   // Local state for filters (Question Bank)
   const [selectedSubject, setSelectedSubject] = useState('All Subjects');
@@ -72,11 +81,9 @@ export default function TestsPage() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   // New connection form state
-  
   const [newConnCourseId, setNewConnCourseId] = useState('');
   const [newConnModuleId, setNewConnModuleId] = useState('');
-  const [newConnTestTitle, setNewConnTestTitle] = useState('');
-  const [newConnQuestionCount, setNewConnQuestionCount] = useState('10 Questions');
+  const [newConnTestId, setNewConnTestId] = useState('');
 
   // New category form state
   const [newCatName, setNewCatName] = useState('');
@@ -94,10 +101,14 @@ export default function TestsPage() {
 
   const { data: coursesData } = useCoursesList(1, 50);
   const { data: selectedCourseDetail } = useCourseDetail(newConnCourseId);
+  const { data: analyticsStats, refetch: refetchAnalytics } = useTestAnalytics();
+  const { data: attempts = [], refetch: refetchAttempts } = useAllTestAttempts();
 
   const handleRefreshAll = () => {
     refetchStats();
     refetchQuestions();
+    refetchAnalytics();
+    refetchAttempts();
   };
 
   // Question CRUD Mutations & State
@@ -106,8 +117,27 @@ export default function TestsPage() {
   const deleteQuestionMutation = useDeleteQuestion();
 
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | undefined>(undefined);
   const [questionIdToDelete, setQuestionIdToDelete] = useState<string | null>(null);
+
+  const handleExportQuestions = async () => {
+    try {
+      setIsExporting(true);
+      await exportQuestionsToExcel({
+        subject: selectedSubject,
+        type: selectedType,
+        difficulty: selectedDifficulty,
+        search: searchQuery
+      });
+    } catch (err) {
+      console.error('Failed to export questions:', err);
+      alert('Failed to export questions. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleCreateQuestionClick = () => {
     setEditingQuestion(undefined);
@@ -139,11 +169,30 @@ export default function TestsPage() {
     setEditingQuestion(undefined);
   };
 
-  // Tests Query & CRUD
   const { data: tests = [], isLoading: isTestsLoading } = useTestsList();
   const createTestMutation = useCreateTest();
   const updateTestMutation = useUpdateTest();
   const deleteTestMutation = useDeleteTest();
+
+  // Derive connections from tests
+  const connections = useMemo(() => {
+    return tests
+      .filter((t) => t.course_id !== null && t.course_id !== undefined)
+      .map((t) => {
+        const course = coursesData?.data.find((c) => c.id === t.course_id);
+        const module = course?.modules?.find((m) => m.id === t.module_id);
+        return {
+          id: t.id,
+          courseId: t.course_id!,
+          courseTitle: course?.title || 'Unknown Course',
+          moduleId: t.module_id || undefined,
+          moduleTitle: module?.title || 'Entire Course Syllabus',
+          testTitle: t.title,
+          questionCount: `${t.question_count || 0} Questions`,
+          status: t.is_published ? 'Active' : 'Draft',
+        };
+      });
+  }, [tests, coursesData]);
 
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [editingTestId, setEditingTestId] = useState<string | undefined>(undefined);
@@ -175,31 +224,44 @@ export default function TestsPage() {
     setEditingTestId(undefined);
   };
 
-  const handleCreateConnection = (e: React.FormEvent) => {
+  const handleCreateConnection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newConnCourseId || !newConnTestTitle) return;
-    const course = coursesData?.data.find((c) => c.id === newConnCourseId);
-    const module = selectedCourseDetail?.modules?.find((m) => m.id === newConnModuleId);
+    if (!newConnCourseId || !newConnTestId) return;
 
-    addConnection({
-      courseId: newConnCourseId,
-      courseTitle: course?.title || 'Unknown Course',
-      moduleId: newConnModuleId || undefined,
-      moduleTitle: module?.title || undefined,
-      testTitle: newConnTestTitle,
-      questionCount: newConnQuestionCount,
+    await updateTestMutation.mutateAsync({
+      id: newConnTestId,
+      data: {
+        course_id: newConnCourseId,
+        module_id: newConnModuleId || null,
+      },
     });
 
     setIsConnectionModalOpen(false);
     setNewConnCourseId('');
     setNewConnModuleId('');
-    setNewConnTestTitle('');
+    setNewConnTestId('');
   };
 
-  const handleCreateCategory = (e: React.FormEvent) => {
+  const deleteConnection = async (id: string) => {
+    if (window.confirm('Are you sure you want to remove this connection?')) {
+      await updateTestMutation.mutateAsync({
+        id,
+        data: {
+          course_id: null,
+          module_id: null,
+        },
+      });
+    }
+  };
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName || !newCatDescription) return;
-    addCategory(newCatName, newCatDescription, newCatIcon);
+    await createCategoryMutation.mutateAsync({
+      name: newCatName,
+      description: newCatDescription,
+      iconName: newCatIcon,
+    });
     setIsCategoryModalOpen(false);
     setNewCatName('');
     setNewCatDescription('');
@@ -332,6 +394,23 @@ export default function TestsPage() {
                   <option value="Medium">Medium</option>
                   <option value="Hard">Hard</option>
                 </select>
+
+                <button
+                  onClick={() => setIsBulkImportOpen(true)}
+                  className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-border/50 text-text-secondary font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Import</span>
+                </button>
+
+                <button
+                  onClick={handleExportQuestions}
+                  disabled={isExporting}
+                  className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-border/50 text-text-secondary font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isExporting ? 'Exporting...' : 'Export'}</span>
+                </button>
 
                 <button
                   onClick={handleCreateQuestionClick}
@@ -673,13 +752,13 @@ export default function TestsPage() {
         {/* TAB 4: TEST ANALYTICS */}
         {/* ========================================== */}
         {activeTab === 'analytics' && (
-          <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+          <div className="space-y-6 animate-fade-in">
             {/* Visual Analytics overview cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
-                { label: 'Total Test Submissions', val: '1,248', icon: Users, delta: '+12% this week', color: 'text-blue-500 bg-blue-500/10' },
-                { label: 'Avg. Accuracy Rate', val: '76.4%', icon: Award, delta: '+3.1% overall', color: 'text-emerald-500 bg-emerald-500/10' },
-                { label: 'Active Test Takers', val: '342', icon: TrendingUp, delta: 'Real-time active', color: 'text-purple-500 bg-purple-500/10' },
+                { label: 'Total Test Submissions', val: (analyticsStats?.total_submissions ?? 0).toLocaleString(), icon: Users, delta: 'Total attempts', color: 'text-blue-500 bg-blue-500/10' },
+                { label: 'Avg. Accuracy Rate', val: `${analyticsStats?.avg_accuracy ?? 0}%`, icon: Award, delta: 'All questions', color: 'text-emerald-500 bg-emerald-500/10' },
+                { label: 'Active Test Takers', val: (analyticsStats?.active_takers ?? 0).toLocaleString(), icon: TrendingUp, delta: 'Unique students', color: 'text-purple-500 bg-purple-500/10' },
               ].map((c, idx) => (
                 <div key={idx} className="bg-cardBg border border-border/45 rounded-2xl p-5 flex items-center justify-between shadow-xs">
                   <div className="space-y-1">
@@ -694,21 +773,70 @@ export default function TestsPage() {
               ))}
             </div>
 
-            <div className="bg-cardBg border border-border/40 rounded-3xl p-12 text-center space-y-4 shadow-sm">
-              <div className="w-16 h-16 rounded-2xl bg-accent/10 text-accent flex items-center justify-center mx-auto shadow-inner">
-                <TrendingUp className="w-8 h-8 stroke-[1.5]" />
+            <div className="bg-cardBg border border-border/40 rounded-3xl overflow-hidden shadow-xs">
+              <div className="p-6 border-b border-border/40 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider">Student Performance Log</h3>
+                  <p className="text-[11px] text-text-secondary font-medium mt-0.5">
+                    Real-time detailed scoreboard of student test attempts.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <h3 className="text-lg font-black text-text-primary tracking-tight">Test Analytics & Student Performance</h3>
-                <p className="text-xs text-text-secondary leading-relaxed font-semibold max-w-sm mx-auto">
-                  Monitor detailed exam metrics, difficulty index scores, student test attempts, and export analytical scoreboards.
-                </p>
-              </div>
-              <div className="pt-2">
-                <span className="px-3 py-1 bg-accent/5 text-accent border border-accent/20 rounded-full text-[9px] font-black uppercase tracking-wider">
-                  Analytics Framework Active
-                </span>
-              </div>
+
+              {attempts.length === 0 ? (
+                <div className="p-12 text-center text-text-secondary font-bold text-xs">
+                  No student attempts recorded yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto font-sans">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-55 border-b border-border/40 text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                        <th className="py-3 px-5">Student</th>
+                        <th className="py-3 px-4">Test Title</th>
+                        <th className="py-3 px-4 text-center">Score</th>
+                        <th className="py-3 px-4 text-center">Accuracy</th>
+                        <th className="py-3 px-4 text-center">Duration</th>
+                        <th className="py-3 px-4">Date</th>
+                        <th className="py-3 px-5 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/30">
+                      {attempts.map((att) => (
+                        <tr key={att.id} className="hover:bg-slate-50/50 transition-colors text-xs font-semibold text-text-primary">
+                          <td className="py-4 px-5">
+                            <div>
+                              <p className="font-extrabold">{att.studentName}</p>
+                              <p className="text-[10px] text-text-secondary font-medium">{att.studentEmail}</p>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 text-accent font-extrabold">{att.testTitle}</td>
+                          <td className="py-4 px-4 text-center font-bold">{att.totalScore} pts</td>
+                          <td className="py-4 px-4 text-center font-bold text-emerald-600">{att.accuracy}%</td>
+                          <td className="py-4 px-4 text-center text-text-secondary font-bold">
+                            {Math.floor(att.timeTaken / 60)}m {att.timeTaken % 60}s
+                          </td>
+                          <td className="py-4 px-4 text-text-secondary font-medium">
+                            {new Date(att.createdAt).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </td>
+                          <td className="py-4 px-5 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                              att.passed ? 'bg-emerald-500/10 text-emerald-700' : 'bg-rose-500/10 text-rose-700'
+                            }`}>
+                              {att.passed ? 'Passed' : 'Failed'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -720,196 +848,45 @@ export default function TestsPage() {
       {/* ========================================== */}
 
       {/* New Connection Modal */}
-      {isConnectionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <form 
-            onSubmit={handleCreateConnection}
-            className="w-full max-w-md bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
-          >
-            <div className="p-6 border-b border-border/45 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-extrabold text-text-primary tracking-tight">Create Course Connection</h3>
-                <p className="text-xs text-text-secondary font-medium mt-0.5">Link a mock test profile to a course module.</p>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setIsConnectionModalOpen(false)}
-                className="p-1 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-text-primary transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 overflow-y-auto">
-              {/* Select Course */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">Select Course</label>
-                <select
-                  value={newConnCourseId}
-                  onChange={(e) => {
-                    setNewConnCourseId(e.target.value);
-                    setNewConnModuleId('');
-                  }}
-                  required
-                  className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-secondary bg-slate-50/20"
-                >
-                  <option value="">-- Choose Course --</option>
-                  {coursesData?.data.map((c) => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Select Module (Optional) */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">Select Module (Optional)</label>
-                <select
-                  value={newConnModuleId}
-                  onChange={(e) => setNewConnModuleId(e.target.value)}
-                  disabled={!newConnCourseId}
-                  className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-secondary bg-slate-50/20 disabled:opacity-50"
-                >
-                  <option value="">Entire Course Syllabus</option>
-                  {selectedCourseDetail?.modules?.map((m) => (
-                    <option key={m.id} value={m.id}>{m.title}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Connected Test Title */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">Test Title</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Polity Mock Quiz 3"
-                  value={newConnTestTitle}
-                  onChange={(e) => setNewConnTestTitle(e.target.value)}
-                  required
-                  className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
-                />
-              </div>
-
-              {/* Question Count Label */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">Number of Questions</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 15 Questions"
-                  value={newConnQuestionCount}
-                  onChange={(e) => setNewConnQuestionCount(e.target.value)}
-                  required
-                  className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
-                />
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 border-t border-border/40 flex items-center justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setIsConnectionModalOpen(false)}
-                className="px-4 py-2.5 bg-white border border-border hover:bg-slate-50 text-xs font-bold rounded-xl text-text-secondary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2.5 bg-accent hover:bg-accent-onContainer text-xs font-bold rounded-xl text-white shadow-md shadow-accent/15 transition-all"
-              >
-                Create Linking
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <ConnectionModal
+        isOpen={isConnectionModalOpen}
+        onClose={() => setIsConnectionModalOpen(false)}
+        onSubmit={handleCreateConnection}
+        courses={coursesData?.data || []}
+        selectedCourseDetail={selectedCourseDetail}
+        newConnCourseId={newConnCourseId}
+        setNewConnCourseId={setNewConnCourseId}
+        newConnModuleId={newConnModuleId}
+        setNewConnModuleId={setNewConnModuleId}
+        newConnTestId={newConnTestId}
+        setNewConnTestId={setNewConnTestId}
+        tests={tests}
+      />
 
       {/* Add Category Modal */}
-      {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <form 
-            onSubmit={handleCreateCategory}
-            className="w-full max-w-md bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
-          >
-            <div className="p-6 border-b border-border/45 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-extrabold text-text-primary tracking-tight">Add Exam Category</h3>
-                <p className="text-xs text-text-secondary font-medium mt-0.5">Configure a new category folder for syllabus taxonomy.</p>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setIsCategoryModalOpen(false)}
-                className="p-1 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-text-primary transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 overflow-y-auto">
-              {/* Category Name */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">Category Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. UPSC Exams"
-                  value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
-                  required
-                  className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
-                />
-              </div>
-
-              {/* Description */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">Description</label>
-                <textarea
-                  placeholder="Describe the category, exam focus areas, etc."
-                  value={newCatDescription}
-                  onChange={(e) => setNewCatDescription(e.target.value)}
-                  required
-                  rows={3}
-                  className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-semibold text-text-primary bg-slate-50/20"
-                />
-              </div>
-
-              {/* Choose Icon */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">Select Icon Graphic</label>
-                <select
-                  value={newCatIcon}
-                  onChange={(e) => setNewCatIcon(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-secondary bg-slate-50/20"
-                >
-                  <option value="GraduationCap">Graduation Cap</option>
-                  <option value="Landmark">Landmark (Banking)</option>
-                  <option value="FileText">File Text (Standard)</option>
-                  <option value="Award">Award (Certifications)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 border-t border-border/40 flex items-center justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setIsCategoryModalOpen(false)}
-                className="px-4 py-2.5 bg-white border border-border hover:bg-slate-50 text-xs font-bold rounded-xl text-text-secondary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2.5 bg-accent hover:bg-accent-onContainer text-xs font-bold rounded-xl text-white shadow-md shadow-accent/15 transition-all"
-              >
-                Add Category
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <CategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onSubmit={handleCreateCategory}
+        newCatName={newCatName}
+        setNewCatName={setNewCatName}
+        newCatDescription={newCatDescription}
+        setNewCatDescription={setNewCatDescription}
+        newCatIcon={newCatIcon}
+        setNewCatIcon={setNewCatIcon}
+      />
 
       <QuestionFormModal
         isOpen={isQuestionModalOpen}
         onClose={() => setIsQuestionModalOpen(false)}
         onSubmit={handleQuestionSubmit}
         question={editingQuestion}
+      />
+
+      <BulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        onSuccess={handleRefreshAll}
       />
 
       <TestBuilderWizardModal

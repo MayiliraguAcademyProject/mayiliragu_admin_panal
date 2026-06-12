@@ -64,7 +64,7 @@ export default function LoginPage() {
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-extrabold text-text-primary text-center tracking-tight">
-            Mayiliragu LMS
+            EducationApp LMS
           </h2>
           <p className="text-text-secondary text-sm font-medium mt-1.5 text-center">
             Admin Management Portal
@@ -88,7 +88,7 @@ export default function LoginPage() {
               <input
                 id="email"
                 type="email"
-                placeholder="admin@mayiliragu.com"
+                placeholder="admin@education_app.com"
                 {...register('email')}
                 disabled={isLoading}
                 className={`w-full px-4 py-3 rounded-xl border font-medium text-sm transition-all outline-none ${
