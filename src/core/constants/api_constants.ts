@@ -27,6 +27,7 @@ export const ApiConstants = {
     base: '/lessons',
     detail: (lessonId: string) => `/lessons/${lessonId}`,
     swap: '/lessons/sort/swap',
+    downloads: '/lessons/admin/downloads',
   },
   students: {
     base: '/enrollments/students',

@@ -35,6 +35,7 @@ export default function LessonModal({
       description: '',
       driveFileId: '',
       durationMinutes: 5,
+      downloadEnabled: false,
     },
   });
 
@@ -45,6 +46,7 @@ export default function LessonModal({
         setValue('description', editingLesson.description);
         setValue('driveFileId', editingLesson.driveFileId);
         setValue('durationMinutes', Math.round(editingLesson.duration / 60));
+        setValue('downloadEnabled', editingLesson.downloadEnabled ?? false);
       } else {
         reset();
       }
@@ -186,6 +188,27 @@ export default function LessonModal({
                 <p className="text-[11px] text-error font-semibold pl-1">{errors.durationMinutes.message}</p>
               )}
             </div>
+          </div>
+
+          {/* Download Toggle */}
+          <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-border/60 rounded-2xl">
+            <div className="space-y-0.5">
+              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
+                Enable Offline Download
+              </label>
+              <p className="text-[10px] text-text-secondary font-medium">
+                Allows students to download this lesson and watch it offline.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                {...register('downloadEnabled')}
+                disabled={isSubmitting}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+            </label>
           </div>
         </div>
 

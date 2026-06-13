@@ -15,6 +15,7 @@ export interface Lesson {
   driveFileId: string;
   duration: number; // in seconds
   order: number;
+  downloadEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }

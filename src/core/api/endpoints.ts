@@ -208,7 +208,7 @@ export function useDeleteModule(courseId: string) {
 export function useCreateLesson(courseId: string, moduleId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { title: string; description: string; driveFileId: string; duration: number; order: number }) => {
+    mutationFn: async (data: { title: string; description: string; driveFileId: string; duration: number; order: number; downloadEnabled?: boolean }) => {
       const response = await apiClient.post(ApiConstants.lessons.base, { ...data, moduleId });
       return response.data;
     },
@@ -221,7 +221,7 @@ export function useCreateLesson(courseId: string, moduleId: string) {
 export function useUpdateLesson(courseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { title?: string; description?: string; driveFileId?: string; duration?: number; order?: number } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { title?: string; description?: string; driveFileId?: string; duration?: number; order?: number; downloadEnabled?: boolean } }) => {
       const response = await apiClient.put(ApiConstants.lessons.detail(id), data);
       return response.data;
     },
@@ -230,7 +230,6 @@ export function useUpdateLesson(courseId: string) {
     },
   });
 }
-
 export function useDeleteLesson(courseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -240,6 +239,16 @@ export function useDeleteLesson(courseId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useVideoDownloads(params?: { search?: string; page?: number; limit?: number }) {
+  return useQuery({
+    queryKey: ['videoDownloads', params],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.lessons.downloads, { params });
+      return response.data;
     },
   });
 }
