@@ -34,6 +34,7 @@ export const lessonSchema = z.object({
     'Enter ONLY the File ID itself, not the full Drive URL'
   ),
   durationMinutes: z.number().int().positive('Duration must be a positive integer'),
+  downloadEnabled: z.boolean().optional(),
 });
 
 export type LessonFormValues = z.infer<typeof lessonSchema>;

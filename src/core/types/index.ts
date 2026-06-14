@@ -15,6 +15,7 @@ export interface Lesson {
   driveFileId: string;
   duration: number; // in seconds
   order: number;
+  downloadEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -409,5 +410,77 @@ export interface StudyMaterial {
   category?: StudyMaterialCategory;
   versions?: StudyMaterialVersion[];
 }
+
+export interface Book {
+  id: string;
+  title: string;
+  description?: string;
+  thumbnailUrl: string;
+  images: string[];
+  author?: string;
+  publisher?: string;
+  priceHardCopy?: number | null;
+  priceSoftCopy?: number | null;
+  stockHardCopy: number;
+  pdfUrl?: string | null;
+  categoryId: string;
+  isActive: boolean;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  category?: StudyMaterialCategory;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discountType: 'PERCENTAGE' | 'FLAT';
+  discountValue: number;
+  minPurchaseAmount: number;
+  maxDiscountAmount?: number | null;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  usageLimit?: number | null;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BookOrderItem {
+  id: string;
+  orderId: string;
+  bookId: string;
+  format: 'HARD_COPY' | 'SOFT_COPY';
+  price: number;
+  quantity: number;
+  book?: Book;
+}
+
+export interface BookOrder {
+  id: string;
+  studentId: string;
+  couponId?: string | null;
+  orderDate: string;
+  subTotal: number;
+  shippingCharge: number;
+  discountAmount: number;
+  payableAmount: number;
+  paymentMethod: string;
+  paymentStatus: 'PENDING' | 'PAID' | 'REFUNDED';
+  orderStatus: 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+  shippingName?: string | null;
+  shippingPhone?: string | null;
+  shippingAddress?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items?: BookOrderItem[];
+  coupon?: Coupon | null;
+  student?: {
+    name: string;
+    email: string;
+  };
+}
+
 
 

@@ -27,6 +27,7 @@ import {
   useDeleteStudyMaterial
 } from '../../../core/api/endpoints';
 import type { StudyMaterial } from '../../../core/types';
+import { ApiConstants } from '../../../core/constants/api_constants';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
 import CategoryModal from '../components/CategoryModal';
 import UploadMaterialModal from '../components/UploadMaterialModal';
@@ -202,33 +203,30 @@ export default function StudyMaterialsPage() {
       <div className="flex border-b border-border/80 gap-1 overflow-x-auto">
         <button
           onClick={() => setActiveTab('materials')}
-          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${
-            activeTab === 'materials'
+          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'materials'
               ? 'border-accent text-accent'
               : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
+            }`}
         >
           <BookOpen className="w-4 h-4" />
           <span>Study Materials ({publishedMaterials.length})</span>
         </button>
         <button
           onClick={() => setActiveTab('approvals')}
-          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${
-            activeTab === 'approvals'
+          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'approvals'
               ? 'border-accent text-accent'
               : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
+            }`}
         >
           <UserCheck className="w-4 h-4" />
           <span>Approval Queue ({pendingMaterials.length})</span>
         </button>
         <button
           onClick={() => setActiveTab('categories')}
-          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${
-            activeTab === 'categories'
+          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'categories'
               ? 'border-accent text-accent'
               : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
+            }`}
         >
           <FolderOpen className="w-4 h-4" />
           <span>Category Manager ({categories.length})</span>
@@ -288,7 +286,7 @@ export default function StudyMaterialsPage() {
                   </div>
                   <div className="flex items-center space-x-2 self-end sm:self-center">
                     <a
-                      href={`http://192.168.0.142:5000${mat.fileUrl}`}
+                      href={ApiConstants.getAssetUrl(mat.fileUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center space-x-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-text-primary text-xs font-bold rounded-xl transition-all"
@@ -354,7 +352,7 @@ export default function StudyMaterialsPage() {
                   </div>
                   <div className="flex items-center space-x-2 self-end sm:self-center">
                     <a
-                      href={`http://192.168.0.142:5000${mat.fileUrl}`}
+                      href={ApiConstants.getAssetUrl(mat.fileUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 bg-slate-100 hover:bg-slate-200 text-text-primary rounded-xl transition-all"

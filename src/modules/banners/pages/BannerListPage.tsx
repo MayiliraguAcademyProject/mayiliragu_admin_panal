@@ -29,7 +29,7 @@ export default function BannerListPage() {
 
   // Queries & Mutations
   const { data: banners, isLoading, error } = useBannersAdminList();
-  const { data: coursesData } = useCoursesList(1, 100);
+  const { data: coursesData } = useCoursesList(1, 50);
   
   const createBannerMutation = useCreateBanner();
   const updateBannerMutation = useUpdateBanner();
@@ -97,7 +97,7 @@ export default function BannerListPage() {
   // Find course title by ID for displaying in listing
   const getCourseTitle = (courseId: string | null | undefined) => {
     if (!courseId) return null;
-    const course = coursesData?.data?.find(c => c.id === courseId);
+    const course = coursesData?.data?.find((c: any) => c.id === courseId);
     return course ? course.title : courseId;
   };
 

@@ -1,5 +1,11 @@
 export const ApiConstants = {
-  baseUrl: (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://192.168.0.142:5000/api',
+  baseUrl: (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://192.168.31.86:5000/api',
+  getAssetUrl: (path: string) => {
+    if (!path) return '';
+    const base = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://192.168.31.86:5000/api';
+    const serverRoot = base.endsWith('/api') ? base.slice(0, -4) : base;
+    return `${serverRoot}${path}`;
+  },
   auth: {
     login: '/auth/login',
     logout: '/auth/logout',
@@ -21,6 +27,7 @@ export const ApiConstants = {
     base: '/lessons',
     detail: (lessonId: string) => `/lessons/${lessonId}`,
     swap: '/lessons/sort/swap',
+    downloads: '/lessons/admin/downloads',
   },
   students: {
     base: '/enrollments/students',
@@ -74,5 +81,16 @@ export const ApiConstants = {
   analytics: {
     facultyClass: '/analytics/faculty/class',
     adminBatches: '/analytics/admin/batches',
+  },
+  books: {
+    base: '/books',
+    detail: (id: string) => `/books/${id}`,
+    orders: '/books/orders',
+    orderStatus: (id: string) => `/books/admin/orders/${id}/status`,
+    orderPayment: (id: string) => `/books/admin/orders/${id}/payment`,
+    adminOrders: '/books/admin/orders',
+    adminCoupons: '/books/admin/coupons',
+    adminBooks: '/books/admin/books',
+    adminBookDetail: (id: string) => `/books/admin/books/${id}`,
   },
 } as const;

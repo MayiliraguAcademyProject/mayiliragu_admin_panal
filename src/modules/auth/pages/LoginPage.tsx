@@ -32,7 +32,7 @@ export default function LoginPage() {
     setErrorMsg(null);
     try {
       const response = await apiClient.post('/auth/login', values);
-      const { user, accessToken, refreshToken } = response.data;
+      const { user, accessToken, refreshToken } = response.data.data;
       
       if (user.role !== 'ADMIN') {
         throw new Error('Access denied. Admin portal is restricted to administrator accounts only.');

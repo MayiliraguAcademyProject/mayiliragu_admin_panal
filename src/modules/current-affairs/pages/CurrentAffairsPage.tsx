@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  Loader2, 
+import {
+  Plus,
+  Trash2,
+  Edit2,
+  Loader2,
   AlertTriangle,
   Sparkles,
   Newspaper,
@@ -33,6 +33,7 @@ import {
   useCreateDate
 } from '../../../core/api/endpoints';
 import type { CurrentAffair, GovernmentScheme, CurrentAffairQuiz, ImportantDate } from '../../../core/types';
+import { ApiConstants } from '../../../core/constants/api_constants';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
 
 // Import extracted modals and schemas
@@ -45,7 +46,7 @@ import { articleSchema, quizFormSchema, magazineSchema, schemeSchema, dateSchema
 
 export default function CurrentAffairsPage() {
   const [activeTab, setActiveTab] = useState<'articles' | 'magazines' | 'schemes' | 'dates'>('articles');
-  
+
   // Modals status
   const [isArticleModalOpen, setIsArticleModalOpen] = useState(false);
   const [editingArticle, setEditingArticle] = useState<CurrentAffair | null>(null);
@@ -215,8 +216,8 @@ export default function CurrentAffairsPage() {
         questionEn: q.questionEn,
         questionTa: q.questionTa || null,
         optionsEn: [q.optionAEn, q.optionBEn, q.optionCEn, q.optionDEn],
-        optionsTa: q.optionATa || q.optionBTa || q.optionCTa || q.optionDTa 
-          ? [q.optionATa || '', q.optionBTa || '', q.optionCTa || '', q.optionDTa || ''] 
+        optionsTa: q.optionATa || q.optionBTa || q.optionCTa || q.optionDTa
+          ? [q.optionATa || '', q.optionBTa || '', q.optionCTa || '', q.optionDTa || '']
           : null,
         correctAnswer: q.correctAnswer,
         explanationEn: q.explanationEn || null,
@@ -327,36 +328,32 @@ export default function CurrentAffairsPage() {
       <div className="flex border-b border-border/80 gap-1 overflow-x-auto">
         <button
           onClick={() => setActiveTab('articles')}
-          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${
-            activeTab === 'articles' ? 'border-accent text-accent' : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
+          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'articles' ? 'border-accent text-accent' : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
         >
           <Newspaper className="w-4 h-4" />
           <span>Daily Articles</span>
         </button>
         <button
           onClick={() => setActiveTab('magazines')}
-          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${
-            activeTab === 'magazines' ? 'border-accent text-accent' : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
+          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'magazines' ? 'border-accent text-accent' : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
         >
           <BookOpen className="w-4 h-4" />
           <span>Monthly Magazines</span>
         </button>
         <button
           onClick={() => setActiveTab('schemes')}
-          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${
-            activeTab === 'schemes' ? 'border-accent text-accent' : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
+          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'schemes' ? 'border-accent text-accent' : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
         >
           <FileText className="w-4 h-4" />
           <span>Gov Schemes</span>
         </button>
         <button
           onClick={() => setActiveTab('dates')}
-          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${
-            activeTab === 'dates' ? 'border-accent text-accent' : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
+          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'dates' ? 'border-accent text-accent' : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
         >
           <Calendar className="w-4 h-4" />
           <span>Important Dates</span>
@@ -485,7 +482,7 @@ export default function CurrentAffairsPage() {
                     <p className="text-[10px] text-text-secondary mt-1 font-semibold">Published: {new Date(mag.publishedAt).toLocaleDateString()}</p>
                   </div>
                   <a
-                    href={`http://192.168.0.142:5000${mag.pdfUrl}`}
+                    href={ApiConstants.getAssetUrl(mag.pdfUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center space-x-1.5 w-full py-2.5 border border-border hover:bg-slate-50 text-text-primary rounded-xl text-xs font-bold transition-all"
@@ -528,9 +525,8 @@ export default function CurrentAffairsPage() {
                 <div key={sch.id} className="bg-cardBg border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
                   <div>
                     <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${
-                        sch.type === 'Central' ? 'bg-indigo-50 text-indigo-750' : 'bg-teal-50 text-teal-750'
-                      }`}>{sch.type} Scheme</span>
+                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${sch.type === 'Central' ? 'bg-indigo-50 text-indigo-750' : 'bg-teal-50 text-teal-750'
+                        }`}>{sch.type} Scheme</span>
                     </div>
                     <h3 className="font-extrabold text-sm text-text-primary mt-2">
                       {sch.titleEn} {sch.titleTa && <span className="text-text-secondary font-medium">/ {sch.titleTa}</span>}

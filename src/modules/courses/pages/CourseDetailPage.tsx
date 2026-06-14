@@ -22,7 +22,8 @@ import {
   Loader2,
   Clock,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Download
 } from 'lucide-react';
 
 import type { ModuleFormValues, LessonFormValues } from '../../../core/validation';
@@ -94,6 +95,7 @@ export default function CourseDetailPage() {
             description: values.description,
             driveFileId: values.driveFileId,
             duration: durationSeconds,
+            downloadEnabled: values.downloadEnabled,
           },
         });
       } else {
@@ -105,6 +107,7 @@ export default function CourseDetailPage() {
           driveFileId: values.driveFileId,
           duration: durationSeconds,
           order,
+          downloadEnabled: values.downloadEnabled,
         });
       }
       setIsLessonDialogOpen(false);
@@ -437,6 +440,10 @@ export default function CourseDetailPage() {
                                     <span className="flex items-center space-x-1">
                                       <Video className="w-3.5 h-3.5 text-indigo-500" />
                                       <span className="font-mono">ID: {lesson.driveFileId}</span>
+                                    </span>
+                                    <span className={`flex items-center space-x-1 ${lesson.downloadEnabled ? 'text-green-600' : 'text-slate-400'}`}>
+                                      <Download className="w-3.5 h-3.5" />
+                                      <span>{lesson.downloadEnabled ? 'Download Enabled' : 'Download Disabled'}</span>
                                     </span>
                                   </div>
                                 </div>

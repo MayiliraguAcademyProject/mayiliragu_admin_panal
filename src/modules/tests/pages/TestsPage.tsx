@@ -179,8 +179,8 @@ export default function TestsPage() {
     return tests
       .filter((t) => t.course_id !== null && t.course_id !== undefined)
       .map((t) => {
-        const course = coursesData?.data.find((c) => c.id === t.course_id);
-        const module = course?.modules?.find((m) => m.id === t.module_id);
+        const course = coursesData?.data?.find((c: any) => c.id === t.course_id);
+        const module = course?.modules?.find((m: any) => m.id === t.module_id);
         return {
           id: t.id,
           courseId: t.course_id!,

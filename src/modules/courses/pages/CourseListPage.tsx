@@ -79,7 +79,7 @@ export default function CourseListPage() {
     }
   };
 
-  const filteredCourses = data?.data.filter(course =>
+  const filteredCourses = data?.data?.filter((course: any) =>
     course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     course.description.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
@@ -153,7 +153,7 @@ export default function CourseListPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredCourses.map((course) => (
+          {filteredCourses.map((course: any) => (
             <div
               key={course.id}
               className="bg-cardBg border border-border/70 rounded-3xl shadow-sm hover:shadow-xl hover:scale-[1.005] hover:border-accent/30 transition-all duration-300 flex overflow-hidden group h-48 cursor-pointer relative"
@@ -268,7 +268,7 @@ export default function CourseListPage() {
         }}
         title="Delete Course"
         message={`Are you sure you want to delete the course "${
-          data?.data.find((c) => c.id === confirmDeleteId)?.title || ''
+          data?.data?.find((c: any) => c.id === confirmDeleteId)?.title || ''
         }"? All associated modules and lessons will be lost.`}
       />
     </div>

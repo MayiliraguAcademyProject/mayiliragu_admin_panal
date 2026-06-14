@@ -12,6 +12,8 @@ interface QuestionFormModalProps {
   defaultSubjectName?: string;
 }
 
+const EMPTY_CATEGORIES: any[] = [];
+
 export default function QuestionFormModal({
   isOpen,
   onClose,
@@ -20,7 +22,7 @@ export default function QuestionFormModal({
   defaultCategoryId,
   defaultSubjectName,
 }: QuestionFormModalProps) {
-  const { data: categories = [] } = useExamCategories();
+  const { data: categories = EMPTY_CATEGORIES } = useExamCategories();
 
   const subjects = useMemo(() => {
     return categories.flatMap((cat) => cat.subjects || []);
@@ -64,6 +66,8 @@ export default function QuestionFormModal({
 
   // Set defaults and populated edit values
   useEffect(() => {
+    if (!isOpen) return;
+
     if (question) {
       setType(question.type || 'single_choice');
       setQuestionTextEn(question.question_text_en || '');
@@ -127,39 +131,52 @@ export default function QuestionFormModal({
       setAcceptedAnswers([{ value: '', case_sensitive: false }]);
       setModelAnswer('');
       setWordLimit(200);
+      setCategoryId('');
+      setSubjectId('');
+      setTopicId('');
+    }
+  }, [question, isOpen]);
 
-      if (defaultCategoryId) {
-        setCategoryId(defaultCategoryId);
-      } else if (categories.length > 0) {
-        setCategoryId(categories[0].id);
-      }
-
-      if (defaultSubjectName) {
-        const sub = subjects.find(s => s.name === defaultSubjectName);
-        if (sub) setSubjectId(sub.id);
+  // Set default category and subject for Create Mode once categories load
+  useEffect(() => {
+    if (isOpen && !question && categories.length > 0) {
+      if (!categoryId) {
+        if (defaultCategoryId) {
+          setCategoryId(defaultCategoryId);
+        } else {
+          setCategoryId(categories[0].id);
+        }
       }
     }
-  }, [question, isOpen, defaultCategoryId, defaultSubjectName, categories, subjects]);
+  }, [categories, isOpen, question, defaultCategoryId, categoryId]);
+
+  // Set default subject name if provided
+  useEffect(() => {
+    if (isOpen && !question && subjects.length > 0 && defaultSubjectName && !subjectId) {
+      const sub = subjects.find(s => s.name === defaultSubjectName);
+      if (sub) setSubjectId(sub.id);
+    }
+  }, [subjects, isOpen, question, defaultSubjectName, subjectId]);
 
   // Set default subject if category changes
   useEffect(() => {
-    if (!question && categoryId) {
+    if (!question && categoryId && subjects.length > 0) {
       const filteredSubjects = subjects.filter(s => s.categoryId === categoryId);
       if (filteredSubjects.length > 0 && !filteredSubjects.some(s => s.id === subjectId)) {
         setSubjectId(filteredSubjects[0].id);
       }
     }
-  }, [categoryId, subjects, question]);
+  }, [categoryId, subjects, question, subjectId]);
 
   // Set default topic if subject changes
   useEffect(() => {
-    if (!question && subjectId) {
+    if (!question && subjectId && topics.length > 0) {
       const filteredTopics = topics.filter(t => t.subjectId === subjectId);
       if (filteredTopics.length > 0 && !filteredTopics.some(t => t.id === topicId)) {
         setTopicId(filteredTopics[0].id);
       }
     }
-  }, [subjectId, topics, question]);
+  }, [subjectId, topics, question, topicId]);
 
   const handleAddOption = () => {
     const nextLabel = String.fromCharCode(65 + options.length); // A, B, C, D...

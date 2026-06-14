@@ -34,7 +34,11 @@ import type {
   ImportantDate,
   StudyMaterial,
   StudyMaterialCategory,
-  StudyMaterialVersion
+  StudyMaterialVersion,
+  Book,
+  Coupon,
+  BookOrder,
+  BookOrderItem
 } from '../types';
 
 export type { 
@@ -66,7 +70,11 @@ export type {
   ImportantDate,
   StudyMaterial,
   StudyMaterialCategory,
-  StudyMaterialVersion
+  StudyMaterialVersion,
+  Book,
+  Coupon,
+  BookOrder,
+  BookOrderItem
 };
 
 // ==========================================
@@ -94,7 +102,7 @@ export function useCoursesList(page: number, limit: number) {
       const response = await apiClient.get(ApiConstants.courses.base, {
         params: { page, limit },
       });
-      return response.data;
+      return response.data.data;
     },
   });
 }
@@ -104,7 +112,7 @@ export function useCourseDetail(courseId: string) {
     queryKey: ['course', courseId],
     queryFn: async () => {
       const response = await apiClient.get(ApiConstants.courses.detail(courseId));
-      return response.data;
+      return response.data.data;
     },
     enabled: !!courseId,
   });
@@ -200,7 +208,7 @@ export function useDeleteModule(courseId: string) {
 export function useCreateLesson(courseId: string, moduleId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { title: string; description: string; driveFileId: string; duration: number; order: number }) => {
+    mutationFn: async (data: { title: string; description: string; driveFileId: string; duration: number; order: number; downloadEnabled?: boolean }) => {
       const response = await apiClient.post(ApiConstants.lessons.base, { ...data, moduleId });
       return response.data;
     },
@@ -213,7 +221,7 @@ export function useCreateLesson(courseId: string, moduleId: string) {
 export function useUpdateLesson(courseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { title?: string; description?: string; driveFileId?: string; duration?: number; order?: number } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { title?: string; description?: string; driveFileId?: string; duration?: number; order?: number; downloadEnabled?: boolean } }) => {
       const response = await apiClient.put(ApiConstants.lessons.detail(id), data);
       return response.data;
     },
@@ -222,7 +230,6 @@ export function useUpdateLesson(courseId: string) {
     },
   });
 }
-
 export function useDeleteLesson(courseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -232,6 +239,16 @@ export function useDeleteLesson(courseId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useVideoDownloads(params?: { search?: string; page?: number; limit?: number }) {
+  return useQuery({
+    queryKey: ['videoDownloads', params],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.lessons.downloads, { params });
+      return response.data;
     },
   });
 }
@@ -579,7 +596,7 @@ export function useBannersAdminList() {
     queryKey: ['bannersAdmin'],
     queryFn: async () => {
       const response = await apiClient.get(ApiConstants.banners.admin);
-      return response.data;
+      return response.data.data;
     },
   });
 }
@@ -1091,6 +1108,210 @@ export function useAdminBatchComparisons() {
     },
   });
 }
+
+// ==========================================
+// BOOK STORE HOOKS
+// ==========================================
+
+export function useAdminBooksList(categoryId?: string, search?: string) {
+  return useQuery<{ data: Book[] }>({
+    queryKey: ['adminBooks', categoryId, search],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.books.base, {
+        params: { categoryId, search },
+      });
+      return response.data;
+    },
+  });
+}
+
+export function useCreateBook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      title,
+      description,
+      author,
+      publisher,
+      priceHardCopy,
+      priceSoftCopy,
+      stockHardCopy,
+      categoryId,
+      thumbnail,
+      pdf,
+    }: {
+      title: string;
+      description?: string;
+      author?: string;
+      publisher?: string;
+      priceHardCopy?: number;
+      priceSoftCopy?: number;
+      stockHardCopy?: number;
+      categoryId: string;
+      thumbnail?: File;
+      pdf?: File;
+    }) => {
+      const formData = new FormData();
+      formData.append('title', title);
+      if (description) formData.append('description', description);
+      if (author) formData.append('author', author);
+      if (publisher) formData.append('publisher', publisher);
+      if (priceHardCopy !== undefined) formData.append('priceHardCopy', String(priceHardCopy));
+      if (priceSoftCopy !== undefined) formData.append('priceSoftCopy', String(priceSoftCopy));
+      if (stockHardCopy !== undefined) formData.append('stockHardCopy', String(stockHardCopy));
+      formData.append('categoryId', categoryId);
+      if (thumbnail) formData.append('thumbnail', thumbnail);
+      if (pdf) formData.append('pdf', pdf);
+
+      const response = await apiClient.post(ApiConstants.books.adminBooks, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminBooks'] });
+    },
+  });
+}
+
+export function useUpdateBook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      title,
+      description,
+      author,
+      publisher,
+      priceHardCopy,
+      priceSoftCopy,
+      stockHardCopy,
+      categoryId,
+      isActive,
+      thumbnail,
+      pdf,
+    }: {
+      id: string;
+      title?: string;
+      description?: string;
+      author?: string;
+      publisher?: string;
+      priceHardCopy?: number;
+      priceSoftCopy?: number;
+      stockHardCopy?: number;
+      categoryId?: string;
+      isActive?: boolean;
+      thumbnail?: File;
+      pdf?: File;
+    }) => {
+      const formData = new FormData();
+      if (title) formData.append('title', title);
+      if (description) formData.append('description', description);
+      if (author) formData.append('author', author);
+      if (publisher) formData.append('publisher', publisher);
+      if (priceHardCopy !== undefined) formData.append('priceHardCopy', String(priceHardCopy));
+      if (priceSoftCopy !== undefined) formData.append('priceSoftCopy', String(priceSoftCopy));
+      if (stockHardCopy !== undefined) formData.append('stockHardCopy', String(stockHardCopy));
+      if (categoryId) formData.append('categoryId', categoryId);
+      if (isActive !== undefined) formData.append('isActive', String(isActive));
+      if (thumbnail) formData.append('thumbnail', thumbnail);
+      if (pdf) formData.append('pdf', pdf);
+
+      const response = await apiClient.put(`${ApiConstants.books.adminBooks}/${id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminBooks'] });
+    },
+  });
+}
+
+export function useDeleteBook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiClient.delete(`${ApiConstants.books.adminBooks}/${id}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminBooks'] });
+    },
+  });
+}
+
+export function useCouponsList() {
+  return useQuery<{ data: Coupon[] }>({
+    queryKey: ['adminCoupons'],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.books.adminCoupons);
+      return response.data;
+    },
+  });
+}
+
+export function useCreateCoupon() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      code: string;
+      discountType: 'PERCENTAGE' | 'FLAT';
+      discountValue: number;
+      minPurchaseAmount?: number;
+      maxDiscountAmount?: number;
+      startDate: string;
+      endDate: string;
+      isActive: boolean;
+      usageLimit?: number;
+    }) => {
+      const response = await apiClient.post(ApiConstants.books.adminCoupons, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminCoupons'] });
+    },
+  });
+}
+
+export function useAdminOrdersList(orderStatus?: string, paymentStatus?: string) {
+  return useQuery<{ data: BookOrder[] }>({
+    queryKey: ['adminOrders', orderStatus, paymentStatus],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.books.adminOrders, {
+        params: { orderStatus, paymentStatus },
+      });
+      return response.data;
+    },
+  });
+}
+
+export function useUpdateOrderStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, orderStatus }: { id: string; orderStatus: string }) => {
+      const response = await apiClient.patch(ApiConstants.books.orderStatus(id), { orderStatus });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminOrders'] });
+    },
+  });
+}
+
+export function useUpdateOrderPaymentStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, paymentStatus }: { id: string; paymentStatus: string }) => {
+      const response = await apiClient.patch(ApiConstants.books.orderPayment(id), { paymentStatus });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminOrders'] });
+    },
+  });
+}
+
 
 
 
