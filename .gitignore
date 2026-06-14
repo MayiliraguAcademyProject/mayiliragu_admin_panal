@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Deploy scripts
+deploy.bat
+deploy.ps1
