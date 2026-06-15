@@ -93,4 +93,8 @@ export const ApiConstants = {
     adminBooks: '/books/admin/books',
     adminBookDetail: (id: string) => `/books/admin/books/${id}`,
   },
+  notifications: {
+    sendImmediate: '/notifications/admin/send',
+    campaigns: '/notifications/admin/campaigns',
+  },
 } as const;

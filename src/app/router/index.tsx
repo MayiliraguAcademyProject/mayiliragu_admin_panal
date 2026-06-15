@@ -18,6 +18,7 @@ const StudyMaterialsPage = React.lazy(() => import('../../modules/study-material
 const PerformanceAnalyticsPage = React.lazy(() => import('../../modules/performance/pages/PerformanceAnalyticsPage'));
 const BookStorePage = React.lazy(() => import('../../modules/book-store/pages/BookStorePage'));
 const VideoDownloadsPage = React.lazy(() => import('../../modules/downloads/pages/VideoDownloadsPage'));
+const NotificationsPage = React.lazy(() => import('../../modules/notifications/pages/NotificationsPage'));
 
 // Loading fallback component
 const SuspenseFallback = () => (
@@ -134,6 +135,14 @@ export const router = createBrowserRouter([
         element: (
           <React.Suspense fallback={<SuspenseFallback />}>
             <VideoDownloadsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'notifications',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <NotificationsPage />
           </React.Suspense>
         ),
       },
