@@ -86,7 +86,7 @@ export function useAdminStats() {
     queryKey: ['adminStats'],
     queryFn: async () => {
       const response = await apiClient.get(ApiConstants.dashboard.admin);
-      return response.data;
+      return response.data.data;
     },
   });
 }
