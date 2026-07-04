@@ -33,7 +33,7 @@ export default function LoginPage() {
     try {
       const response = await apiClient.post('/auth/login', values);
       const { user, accessToken, refreshToken } = response.data.data;
-      
+
       if (user.role !== 'ADMIN') {
         throw new Error('Access denied. Admin portal is restricted to administrator accounts only.');
       }
@@ -65,14 +65,14 @@ export default function LoginPage() {
       {/* Main card */}
       <div className="w-full max-w-md bg-cardBg rounded-3xl border border-border/70 shadow-2xl shadow-[#131B2E]/5 overflow-hidden transform transition-all duration-300 hover:scale-[1.01]">
         <div className="p-8 sm:p-10 flex flex-col items-center">
-          
+
           {/* Logo */}
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-accent to-accent/80 flex items-center justify-center shadow-lg shadow-accent/20 mb-5">
             <GraduationCap className="w-9 h-9 text-white" />
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-extrabold text-text-primary text-center tracking-tight">
-            EducationApp LMS
+            Mayiliragu LMS
           </h2>
           <p className="text-text-secondary text-sm font-medium mt-1.5 text-center">
             Admin Management Portal
@@ -80,7 +80,7 @@ export default function LoginPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="w-full mt-8 space-y-5">
-            
+
             {/* Error banner */}
             {errorMsg && (
               <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-center shadow-inner">
@@ -96,14 +96,13 @@ export default function LoginPage() {
               <input
                 id="email"
                 type="email"
-                placeholder="admin@education_app.com"
+                placeholder="admin@Mayiliragu.com"
                 {...register('email')}
                 disabled={isLoading}
-                className={`w-full px-4 py-3 rounded-xl border font-medium text-sm transition-all outline-none ${
-                  errors.email
-                    ? 'border-error bg-red-50/20 focus:border-error focus:ring-1 focus:ring-error'
-                    : 'border-border focus:border-accent focus:ring-1 focus:ring-accent bg-slate-50/30'
-                } text-text-primary placeholder-gray-400`}
+                className={`w-full px-4 py-3 rounded-xl border font-medium text-sm transition-all outline-none ${errors.email
+                  ? 'border-error bg-red-50/20 focus:border-error focus:ring-1 focus:ring-error'
+                  : 'border-border focus:border-accent focus:ring-1 focus:ring-accent bg-slate-50/30'
+                  } text-text-primary placeholder-gray-400`}
               />
               {errors.email && (
                 <p className="text-[11px] text-error font-semibold pl-1">
@@ -124,11 +123,10 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   {...register('password')}
                   disabled={isLoading}
-                  className={`w-full pl-4 pr-11 py-3 rounded-xl border font-medium text-sm transition-all outline-none ${
-                    errors.password
-                      ? 'border-error bg-red-50/20 focus:border-error focus:ring-1 focus:ring-error'
-                      : 'border-border focus:border-accent focus:ring-1 focus:ring-accent bg-slate-50/30'
-                  } text-text-primary placeholder-gray-400`}
+                  className={`w-full pl-4 pr-11 py-3 rounded-xl border font-medium text-sm transition-all outline-none ${errors.password
+                    ? 'border-error bg-red-50/20 focus:border-error focus:ring-1 focus:ring-error'
+                    : 'border-border focus:border-accent focus:ring-1 focus:ring-accent bg-slate-50/30'
+                    } text-text-primary placeholder-gray-400`}
                 />
                 <button
                   type="button"

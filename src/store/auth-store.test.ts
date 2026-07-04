@@ -25,7 +25,7 @@ describe('useAuthStore', () => {
     const mockUser = {
       id: 'user-1',
       name: 'Admin User',
-      email: 'admin@education_app.com',
+      email: 'admin@Mayiliragu.com',
       role: 'ADMIN' as const,
     };
     const mockAccessToken = 'access-token-123';
@@ -48,7 +48,7 @@ describe('useAuthStore', () => {
     const mockUser = {
       id: 'user-1',
       name: 'Admin User',
-      email: 'admin@education_app.com',
+      email: 'admin@Mayiliragu.com',
       role: 'ADMIN' as const,
     };
     useAuthStore.getState().login(mockUser, 'access', 'refresh');
@@ -69,7 +69,7 @@ describe('useAuthStore', () => {
     const mockAdminUser = {
       id: 'admin-1',
       name: 'Admin User',
-      email: 'admin@education_app.com',
+      email: 'admin@Mayiliragu.com',
       role: 'ADMIN' as const,
     };
     useAuthStore.getState().login(mockAdminUser, 'access', 'refresh');

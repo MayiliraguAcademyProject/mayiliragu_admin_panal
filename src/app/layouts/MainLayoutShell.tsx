@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth-store';
-import { 
-  LayoutDashboard, 
-  BookOpen, 
-  Users, 
-  GraduationCap, 
-  LogOut, 
-  Menu, 
-  X, 
+import {
+  LayoutDashboard,
+  BookOpen,
+  Users,
+  GraduationCap,
+  LogOut,
+  Menu,
+  X,
   User as UserIcon,
   ChevronRight,
   Image,
@@ -84,10 +84,9 @@ export default function MainLayoutShell() {
   return (
     <div className="flex h-screen w-screen overflow-hidden font-sans bg-gradient-to-br from-background-start via-[#EFF5FF] to-background-end">
       {/* Sidebar - Desktop */}
-      <aside 
-        className={`bg-primary-container text-white transition-all duration-300 ease-in-out flex flex-col z-20 shadow-xl ${
-          isSidebarOpen ? 'w-64' : 'w-20'
-        } hidden md:flex`}
+      <aside
+        className={`bg-primary-container text-white transition-all duration-300 ease-in-out flex flex-col z-20 shadow-xl ${isSidebarOpen ? 'w-64' : 'w-20'
+          } hidden md:flex`}
       >
         {/* Brand Logo Header */}
         <div className="h-16 flex items-center px-5 border-b border-[#1E293B]">
@@ -97,7 +96,7 @@ export default function MainLayoutShell() {
             </div>
             {isSidebarOpen && (
               <span className="text-base font-extrabold tracking-wider bg-gradient-to-r from-white via-secondary to-accent bg-clip-text text-transparent transition-opacity duration-300">
-                EDUCATION_APP
+                Mayiliragu
               </span>
             )}
           </Link>
@@ -110,10 +109,9 @@ export default function MainLayoutShell() {
               key={item.name}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${
-                  isActive
-                    ? 'bg-accent text-white shadow-md shadow-accent/30 font-semibold'
-                    : 'text-gray-400 hover:text-white hover:bg-slate-800/50'
+                `flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${isActive
+                  ? 'bg-accent text-white shadow-md shadow-accent/30 font-semibold'
+                  : 'text-gray-400 hover:text-white hover:bg-slate-800/50'
                 }`
               }
             >
@@ -121,7 +119,7 @@ export default function MainLayoutShell() {
                 <>
                   <item.icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'}`} />
                   {isSidebarOpen && <span className="ml-3 text-sm tracking-wide">{item.name}</span>}
-                  
+
                   {/* Left indicator line */}
                   {isActive && (
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-md" />
@@ -136,9 +134,8 @@ export default function MainLayoutShell() {
         <div className="p-4 border-t border-[#1E293B] bg-slate-950/20">
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center px-4 py-3 text-sm rounded-xl text-red-400 hover:text-red-350 hover:bg-red-950/20 transition-all duration-200 group ${
-              isSidebarOpen ? 'justify-start' : 'justify-center'
-            }`}
+            className={`w-full flex items-center px-4 py-3 text-sm rounded-xl text-red-400 hover:text-red-350 hover:bg-red-950/20 transition-all duration-200 group ${isSidebarOpen ? 'justify-start' : 'justify-center'
+              }`}
           >
             <LogOut className="w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" />
             {isSidebarOpen && <span className="ml-3 font-semibold">Sign Out</span>}
@@ -148,17 +145,16 @@ export default function MainLayoutShell() {
 
       {/* Mobile Drawer Navigation overlay */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-30 md:hidden transition-opacity duration-300"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar - Mobile Drawer */}
-      <aside 
-        className={`fixed top-0 bottom-0 left-0 w-64 bg-primary-container text-white z-40 flex flex-col md:hidden transition-transform duration-300 ease-in-out shadow-2xl ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+      <aside
+        className={`fixed top-0 bottom-0 left-0 w-64 bg-primary-container text-white z-40 flex flex-col md:hidden transition-transform duration-300 ease-in-out shadow-2xl ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="h-16 flex items-center justify-between px-5 border-b border-[#1E293B]">
           <Link to="/dashboard" className="flex items-center space-x-3">
@@ -166,7 +162,7 @@ export default function MainLayoutShell() {
               <span className="text-primary font-black text-lg">M</span>
             </div>
             <span className="text-base font-extrabold tracking-wider bg-gradient-to-r from-white to-secondary bg-clip-text text-transparent">
-              EDUCATION_APP
+              Mayiliragu
             </span>
           </Link>
           <button onClick={() => setIsSidebarOpen(false)} className="text-gray-400 hover:text-white">
@@ -181,10 +177,9 @@ export default function MainLayoutShell() {
               to={item.path}
               onClick={() => setIsSidebarOpen(false)}
               className={({ isActive }) =>
-                `flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative overflow-hidden ${
-                  isActive
-                    ? 'bg-accent text-white shadow-lg shadow-accent/20 font-semibold'
-                    : 'text-gray-400 hover:text-white hover:bg-slate-800/50'
+                `flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative overflow-hidden ${isActive
+                  ? 'bg-accent text-white shadow-lg shadow-accent/20 font-semibold'
+                  : 'text-gray-400 hover:text-white hover:bg-slate-800/50'
                 }`
               }
             >
@@ -211,13 +206,13 @@ export default function MainLayoutShell() {
         <header className="h-16 bg-cardBg border-b border-border/80 flex items-center justify-between px-6 z-10 shadow-sm">
           {/* Collapse sidebar controls */}
           <div className="flex items-center space-x-4">
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-1.5 rounded-lg hover:bg-background-end text-text-primary transition-colors focus:outline-none"
             >
               <Menu className="w-5 h-5" />
             </button>
-            
+
             {/* Dynamic Breadcrumbs */}
             {getBreadcrumbs()}
           </div>
