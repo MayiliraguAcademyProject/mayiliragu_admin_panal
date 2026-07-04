@@ -13,7 +13,7 @@ export type LoginFormValues = z.infer<typeof loginSchema>;
 export const courseSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100),
   description: z.string().min(10, 'Description must be at least 10 characters'),
-  thumbnail: z.string().min(1, 'Thumbnail URL is required').url('Must be a valid URL'),
+  thumbnail: z.string().optional(),
 });
 
 export type CourseFormValues = z.infer<typeof courseSchema>;

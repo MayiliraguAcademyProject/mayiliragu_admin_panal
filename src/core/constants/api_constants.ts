@@ -97,4 +97,7 @@ export const ApiConstants = {
     sendImmediate: '/notifications/admin/send',
     campaigns: '/notifications/admin/campaigns',
   },
+  progress: {
+    lessonStats: (lessonId: string) => `/progress/lesson/${lessonId}/stats`,
+  },
 } as const;

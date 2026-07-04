@@ -7,7 +7,8 @@ import {
   useDeleteModule,
   useCreateLesson,
   useUpdateLesson,
-  useDeleteLesson
+  useDeleteLesson,
+  useLessonStats
 } from '../../../core/api/endpoints';
 import type { Module, Lesson } from '../../../core/types';
 import {
@@ -23,12 +24,14 @@ import {
   Clock,
   ChevronRight,
   AlertCircle,
-  Download
+  Download,
+  Users
 } from 'lucide-react';
 
 import type { ModuleFormValues, LessonFormValues } from '../../../core/validation';
 import ModuleModal from '../components/ModuleModal';
 import LessonModal from '../components/LessonModal';
+import ConfirmModal from '../../../shared/components/ConfirmModal';
 
 export default function CourseDetailPage() {
   const { id: courseId = '' } = useParams<{ id: string }>();
@@ -43,6 +46,9 @@ export default function CourseDetailPage() {
   const [targetModuleId, setTargetModuleId] = useState<string>('');
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const [selectedLessonForStats, setSelectedLessonForStats] = useState<Lesson | null>(null);
+  const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
+  const [deletingLessonTitle, setDeletingLessonTitle] = useState<string>('');
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText('education-app@mayiliragu.iam.gserviceaccount.com');
@@ -190,13 +196,17 @@ export default function CourseDetailPage() {
     setIsLessonDialogOpen(true);
   };
 
-  const handleDeleteLesson = async (id: string, title: string) => {
-    if (window.confirm(`Are you sure you want to delete lesson "${title}"?`)) {
-      try {
-        await deleteLessonMutation.mutateAsync(id);
-      } catch (err) {
-        console.error(err);
-      }
+  const handleDeleteLesson = (id: string, title: string) => {
+    setDeletingLessonId(id);
+    setDeletingLessonTitle(title);
+  };
+
+  const handleConfirmDeleteLesson = async () => {
+    if (!deletingLessonId) return;
+    try {
+      await deleteLessonMutation.mutateAsync(deletingLessonId);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -445,6 +455,14 @@ export default function CourseDetailPage() {
                                       <Download className="w-3.5 h-3.5" />
                                       <span>{lesson.downloadEnabled ? 'Download Enabled' : 'Download Disabled'}</span>
                                     </span>
+                                    <button
+                                      onClick={() => setSelectedLessonForStats(lesson)}
+                                      className="flex items-center space-x-1 text-accent hover:underline cursor-pointer transition-all hover:scale-105 font-bold"
+                                      title="View Watching Progress"
+                                    >
+                                      <Users className="w-3.5 h-3.5 text-accent" />
+                                      <span>Watch Stats</span>
+                                    </button>
                                   </div>
                                 </div>
                               </div>
@@ -496,6 +514,158 @@ export default function CourseDetailPage() {
         onCopyEmail={handleCopyEmail}
       />
 
+      {/* Student watch stats dialog */}
+      {selectedLessonForStats && (
+        <StudentWatchStatsModal
+          lesson={selectedLessonForStats}
+          onClose={() => setSelectedLessonForStats(null)}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmModal
+        isOpen={deletingLessonId !== null}
+        onClose={() => {
+          setDeletingLessonId(null);
+          setDeletingLessonTitle('');
+        }}
+        onConfirm={handleConfirmDeleteLesson}
+        title="Delete Lesson"
+        message={`Are you sure you want to delete lesson "${deletingLessonTitle}"? This action cannot be undone.`}
+      />
+
+    </div>
+  );
+}
+
+interface StudentWatchStatsModalProps {
+  lesson: Lesson;
+  onClose: () => void;
+}
+
+function StudentWatchStatsModal({ lesson, onClose }: StudentWatchStatsModalProps) {
+  const { data: statsData, isLoading, isError } = useLessonStats(lesson.id);
+
+  const formatDuration = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const remainingSecs = secs % 60;
+    return `${mins}m ${remainingSecs}s`;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden border border-slate-100 dark:border-slate-800">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-lg font-bold text-text-primary dark:text-white">
+              Student Watching Progress
+            </h3>
+            <p className="text-xs text-text-secondary dark:text-slate-400 mt-1">
+              Lesson: {lesson.title} (Duration: {Math.round(lesson.duration / 60)} mins)
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 max-h-[60vh] overflow-y-auto">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-3">
+              <Loader2 className="w-8 h-8 text-accent animate-spin" />
+              <p className="text-sm text-text-secondary dark:text-slate-400">Loading progress details...</p>
+            </div>
+          ) : isError ? (
+            <div className="flex items-center space-x-2 text-red-600 justify-center py-12">
+              <AlertCircle className="w-5 h-5" />
+              <span>Failed to load stats. Please try again.</span>
+            </div>
+          ) : !statsData?.stats || statsData.stats.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 dark:text-slate-500">
+              No students have watched this lesson yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50 text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                    <th className="p-4">Student</th>
+                    <th className="p-4">Progress</th>
+                    <th className="p-4">Percentage</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Last Viewed</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                  {statsData.stats.map((row: any) => {
+                    const pct = Math.min(
+                      100,
+                      Math.round((row.watchedSeconds / lesson.duration) * 100)
+                    );
+                    return (
+                      <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                        <td className="p-4">
+                          <div className="font-semibold text-text-primary dark:text-white">
+                            {row.student?.name || 'Unknown Student'}
+                          </div>
+                          <div className="text-xs text-text-secondary dark:text-slate-400">
+                            {row.student?.email || '-'}
+                          </div>
+                        </td>
+                        <td className="p-4 font-mono text-xs dark:text-slate-300">
+                          {formatDuration(row.watchedSeconds)}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-16 bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className="bg-accent h-1.5 rounded-full"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-mono font-bold dark:text-slate-300">
+                              {pct}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          {row.completed ? (
+                            <span className="inline-flex px-2 py-0.5 text-[10px] font-bold bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 rounded-full">
+                              Completed
+                            </span>
+                          ) : (
+                            <span className="inline-flex px-2 py-0.5 text-[10px] font-bold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 rounded-full">
+                              In Progress
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 text-xs text-text-secondary dark:text-slate-400">
+                          {row.lastViewedAt ? new Date(row.lastViewedAt).toLocaleString() : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        
+        {/* Footer */}
+        <div className="flex justify-end p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/20">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

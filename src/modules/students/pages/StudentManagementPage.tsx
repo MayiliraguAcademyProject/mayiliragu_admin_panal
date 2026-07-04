@@ -1409,10 +1409,10 @@ export default function StudentManagementPage() {
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-text-secondary uppercase">Motivation & Remarks</label>
+                            <label className="text-xs font-bold text-text-secondary uppercase">Reviews & Remarks</label>
                             <input
                               type="text"
-                              placeholder="Motivation details"
+                              placeholder="Review details"
                               value={editForm.performanceRemarks}
                               onChange={(e) => setEditForm((prev: any) => ({ ...prev, performanceRemarks: e.target.value }))}
                               className="w-full bg-slate-50 border border-border/60 rounded-xl px-4.5 py-3 text-sm text-text-primary focus:border-accent outline-none"
@@ -1426,7 +1426,7 @@ export default function StudentManagementPage() {
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                           <h4 className="text-sm font-extrabold text-text-primary uppercase tracking-wider flex items-center space-x-2">
                             <MessageSquare className="w-4 h-4 text-accent" />
-                            <span>Counseling & Mentoring log</span>
+                            <span>Reviewing & Mentoring log</span>
                           </h4>
                           <button
                             type="button"

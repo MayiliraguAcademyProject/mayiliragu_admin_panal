@@ -199,7 +199,7 @@ export default function NotificationsPage() {
       {/* Main Grid split layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Side: Notification Composer */}
-        <div className="lg:col-span-5 bg-white border border-border/80 rounded-2xl p-6 shadow-sm">
+        <div className="lg:col-span-5 bg-cardBg border border-border/80 rounded-2xl p-6 shadow-sm">
           <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center space-x-2 border-b border-border/60 pb-3">
             <FileText className="w-5 h-5 text-accent" />
             <span>Compose Notification</span>
@@ -216,7 +216,7 @@ export default function NotificationsPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. TNPSC Group 2 Mock Test Published!"
-                className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm"
+                className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm text-text-primary bg-cardBg"
               />
             </div>
 
@@ -230,7 +230,7 @@ export default function NotificationsPage() {
                 onChange={(e) => setBody(e.target.value)}
                 rows={4}
                 placeholder="Compose message description here..."
-                className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm"
+                className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm text-text-primary bg-cardBg"
               />
             </div>
 
@@ -251,7 +251,7 @@ export default function NotificationsPage() {
                     className={`py-2 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center space-y-1 ${
                       targetGroup === group
                         ? 'bg-accent/10 border-accent text-accent'
-                        : 'border-border/95 text-text-secondary hover:bg-slate-50'
+                        : 'border-border/95 text-text-secondary hover:bg-background-end/40'
                     }`}
                   >
                     {group === 'ALL' && <Users className="w-4 h-4" />}
@@ -272,7 +272,7 @@ export default function NotificationsPage() {
                 <select
                   value={targetValue}
                   onChange={(e) => setTargetValue(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm bg-white"
+                  className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm bg-cardBg text-text-primary"
                 >
                   <option value="">-- Choose Course/Batch --</option>
                   {courses.map((course) => (
@@ -292,7 +292,7 @@ export default function NotificationsPage() {
                 <select
                   value={targetValue}
                   onChange={(e) => setTargetValue(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm bg-white"
+                  className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm bg-cardBg text-text-primary"
                 >
                   <option value="">-- Choose Student --</option>
                   {students.map((student) => (
@@ -325,7 +325,7 @@ export default function NotificationsPage() {
                     type="datetime-local"
                     value={scheduledAt}
                     onChange={(e) => setScheduledAt(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm bg-white"
+                    className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm bg-cardBg text-text-primary"
                   />
                 </div>
               )}
@@ -344,7 +344,7 @@ export default function NotificationsPage() {
         </div>
 
         {/* Right Side: Campaigns & Scheduled list logs */}
-        <div className="lg:col-span-7 bg-white border border-border/80 rounded-2xl p-6 shadow-sm flex flex-col h-full">
+        <div className="lg:col-span-7 bg-cardBg border border-border/80 rounded-2xl p-6 shadow-sm flex flex-col h-full">
           <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center space-x-2 border-b border-border/60 pb-3">
             <Clock className="w-5 h-5 text-accent" />
             <span>Campaign Log & Queue</span>
@@ -372,13 +372,13 @@ export default function NotificationsPage() {
                 </thead>
                 <tbody className="divide-y divide-border/60 text-sm">
                   {campaigns.map((camp) => (
-                    <tr key={camp.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={camp.id} className="hover:bg-background-end/40 transition-colors">
                       <td className="py-3.5 pr-2">
                         <p className="font-bold text-text-primary">{camp.title}</p>
                         <p className="text-xs text-text-secondary line-clamp-1 mt-0.5">{camp.body}</p>
                       </td>
                       <td className="py-3.5 px-2">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-800 capitalize">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-secondary-container text-text-primary capitalize">
                           {camp.targetGroup.toLowerCase()}
                         </span>
                       </td>

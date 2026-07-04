@@ -178,20 +178,20 @@ export default function DashboardPage() {
         </div>
 
         {/* Info tips card */}
-        <div className="bg-gradient-to-br from-primary-container to-slate-900 text-white rounded-3xl p-6 flex flex-col justify-between shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
+        <div className="bg-gradient-to-br from-primary to-accent text-white rounded-3xl p-6 flex flex-col justify-between shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
 
           <div className="space-y-4">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-secondary-container" />
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+              <GraduationCap className="w-5 h-5 text-white" />
             </div>
             <h3 className="text-lg font-extrabold tracking-tight">Academic Clarity Design</h3>
-            <p className="text-xs text-gray-300 leading-relaxed">
+            <p className="text-xs text-orange-50 leading-relaxed">
               Maintain standard curriculum hierarchies. Ensure course structures contain modules and sequential lessons with valid drive video streamers.
             </p>
           </div>
 
-          <div className="pt-6 border-t border-white/10 text-[11px] text-gray-400 font-medium">
+          <div className="pt-6 border-t border-white/20 text-[11px] text-orange-100 font-medium">
             Mayiliragu LMS Panel v1.0 • React Web Migration
           </div>
         </div>
