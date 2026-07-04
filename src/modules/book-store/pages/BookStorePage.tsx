@@ -26,7 +26,9 @@ import {
   useCreateCoupon,
   useAdminOrdersList,
   useUpdateOrderStatus,
-  useUpdateOrderPaymentStatus
+  useUpdateOrderPaymentStatus,
+  usePaymentQr,
+  useUpdatePaymentQr
 } from '../../../core/api/endpoints';
 import type { Book } from '../../../core/types';
 import { ApiConstants } from '../../../core/constants/api_constants';
@@ -57,7 +59,7 @@ const couponSchema = z.object({
 });
 
 export default function BookStorePage() {
-  const [activeTab, setActiveTab] = useState<'books' | 'coupons' | 'orders'>('books');
+  const [activeTab, setActiveTab] = useState<'books' | 'coupons' | 'orders' | 'settings'>('books');
 
   // Modals state
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
@@ -65,6 +67,8 @@ export default function BookStorePage() {
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [selectedQrFile, setSelectedQrFile] = useState<File | null>(null);
+  const [activeScreenshotUrl, setActiveScreenshotUrl] = useState<string | null>(null);
 
   // API hooks
   const { data: categoriesData } = useStudyCategoriesList();
@@ -83,6 +87,9 @@ export default function BookStorePage() {
 
   const { data: ordersData, isLoading: isOrdersLoading } = useAdminOrdersList();
   const orders = ordersData?.data || [];
+
+  const { data: qrData, isLoading: isQrLoading } = usePaymentQr();
+  const updateQrMutation = useUpdatePaymentQr();
 
   const updateOrderStatusMutation = useUpdateOrderStatus();
   const updateOrderPaymentMutation = useUpdateOrderPaymentStatus();
@@ -200,6 +207,19 @@ export default function BookStorePage() {
     }
   };
 
+  const handleQrUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedQrFile) return;
+    try {
+      await updateQrMutation.mutateAsync(selectedQrFile);
+      setSelectedQrFile(null);
+      alert('Payment QR Code updated successfully!');
+    } catch (error) {
+      console.error(error);
+      alert('Failed to update QR Code');
+    }
+  };
+
   return (
     <div className="p-6 sm:p-8 space-y-8 animate-fade-in text-text-primary">
       {/* Header */}
@@ -217,8 +237,8 @@ export default function BookStorePage() {
         <button
           onClick={() => setActiveTab('books')}
           className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'books'
-              ? 'border-accent text-accent'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
+            ? 'border-accent text-accent'
+            : 'border-transparent text-text-secondary hover:text-text-primary'
             }`}
         >
           <BookOpen className="w-4 h-4" />
@@ -227,8 +247,8 @@ export default function BookStorePage() {
         <button
           onClick={() => setActiveTab('coupons')}
           className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'coupons'
-              ? 'border-accent text-accent'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
+            ? 'border-accent text-accent'
+            : 'border-transparent text-text-secondary hover:text-text-primary'
             }`}
         >
           <Ticket className="w-4 h-4" />
@@ -237,12 +257,22 @@ export default function BookStorePage() {
         <button
           onClick={() => setActiveTab('orders')}
           className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'orders'
-              ? 'border-accent text-accent'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
+            ? 'border-accent text-accent'
+            : 'border-transparent text-text-secondary hover:text-text-primary'
             }`}
         >
           <ClipboardList className="w-4 h-4" />
           <span>Orders Management ({orders.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'settings'
+            ? 'border-accent text-accent'
+            : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>QR Settings</span>
         </button>
       </div>
 
@@ -277,7 +307,7 @@ export default function BookStorePage() {
                 >
                   <div className="flex gap-4">
                     <img
-                      src={book.thumbnailUrl ? ApiConstants.getAssetUrl(book.thumbnailUrl) : '/placeholder-book.png'}
+                      src={book.thumbnailUrl ? (book.thumbnailUrl.startsWith('http') ? book.thumbnailUrl : ApiConstants.getAssetUrl(book.thumbnailUrl)) : '/placeholder-book.png'}
                       alt={book.title}
                       className="w-16 h-20 object-cover rounded-lg bg-slate-100 flex-shrink-0"
                     />
@@ -477,6 +507,27 @@ export default function BookStorePage() {
                         </div>
                       </div>
                     )}
+                    {order.paymentScreenshotUrl && (
+                      <div className="bg-slate-50 rounded-xl p-4 max-w-xl text-xs space-y-2 text-text-secondary border border-border/30 mt-3">
+                        <h4 className="font-extrabold text-text-primary flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-accent" /> Payment Verification
+                        </h4>
+                        <div className="space-y-2">
+                          <p className="font-semibold text-text-secondary">Uploaded Payment Screenshot:</p>
+                          <button
+                            type="button"
+                            onClick={() => setActiveScreenshotUrl(order.paymentScreenshotUrl ?? null)}
+                            className="inline-block border rounded-lg overflow-hidden bg-white p-1 hover:border-accent transition-all cursor-zoom-in"
+                          >
+                            <img
+                              src={order.paymentScreenshotUrl}
+                              alt="Payment Screenshot"
+                              className="max-w-[120px] max-h-[120px] object-contain"
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Payment/Pricing Summary & Status Management */}
@@ -541,6 +592,70 @@ export default function BookStorePage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'settings' && (
+        <div className="space-y-6 max-w-2xl">
+          <div className="bg-cardBg border border-border/80 rounded-2xl p-6 shadow-sm space-y-6">
+            <div>
+              <h3 className="text-sm font-bold text-text-primary">Global Payment UPI QR Code</h3>
+              <p className="text-xs text-text-secondary mt-1">
+                Upload the shop's UPI QR Code image. Students will see this image during checkout to make online payments.
+              </p>
+            </div>
+
+            {isQrLoading ? (
+              <div className="flex justify-center p-6">
+                <Loader2 className="w-6 h-6 text-accent animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="border border-border/60 rounded-xl p-4 bg-slate-50 flex flex-col items-center justify-center min-h-[220px]">
+                  {qrData?.paymentQrUrl ? (
+                    <div className="space-y-2 text-center">
+                      <img
+                        src={qrData.paymentQrUrl.startsWith('http') ? qrData.paymentQrUrl : ApiConstants.getAssetUrl(qrData.paymentQrUrl)}
+                        alt="Payment QR"
+                        className="max-w-[200px] max-h-[200px] object-contain border rounded-lg bg-white p-2"
+                      />
+                      <p className="text-[10px] text-text-secondary">Current Active QR Code</p>
+                    </div>
+                  ) : (
+                    <div className="text-center space-y-2">
+                      <p className="text-xs text-text-secondary font-semibold">No payment QR Code uploaded yet.</p>
+                      <p className="text-[10px] text-text-secondary">Students will see a placeholder until uploaded.</p>
+                    </div>
+                  )}
+                </div>
+
+                <form onSubmit={handleQrUpload} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-text-secondary">Select QR Image File (PNG/JPG)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setSelectedQrFile(e.target.files?.[0] || null)}
+                      className="w-full text-xs border border-border/80 rounded-xl p-2 bg-white outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={updateQrMutation.isPending || !selectedQrFile}
+                    className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-accent hover:bg-accent-onContainer text-white rounded-xl text-xs font-black shadow-lg shadow-accent/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {updateQrMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    <span>Update Payment QR Code</span>
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -841,6 +956,25 @@ export default function BookStorePage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SCREENSHOT LIGHTBOX */}
+      {activeScreenshotUrl && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+          <div className="relative max-w-4xl max-h-[90vh] overflow-hidden flex flex-col items-center">
+            <button
+              onClick={() => setActiveScreenshotUrl(null)}
+              className="absolute top-4 right-4 bg-black/60 text-white p-2 rounded-full hover:bg-black/80 transition-all z-10"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={activeScreenshotUrl}
+              alt="Verification Proof"
+              className="max-w-full max-h-[80vh] object-contain rounded-2xl border border-white/10 shadow-2xl"
+            />
           </div>
         </div>
       )}

@@ -472,6 +472,7 @@ export interface BookOrder {
   shippingName?: string | null;
   shippingPhone?: string | null;
   shippingAddress?: string | null;
+  paymentScreenshotUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   items?: BookOrderItem[];

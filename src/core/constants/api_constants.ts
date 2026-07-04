@@ -92,6 +92,8 @@ export const ApiConstants = {
     adminCoupons: '/books/admin/coupons',
     adminBooks: '/books/admin/books',
     adminBookDetail: (id: string) => `/books/admin/books/${id}`,
+    paymentQr: '/books/payment-qr',
+    adminPaymentQr: '/books/admin/payment-qr',
   },
   notifications: {
     sendImmediate: '/notifications/admin/send',

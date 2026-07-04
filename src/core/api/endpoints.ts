@@ -1376,6 +1376,34 @@ export function useLessonStats(lessonId: string) {
   });
 }
 
+export function usePaymentQr() {
+  return useQuery({
+    queryKey: ['paymentQr'],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.books.paymentQr);
+      return response.data.data;
+    },
+  });
+}
+
+export function useUpdatePaymentQr() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (qrFile: File) => {
+      const formData = new FormData();
+      formData.append('qrImage', qrFile);
+      const response = await apiClient.post(ApiConstants.books.adminPaymentQr, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentQr'] });
+    },
+  });
+}
+
+
 
 
 
