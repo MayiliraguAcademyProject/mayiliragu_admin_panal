@@ -198,6 +198,8 @@ export interface Question {
   type: string;
   question_text_en: string;
   question_text_ta?: string;
+  section_id?: string | null;
+  section_temp_id?: string | null;
   subject_id?: string;
   topic_id?: string;
   exam_category: string;
@@ -240,6 +242,9 @@ export interface Test {
   duration: number;
   cutoff_marks: number;
   total_marks: number;
+  is_sectioned?: boolean;
+  sections_count?: number;
+  sections?: any[];
   course_id?: string;
   module_id?: string;
   category_id?: string;

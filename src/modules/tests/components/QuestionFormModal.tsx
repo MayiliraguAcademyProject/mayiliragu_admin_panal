@@ -238,18 +238,16 @@ export default function QuestionFormModal({
     e.preventDefault();
     if (!questionTextEn || !categoryId) return;
 
-    const selectedCategory = categories.find(c => c.id === categoryId);
     const selectedSubjectObj = subjects.find(s => s.id === subjectId);
-    const selectedTopicObj = topics.find(t => t.id === topicId);
 
     // Dynamic schema validation & compile parameters
     const payload: any = {
       type,
       question_text_en: questionTextEn,
       question_text_ta: questionTextTa || undefined,
-      exam_category: selectedCategory?.name || categoryId,
-      subject_id: selectedSubjectObj?.name || undefined,
-      topic_id: selectedTopicObj?.name || undefined,
+      exam_category: categoryId,
+      subject_id: subjectId || undefined,
+      topic_id: topicId || undefined,
       difficulty,
       explanation_en: explanationEn || undefined,
       explanation_ta: explanationTa || undefined,

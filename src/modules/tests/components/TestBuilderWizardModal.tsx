@@ -53,6 +53,8 @@ export default function TestBuilderWizardModal({
   const [topicId, setTopicId] = useState('');
   const [isPublished, setIsPublished] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
+  const [isSectioned, setIsSectioned] = useState(false);
+  const [sections, setSections] = useState<Array<{ id?: string; tempId?: string; name: string; order: number; duration: number; cutoff_marks: number; total_marks: number }>>([]);
 
   // Step 2: Selected Questions State
   // Array of questions in order
@@ -96,6 +98,19 @@ export default function TestBuilderWizardModal({
       setTopicId(test.topic_id || '');
       setIsPublished(test.is_published);
       setScheduledAt(test.scheduled_at ? test.scheduled_at.substring(0, 16) : '');
+      setIsSectioned(test.is_sectioned || false);
+      if (test.sections) {
+        setSections(test.sections.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          order: s.order,
+          duration: s.duration,
+          cutoff_marks: s.cutoff_marks,
+          total_marks: s.total_marks
+        })));
+      } else {
+        setSections([]);
+      }
       if (test.questions) {
         // Sort by order and set
         const sorted = [...test.questions].sort((a, b) => a.order - b.order);
@@ -112,10 +127,19 @@ export default function TestBuilderWizardModal({
       setTopicId('');
       setIsPublished(false);
       setScheduledAt('');
+      setIsSectioned(false);
+      setSections([]);
       setSelectedQuestions([]);
       setStep(1);
     }
   }, [test, isOpen]);
+
+  // Keep duration in sync with sum of section durations if sectioned
+  useEffect(() => {
+    if (isSectioned && sections.length > 0) {
+      setDuration(sections.reduce((sum, s) => sum + s.duration, 0));
+    }
+  }, [isSectioned, sections]);
 
   // Dynamic sum of correct marks
   const totalMarks = useMemo(() => {
@@ -124,7 +148,13 @@ export default function TestBuilderWizardModal({
 
   const handleAddQuestion = (q: Question) => {
     if (selectedQuestions.some((item) => item.id === q.id)) return;
-    setSelectedQuestions([...selectedQuestions, q]);
+    const defaultSection = isSectioned && sections.length > 0 ? (sections[0].id || sections[0].tempId || sections[0].name) : null;
+    const newQ = {
+      ...q,
+      section_id: defaultSection,
+      section_temp_id: defaultSection
+    };
+    setSelectedQuestions([...selectedQuestions, newQ]);
   };
 
   const handleRemoveQuestion = (id: string) => {
@@ -156,7 +186,14 @@ export default function TestBuilderWizardModal({
 
     // Shuffle and pick
     const shuffled = [...unselected].sort(() => 0.5 - Math.random());
-    const toAdd = shuffled.slice(0, randomCount);
+    const toAdd = shuffled.slice(0, randomCount).map(q => {
+      const defaultSection = isSectioned && sections.length > 0 ? (sections[0].id || sections[0].tempId || sections[0].name) : null;
+      return {
+        ...q,
+        section_id: defaultSection,
+        section_temp_id: defaultSection
+      };
+    });
     setSelectedQuestions([...selectedQuestions, ...toAdd]);
   };
 
@@ -165,9 +202,32 @@ export default function TestBuilderWizardModal({
       alert('Test Title is required');
       return;
     }
+    if (step === 1 && isSectioned) {
+      if (sections.length === 0) {
+        alert('Please define at least one section for a Sectioned Test');
+        return;
+      }
+      const emptyName = sections.some(s => !s.name.trim());
+      if (emptyName) {
+        alert('All sections must have a valid name');
+        return;
+      }
+    }
     if (step === 2 && selectedQuestions.length === 0) {
       alert('Please select at least one question for this test');
       return;
+    }
+    if (step === 2 && isSectioned) {
+      // Check if any section has 0 questions
+      const emptySection = sections.find(s => {
+        const key = s.id || s.tempId || s.name;
+        const count = selectedQuestions.filter(q => q.section_id === key || q.section_temp_id === key || q.section_id === s.id).length;
+        return count === 0;
+      });
+      if (emptySection) {
+        alert(`Section "${emptySection.name}" has 0 questions. All sections must have at least one question.`);
+        return;
+      }
     }
     setStep(step + 1);
   };
@@ -179,7 +239,9 @@ export default function TestBuilderWizardModal({
   const handleSave = async () => {
     const questionsPayload = selectedQuestions.map((q, idx) => ({
       questionId: q.id,
-      order: idx
+      order: idx,
+      section_id: q.section_id || null,
+      section_temp_id: q.section_temp_id || null
     }));
 
     const payload = {
@@ -195,6 +257,16 @@ export default function TestBuilderWizardModal({
       topic_id: topicId || null,
       is_published: isPublished,
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      is_sectioned: isSectioned,
+      sections: isSectioned ? sections.map((s, idx) => ({
+        id: s.id,
+        tempId: s.tempId,
+        name: s.name,
+        order: idx,
+        duration: Number(s.duration),
+        cutoff_marks: Number(s.cutoff_marks),
+        total_marks: selectedQuestions.filter(q => q.section_id === s.id || q.section_temp_id === s.tempId || q.section_id === s.name).reduce((sum, q) => sum + (q.marks?.correct || 0), 0)
+      })) : [],
       questions: questionsPayload
     };
 
@@ -394,6 +466,156 @@ export default function TestBuilderWizardModal({
                   </div>
                 </div>
 
+                {/* Sectioned Test Toggle */}
+                <div className="flex items-center justify-between border-t border-border/40 pt-4">
+                  <div>
+                    <h5 className="text-xs font-extrabold text-text-primary uppercase flex items-center">
+                      <Sparkles className="w-3.5 h-3.5 mr-1 text-accent" />
+                      <span>Sectioned Test (e.g. Banking Format)</span>
+                    </h5>
+                    <p className="text-[10px] text-text-secondary font-medium">
+                      Divide the test into multiple timed sections (Reasoning, Quant, English, etc.).
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={isSectioned}
+                      onChange={(e) => {
+                        setIsSectioned(e.target.checked);
+                        if (e.target.checked && sections.length === 0) {
+                          setSections([{ tempId: 'sec_1', name: 'Section 1', order: 0, duration: 20, cutoff_marks: 35, total_marks: 0 }]);
+                        }
+                      }}
+                      className="sr-only peer" 
+                    />
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                  </label>
+                </div>
+
+                {/* Section Manager UI */}
+                {isSectioned && (
+                  <div className="border border-border/40 rounded-2xl p-4 bg-slate-50/10 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-[10px] font-extrabold text-text-primary uppercase tracking-wider">Test Sections</h5>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextOrder = sections.length;
+                          setSections([
+                            ...sections,
+                            {
+                              tempId: `sec_${Date.now()}`,
+                              name: `Section ${nextOrder + 1}`,
+                              order: nextOrder,
+                              duration: 20,
+                              cutoff_marks: 35,
+                              total_marks: 0
+                            }
+                          ]);
+                        }}
+                        className="px-2.5 py-1 text-[10px] font-extrabold text-accent border border-accent/40 rounded-lg hover:bg-accent/5 transition-colors flex items-center space-x-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Add Section</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {sections.map((sec, idx) => (
+                        <div key={sec.id || sec.tempId || idx} className="flex items-center gap-3 p-3 border border-border/50 rounded-xl bg-cardBg text-xs">
+                          <span className="font-extrabold text-text-secondary w-4 text-center">{idx + 1}</span>
+                          <div className="flex-1 grid grid-cols-3 gap-2">
+                            <input
+                              type="text"
+                              value={sec.name}
+                              placeholder="Section Name"
+                              onChange={(e) => {
+                                const newSecs = [...sections];
+                                newSecs[idx].name = e.target.value;
+                                setSections(newSecs);
+                              }}
+                              className="px-2 py-1 bg-white border border-border/60 rounded-lg text-xs font-semibold text-text-primary outline-none focus:border-accent"
+                            />
+                            <input
+                              type="number"
+                              value={sec.duration}
+                              placeholder="Duration (min)"
+                              onChange={(e) => {
+                                const newSecs = [...sections];
+                                newSecs[idx].duration = Math.max(1, Number(e.target.value));
+                                setSections(newSecs);
+                              }}
+                              className="px-2 py-1 bg-white border border-border/60 rounded-lg text-xs font-semibold text-text-primary outline-none focus:border-accent"
+                            />
+                            <input
+                              type="number"
+                              value={sec.cutoff_marks}
+                              placeholder="Cutoff (%)"
+                              onChange={(e) => {
+                                const newSecs = [...sections];
+                                newSecs[idx].cutoff_marks = Math.max(0, Number(e.target.value));
+                                setSections(newSecs);
+                              }}
+                              className="px-2 py-1 bg-white border border-border/60 rounded-lg text-xs font-semibold text-text-primary outline-none focus:border-accent"
+                            />
+                          </div>
+                          
+                          <div className="flex items-center space-x-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (idx === 0) return;
+                                const newSecs = [...sections];
+                                const temp = newSecs[idx];
+                                newSecs[idx] = newSecs[idx - 1];
+                                newSecs[idx - 1] = temp;
+                                newSecs.forEach((s, i) => s.order = i);
+                                setSections(newSecs);
+                              }}
+                              disabled={idx === 0}
+                              className="p-1 text-text-secondary hover:text-accent disabled:opacity-20 transition-colors"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (idx === sections.length - 1) return;
+                                const newSecs = [...sections];
+                                const temp = newSecs[idx];
+                                newSecs[idx] = newSecs[idx + 1];
+                                newSecs[idx + 1] = temp;
+                                newSecs.forEach((s, i) => s.order = i);
+                                setSections(newSecs);
+                              }}
+                              disabled={idx === sections.length - 1}
+                              className="p-1 text-text-secondary hover:text-accent disabled:opacity-20 transition-colors"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (sections.length <= 1) return;
+                                if (confirm('Are you sure you want to delete this section? Linked questions will lose their section tag.')) {
+                                  const newSecs = sections.filter((_, i) => i !== idx);
+                                  newSecs.forEach((s, i) => s.order = i);
+                                  setSections(newSecs);
+                                }
+                              }}
+                              disabled={sections.length <= 1}
+                              className="p-1 text-text-secondary hover:text-rose-500 disabled:opacity-20 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
               </div>
             </div>
           )}
@@ -424,7 +646,7 @@ export default function TestBuilderWizardModal({
                     >
                       <option value="all">All Subjects</option>
                       {subjects.map((s) => (
-                        <option key={s.id} value={s.name}>{s.name}</option>
+                        <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
 
@@ -571,13 +793,42 @@ export default function TestBuilderWizardModal({
                         className="p-3 border border-border/60 rounded-xl bg-cardBg flex items-center justify-between gap-3 text-xs"
                       >
                         <span className="font-extrabold text-text-secondary w-4 text-center">{idx + 1}</span>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 space-y-1">
                           <p className="font-extrabold text-text-primary truncate">{q.question_text_en}</p>
                           <div className="flex items-center space-x-2 text-[9px] font-bold text-text-secondary uppercase">
                             <span>{q.type.replace('_', ' ')}</span>
                             <span>•</span>
                             <span>{q.marks?.correct || 1} Marks</span>
                           </div>
+                          {isSectioned && sections.length > 0 && (
+                            <div className="flex items-center space-x-1.5 mt-1">
+                              <span className="text-[9px] font-black text-text-secondary uppercase">Section:</span>
+                              <select
+                                value={q.section_id || q.section_temp_id || sections[0].id || sections[0].tempId || ''}
+                                onChange={(e) => {
+                                  const targetVal = e.target.value;
+                                  setSelectedQuestions(selectedQuestions.map((item) => {
+                                    if (item.id === q.id) {
+                                      const matchingSec = sections.find(s => s.id === targetVal || s.tempId === targetVal || s.name === targetVal);
+                                      return {
+                                        ...item,
+                                        section_id: matchingSec?.id || null,
+                                        section_temp_id: matchingSec?.tempId || matchingSec?.id || null
+                                      };
+                                    }
+                                    return item;
+                                  }));
+                                }}
+                                className="px-1.5 py-0.5 bg-white border border-border/60 rounded text-[9px] font-bold text-text-secondary outline-none focus:border-accent"
+                              >
+                                {sections.map((s) => (
+                                  <option key={s.id || s.tempId || s.name} value={s.id || s.tempId || s.name}>
+                                    {s.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                         </div>
 
                         {/* Order rearrangement controls */}
@@ -660,6 +911,27 @@ export default function TestBuilderWizardModal({
                     </span>
                   </div>
                 </div>
+
+                {isSectioned && sections.length > 0 && (
+                  <div className="border-t border-border/40 pt-4 space-y-2">
+                    <h5 className="text-[10px] font-extrabold text-text-primary uppercase tracking-wider">Sections Breakdown</h5>
+                    <div className="space-y-2">
+                      {sections.map((s, idx) => {
+                        const key = s.id || s.tempId || s.name;
+                        const count = selectedQuestions.filter(q => q.section_id === key || q.section_temp_id === key || q.section_id === s.id).length;
+                        const marks = selectedQuestions.filter(q => q.section_id === key || q.section_temp_id === key || q.section_id === s.id).reduce((sum, q) => sum + (q.marks?.correct || 0), 0);
+                        return (
+                          <div key={idx} className="flex justify-between text-xs p-2 bg-slate-50 rounded-lg">
+                            <span className="font-extrabold text-text-primary">{s.name}</span>
+                            <span className="font-medium text-text-secondary">
+                              {s.duration} min | {count} Qs | {marks} Marks | Cutoff: {s.cutoff_marks}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="border-t border-border/40 pt-4">
                   <div className="flex items-center justify-between">

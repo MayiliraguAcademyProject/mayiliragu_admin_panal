@@ -148,12 +148,18 @@ export default function CategoryDetailPage() {
 
       // Filter by topic if selected
       if (selectedTop) {
-        const qTopicId = q.topic_id?.toLowerCase();
-        const topName = selectedTop.name.toLowerCase();
-        if (qTopicId && (qTopicId.includes(topName) || topName.includes(qTopicId))) {
+        const normalize = (str: string) => str.toLowerCase().replace(/[\s_]+/g, '');
+        const qTopicId = q.topic_id ? normalize(q.topic_id) : '';
+        const topName = normalize(selectedTop.name);
+        const topId = normalize(selectedTop.id);
+
+        if (qTopicId && (qTopicId.includes(topName) || topName.includes(qTopicId) || qTopicId.includes(topId) || topId.includes(qTopicId))) {
           return true;
         }
-        return q.tags.some((tag) => tag.toLowerCase().includes(topName));
+        return q.tags.some((tag) => {
+          const tagNorm = normalize(tag);
+          return tagNorm.includes(topName) || tagNorm.includes(topId);
+        });
       }
 
       return true;
