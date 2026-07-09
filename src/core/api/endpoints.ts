@@ -828,9 +828,12 @@ export async function exportQuestionsToExcel(filters: {
 export function useImportQuestions() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, testId }: { file: File; testId?: string }) => {
       const formData = new FormData();
       formData.append('file', file);
+      if (testId) {
+        formData.append('testId', testId);
+      }
       const response = await apiClient.post(ApiConstants.questions.import, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',

@@ -223,9 +223,17 @@ export interface Question {
   correct_answer?: boolean;
   accepted_answers?: any;
   hint?: string;
-  max_characters?: number;
   model_answer?: string;
   word_limit?: number;
+  images?: any;
+  shared_context_en?: string;
+  shared_context_ta?: string;
+  table_data?: any;
+  sharedContextEn?: string;
+  sharedContextTa?: string;
+  tableData?: any;
+  question_image_url?: string;
+  questionTextEn?: string;
 }
 
 export interface QuestionStats {

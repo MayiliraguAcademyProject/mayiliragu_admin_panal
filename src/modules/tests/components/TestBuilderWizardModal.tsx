@@ -59,6 +59,7 @@ export default function TestBuilderWizardModal({
   // Step 2: Selected Questions State
   // Array of questions in order
   const [selectedQuestions, setSelectedQuestions] = useState<Question[]>([]);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   // Step 2 Filters
   const [repoSubject, setRepoSubject] = useState('all');
@@ -197,6 +198,26 @@ export default function TestBuilderWizardModal({
     setSelectedQuestions([...selectedQuestions, ...toAdd]);
   };
 
+  const handleSelectAll = () => {
+    const defaultSection = isSectioned && sections.length > 0 ? (sections[0].id || sections[0].tempId || sections[0].name) : null;
+    const unselected = filteredRepoQuestions.filter(
+      (q) => !selectedQuestions.some((selected) => selected.id === q.id)
+    );
+    if (unselected.length === 0) return;
+
+    const toAdd = unselected.map(q => ({
+      ...q,
+      section_id: defaultSection,
+      section_temp_id: defaultSection
+    }));
+    setSelectedQuestions([...selectedQuestions, ...toAdd]);
+  };
+
+  const handleDeselectAll = () => {
+    const filteredIds = new Set(filteredRepoQuestions.map((q) => q.id));
+    setSelectedQuestions(selectedQuestions.filter((q) => !filteredIds.has(q.id)));
+  };
+
   const handleNext = () => {
     if (step === 1 && !title.trim()) {
       alert('Test Title is required');
@@ -277,7 +298,7 @@ export default function TestBuilderWizardModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-5xl h-[88vh] bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="w-full max-w-6xl h-[88vh] bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
         
         {/* Header */}
         <div className="p-6 border-b border-border/45 flex items-center justify-between bg-slate-50/50">
@@ -632,9 +653,25 @@ export default function TestBuilderWizardModal({
                       <BookOpen className="w-3.5 h-3.5 mr-1 text-accent" />
                       <span>Question Repository</span>
                     </h4>
-                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-md font-bold text-text-secondary">
-                      {filteredRepoQuestions.length} Matches
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={handleSelectAll}
+                        className="text-[10px] bg-accent/10 border border-accent/25 hover:bg-accent/20 px-2.5 py-0.5 rounded-md font-black text-accent uppercase tracking-wider transition-colors"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeselectAll}
+                        className="text-[10px] bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 px-2.5 py-0.5 rounded-md font-black text-rose-500 uppercase tracking-wider transition-colors"
+                      >
+                        Deselect All
+                      </button>
+                      <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-md font-bold text-text-secondary">
+                        {filteredRepoQuestions.length} Matches
+                      </span>
+                    </div>
                   </div>
 
                   {/* Filter Toolbar */}
@@ -868,88 +905,284 @@ export default function TestBuilderWizardModal({
 
           {/* STEP 3: REVIEW & PUBLISH */}
           {step === 3 && (
-            <div className="flex-1 overflow-y-auto space-y-6 max-w-xl mx-auto w-full py-4">
-              <div className="border border-border/65 rounded-2xl p-6 space-y-4 bg-slate-50/10">
-                <h4 className="text-xs font-black text-text-primary uppercase tracking-wider border-b border-border/40 pb-2">
-                  Test Specification Review
-                </h4>
+            <div className="flex-1 overflow-y-auto w-full py-4 px-2">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                {/* Left Column: Spec Review */}
+                <div className="lg:col-span-5 space-y-6">
+                  <div className="border border-border/65 rounded-3xl p-6 space-y-4 bg-slate-50/10 shadow-xs">
+                    <h4 className="text-xs font-black text-text-primary uppercase tracking-wider border-b border-border/40 pb-2">
+                      Test Specification Review
+                    </h4>
 
-                <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-xs font-medium text-text-secondary">
-                  <div>
-                    <span className="block text-[10px] font-bold text-text-secondary uppercase">Title</span>
-                    <span className="font-extrabold text-text-primary">{title}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-text-secondary uppercase">Duration</span>
-                    <span className="font-extrabold text-text-primary">{duration} Minutes</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-text-secondary uppercase">Total Questions</span>
-                    <span className="font-extrabold text-text-primary">{selectedQuestions.length} Questions</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-text-secondary uppercase">Total Marks</span>
-                    <span className="font-extrabold text-text-primary">{totalMarks} Marks</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-text-secondary uppercase">Cutoff Percent</span>
-                    <span className="font-extrabold text-text-primary">{cutoffMarks}%</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-text-secondary uppercase">Passing Score</span>
-                    <span className="font-extrabold text-text-primary">
-                      {((cutoffMarks / 100) * totalMarks).toFixed(1)} / {totalMarks} Marks
-                    </span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-text-secondary uppercase">Scheduled Date</span>
-                    <span className="font-extrabold text-text-primary text-accent">
-                      {scheduledAt ? new Date(scheduledAt).toLocaleString(undefined, {
-                        dateStyle: 'medium',
-                        timeStyle: 'short'
-                      }) : 'Instant / Always Available'}
-                    </span>
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-xs font-medium text-text-secondary">
+                      <div>
+                        <span className="block text-[10px] font-bold text-text-secondary uppercase">Title</span>
+                        <span className="font-extrabold text-text-primary">{title}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-text-secondary uppercase">Duration</span>
+                        <span className="font-extrabold text-text-primary">{duration} Minutes</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-text-secondary uppercase">Total Questions</span>
+                        <span className="font-extrabold text-text-primary">{selectedQuestions.length} Questions</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-text-secondary uppercase">Total Marks</span>
+                        <span className="font-extrabold text-text-primary">{totalMarks} Marks</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-text-secondary uppercase">Cutoff Percent</span>
+                        <span className="font-extrabold text-text-primary">{cutoffMarks}%</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-text-secondary uppercase">Passing Score</span>
+                        <span className="font-extrabold text-text-primary">
+                          {((cutoffMarks / 100) * totalMarks).toFixed(1)} / {totalMarks} Marks
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-text-secondary uppercase">Scheduled Date</span>
+                        <span className="font-extrabold text-text-primary text-accent">
+                          {scheduledAt ? new Date(scheduledAt).toLocaleString(undefined, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short'
+                          }) : 'Instant / Always Available'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {isSectioned && sections.length > 0 && (
+                      <div className="border-t border-border/40 pt-4 space-y-2">
+                        <h5 className="text-[10px] font-extrabold text-text-primary uppercase tracking-wider">Sections Breakdown</h5>
+                        <div className="space-y-2">
+                          {sections.map((s, idx) => {
+                            const key = s.id || s.tempId || s.name;
+                            const count = selectedQuestions.filter(q => q.section_id === key || q.section_temp_id === key || q.section_id === s.id).length;
+                            const marks = selectedQuestions.filter(q => q.section_id === key || q.section_temp_id === key || q.section_id === s.id).reduce((sum, q) => sum + (q.marks?.correct || 0), 0);
+                            return (
+                              <div key={idx} className="flex justify-between text-xs p-2 bg-slate-50 rounded-lg">
+                                <span className="font-extrabold text-text-primary">{s.name}</span>
+                                <span className="font-medium text-text-secondary">
+                                  {s.duration} min | {count} Qs | {marks} Marks | Cutoff: {s.cutoff_marks}%
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="border-t border-border/40 pt-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h5 className="text-xs font-extrabold text-text-primary uppercase">Publish Test Profile</h5>
+                          <p className="text-[10px] text-text-secondary font-medium">
+                            If published, students will be able to take this assessment immediately.
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={isPublished}
+                            onChange={(e) => setIsPublished(e.target.checked)}
+                            className="sr-only peer" 
+                          />
+                          <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {isSectioned && sections.length > 0 && (
-                  <div className="border-t border-border/40 pt-4 space-y-2">
-                    <h5 className="text-[10px] font-extrabold text-text-primary uppercase tracking-wider">Sections Breakdown</h5>
-                    <div className="space-y-2">
-                      {sections.map((s, idx) => {
-                        const key = s.id || s.tempId || s.name;
-                        const count = selectedQuestions.filter(q => q.section_id === key || q.section_temp_id === key || q.section_id === s.id).length;
-                        const marks = selectedQuestions.filter(q => q.section_id === key || q.section_temp_id === key || q.section_id === s.id).reduce((sum, q) => sum + (q.marks?.correct || 0), 0);
+                {/* Right Column: Student Preview Simulator */}
+                <div className="lg:col-span-7 space-y-4">
+                  <div className="border border-border/60 rounded-3xl p-6 bg-slate-50/30 flex flex-col space-y-4">
+                    <div className="flex items-center justify-between border-b border-border/40 pb-3">
+                      <div>
+                        <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">
+                          Student Exam View Simulator
+                        </h4>
+                        <p className="text-[10px] text-text-secondary font-bold mt-0.5">
+                          Verify layout, passage alignment, and options rendering
+                        </p>
+                      </div>
+                      
+                      {selectedQuestions.length > 0 && (
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            disabled={previewIndex === 0}
+                            onClick={() => setPreviewIndex(prev => prev - 1)}
+                            className="p-1 border border-border rounded-lg bg-white disabled:opacity-30 hover:bg-slate-50 transition-colors"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <span className="text-[11px] font-black text-text-primary">
+                            Q. {previewIndex + 1} of {selectedQuestions.length}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={previewIndex === selectedQuestions.length - 1}
+                            onClick={() => setPreviewIndex(prev => prev + 1)}
+                            className="p-1 border border-border rounded-lg bg-white disabled:opacity-30 hover:bg-slate-50 transition-colors"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedQuestions.length === 0 ? (
+                      <div className="text-center py-12 text-xs font-bold text-text-secondary">
+                        No questions selected. Go back to Step 2 to add questions.
+                      </div>
+                    ) : (
+                      (() => {
+                        const q = selectedQuestions[previewIndex];
+                        if (!q) return null;
+
                         return (
-                          <div key={idx} className="flex justify-between text-xs p-2 bg-slate-50 rounded-lg">
-                            <span className="font-extrabold text-text-primary">{s.name}</span>
-                            <span className="font-medium text-text-secondary">
-                              {s.duration} min | {count} Qs | {marks} Marks | Cutoff: {s.cutoff_marks}%
-                            </span>
+                          <div className="space-y-4">
+                            {/* Question metadata badge */}
+                            <div className="flex items-center space-x-2">
+                              <span className="px-2 py-0.5 rounded text-[9px] font-black bg-accent/10 text-accent uppercase border border-accent/20">
+                                {q.type?.replace('_', ' ')}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[9px] font-black bg-slate-100 text-slate-650 uppercase border border-slate-200">
+                                {q.difficulty}
+                              </span>
+                              {q.marks?.correct !== undefined && (
+                                <span className="px-2 py-0.5 rounded text-[9px] font-black bg-emerald-50 text-emerald-700 uppercase border border-emerald-200">
+                                  +{q.marks.correct} Marks
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Shared Context / Passage */}
+                            {(q.sharedContextEn || q.shared_context_en) && (
+                              <div className="bg-white border border-border/60 rounded-2xl p-4 text-[11px] leading-relaxed text-text-secondary max-h-48 overflow-y-auto shadow-inner">
+                                <div className="font-extrabold border-b border-border/30 pb-1 mb-2 text-[9px] uppercase tracking-wider text-text-primary">
+                                  Common Passage / Directions
+                                </div>
+                                <div className="whitespace-pre-wrap">{q.sharedContextEn || q.shared_context_en}</div>
+                              </div>
+                            )}
+
+                            {/* Table Data */}
+                            {(q.tableData || q.table_data) && (
+                              (() => {
+                                let parsedTable = null;
+                                const tableDataVal = q.tableData || q.table_data;
+                                try {
+                                  parsedTable = typeof tableDataVal === 'string' ? JSON.parse(tableDataVal) : tableDataVal;
+                                } catch (e) {
+                                  try {
+                                    const rows = tableDataVal.split('\n').map((r: string) => r.split(/[,\t]/).map(c => c.trim()));
+                                    if (rows.length > 0 && rows[0].length > 0) parsedTable = rows;
+                                  } catch (err) {}
+                                }
+
+                                if (parsedTable && Array.isArray(parsedTable) && parsedTable.length > 0) {
+                                  return (
+                                    <div className="overflow-x-auto border border-border/80 rounded-xl shadow-xs">
+                                      <table className="w-full text-left text-[10px] border-collapse bg-white">
+                                        <tbody>
+                                          {parsedTable.map((row: any, rIdx: number) => {
+                                            const cells = Array.isArray(row) ? row : Object.values(row);
+                                            return (
+                                              <tr key={rIdx} className={rIdx === 0 ? 'bg-slate-50 font-bold border-b border-border/60' : 'border-b border-border/30'}>
+                                                {cells.map((cell: any, cIdx: number) => (
+                                                  <td key={cIdx} className="p-2 border border-border/20 text-center text-text-primary font-medium">
+                                                    {cell}
+                                                  </td>
+                                                ))}
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()
+                            )}
+
+                            {/* Image Asset */}
+                            {(() => {
+                              const imageUrl = (() => {
+                                if (!q.images) return q.question_image_url || '';
+                                if (Array.isArray(q.images)) {
+                                  return (q.images[0] as any)?.url || q.images[0] || '';
+                                }
+                                if (typeof q.images === 'string') {
+                                  try {
+                                    const parsed = JSON.parse(q.images);
+                                    if (Array.isArray(parsed)) {
+                                      return parsed[0]?.url || parsed[0] || '';
+                                    }
+                                    return parsed.url || parsed || '';
+                                  } catch (e) {
+                                    return q.images;
+                                  }
+                                }
+                                return '';
+                              })();
+                              
+                              if (!imageUrl) return null;
+                              
+                              return (
+                                <div className="border border-border/60 rounded-2xl overflow-hidden max-h-56 bg-white flex justify-center p-2 shadow-xs">
+                                  <img
+                                    src={imageUrl}
+                                    alt="Question Asset"
+                                    className="max-h-52 w-auto object-contain"
+                                  />
+                                </div>
+                              );
+                            })()}
+
+                            {/* Question Text */}
+                            <div className="space-y-2">
+                              <p className="text-xs font-extrabold text-text-primary leading-relaxed whitespace-pre-wrap">
+                                {q.question_text_en || q.questionTextEn}
+                              </p>
+                              {q.question_text_ta && (
+                                <p className="text-xs font-semibold text-text-secondary leading-relaxed border-t border-border/20 pt-2 italic">
+                                  {q.question_text_ta}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Options cards */}
+                            {q.options && Array.isArray(q.options) && q.options.length > 0 && (
+                              <div className="grid grid-cols-1 gap-2.5 pt-2">
+                                {q.options.map((opt: any, oIdx: number) => (
+                                  <div
+                                    key={opt.id || oIdx}
+                                    className="border rounded-xl p-3 flex items-start space-x-3 bg-white shadow-xs transition-colors border-border/80"
+                                  >
+                                    <div className="w-4 h-4 rounded-full border border-border bg-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                                      <div className="w-2 h-2 rounded-full bg-transparent"></div>
+                                    </div>
+                                    <div className="text-[11px] leading-relaxed text-text-primary flex-1">
+                                      <span className="font-extrabold text-accent">{opt.label || opt.key || String.fromCharCode(65 + oIdx)}.</span> {opt.text_en || opt.text}
+                                    </div>
+                                    {opt.is_correct && (
+                                      <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold px-1.5 py-0.5 rounded-lg flex-shrink-0">
+                                        CORRECT KEY
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="border-t border-border/40 pt-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h5 className="text-xs font-extrabold text-text-primary uppercase">Publish Test Profile</h5>
-                      <p className="text-[10px] text-text-secondary font-medium">
-                        If published, students will be able to take this assessment immediately.
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={isPublished}
-                        onChange={(e) => setIsPublished(e.target.checked)}
-                        className="sr-only peer" 
-                      />
-                      <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
-                    </label>
+                      })()
+                    )}
                   </div>
                 </div>
 
