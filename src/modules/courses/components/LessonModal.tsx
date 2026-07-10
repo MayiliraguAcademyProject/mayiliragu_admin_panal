@@ -90,7 +90,7 @@ export default function LessonModal({
             </p>
             <div className="flex items-center justify-between bg-white border border-[#B8D6FF] rounded-xl px-3 py-1.5 mt-2">
               <span className="text-[10px] text-text-primary font-mono select-all truncate max-w-[80%]">
-                education-app@mayiliragu.iam.gserviceaccount.com
+                mayiliraguacadamy@mayiliragu-501911.iam.gserviceaccount.com
               </span>
               <button
                 type="button"

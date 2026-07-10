@@ -51,7 +51,7 @@ export default function CourseDetailPage() {
   const [deletingLessonTitle, setDeletingLessonTitle] = useState<string>('');
 
   const handleCopyEmail = () => {
-    navigator.clipboard.writeText('education-app@mayiliragu.iam.gserviceaccount.com');
+    navigator.clipboard.writeText('mayiliraguacadamy@mayiliragu-501911.iam.gserviceaccount.com');
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
   };

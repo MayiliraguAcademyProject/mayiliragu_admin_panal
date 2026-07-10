@@ -58,6 +58,11 @@ export default function TestsPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'bank' | 'connect' | 'builder' | 'analytics'>('bank');
 
+  // Analytics tab filters
+  const [attemptsSearch, setAttemptsSearch] = useState('');
+  const [attemptsTestFilter, setAttemptsTestFilter] = useState('All Tests');
+  const [attemptsStatusFilter, setAttemptsStatusFilter] = useState<'all' | 'passed' | 'failed'>('all');
+
   // Zustand Store replaced with API queries/mutations
   const { data: categories = [] } = useExamCategories();
   const createCategoryMutation = useCreateCategory();
@@ -766,95 +771,217 @@ export default function TestsPage() {
         {/* ========================================== */}
         {/* TAB 4: TEST ANALYTICS */}
         {/* ========================================== */}
-        {activeTab === 'analytics' && (
-          <div className="space-y-6 animate-fade-in">
-            {/* Visual Analytics overview cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                { label: 'Total Test Submissions', val: (analyticsStats?.total_submissions ?? 0).toLocaleString(), icon: Users, delta: 'Total attempts', color: 'text-blue-500 bg-blue-500/10' },
-                { label: 'Avg. Accuracy Rate', val: `${analyticsStats?.avg_accuracy ?? 0}%`, icon: Award, delta: 'All questions', color: 'text-emerald-500 bg-emerald-500/10' },
-                { label: 'Active Test Takers', val: (analyticsStats?.active_takers ?? 0).toLocaleString(), icon: TrendingUp, delta: 'Unique students', color: 'text-purple-500 bg-purple-500/10' },
-              ].map((c, idx) => (
-                <div key={idx} className="bg-cardBg border border-border/45 rounded-2xl p-5 flex items-center justify-between shadow-xs">
-                  <div className="space-y-1">
-                    <p className="text-[11px] text-text-secondary font-bold uppercase tracking-wider">{c.label}</p>
-                    <p className="text-2xl font-black text-text-primary">{c.val}</p>
-                    <p className="text-[10px] text-emerald-600 font-bold">{c.delta}</p>
-                  </div>
-                  <div className={`p-3 rounded-2xl ${c.color}`}>
-                    <c.icon className="w-5 h-5" />
-                  </div>
-                </div>
-              ))}
-            </div>
+        {activeTab === 'analytics' && (() => {
+          // Unique test titles for filter dropdown
+          const uniqueTests = Array.from(new Set(attempts.map(a => a.testTitle))).sort();
 
-            <div className="bg-cardBg border border-border/40 rounded-3xl overflow-hidden shadow-xs">
-              <div className="p-6 border-b border-border/40 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider">Student Performance Log</h3>
-                  <p className="text-[11px] text-text-secondary font-medium mt-0.5">
-                    Real-time detailed scoreboard of student test attempts.
-                  </p>
+          // Filtered attempts
+          const filteredAttempts = attempts.filter(att => {
+            const q = attemptsSearch.toLowerCase();
+            const matchSearch = !q ||
+              att.studentName.toLowerCase().includes(q) ||
+              att.studentEmail.toLowerCase().includes(q) ||
+              att.testTitle.toLowerCase().includes(q);
+            const matchTest = attemptsTestFilter === 'All Tests' || att.testTitle === attemptsTestFilter;
+            const matchStatus =
+              attemptsStatusFilter === 'all' ||
+              (attemptsStatusFilter === 'passed' && att.passed) ||
+              (attemptsStatusFilter === 'failed' && !att.passed);
+            return matchSearch && matchTest && matchStatus;
+          });
+
+          const totalAttempts = filteredAttempts.length;
+          const avgAccuracy = totalAttempts > 0
+            ? Math.round(filteredAttempts.reduce((s, a) => s + a.accuracy, 0) / totalAttempts)
+            : 0;
+          const passCount = filteredAttempts.filter(a => a.passed).length;
+          const passRate = totalAttempts > 0 ? Math.round((passCount / totalAttempts) * 100) : 0;
+          const avgTime = totalAttempts > 0
+            ? Math.round(filteredAttempts.reduce((s, a) => s + a.timeTaken, 0) / totalAttempts)
+            : 0;
+
+          return (
+            <div className="space-y-5 animate-fade-in">
+
+              {/* Summary stat cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: 'Total Attempts', val: totalAttempts.toLocaleString(), icon: Users, color: 'text-blue-500 bg-blue-500/10' },
+                  { label: 'Avg. Accuracy', val: `${avgAccuracy}%`, icon: Award, color: 'text-emerald-500 bg-emerald-500/10' },
+                  { label: 'Pass Rate', val: `${passRate}%`, icon: CheckCircle, color: 'text-violet-500 bg-violet-500/10' },
+                  { label: 'Avg. Time', val: `${Math.floor(avgTime / 60)}m ${avgTime % 60}s`, icon: TrendingUp, color: 'text-amber-500 bg-amber-500/10' },
+                ].map((c, idx) => (
+                  <div key={idx} className="bg-cardBg border border-border/45 rounded-2xl p-4 flex items-center justify-between shadow-xs">
+                    <div>
+                      <p className="text-[10px] text-text-secondary font-bold uppercase tracking-wider">{c.label}</p>
+                      <p className="text-2xl font-black text-text-primary mt-0.5">{c.val}</p>
+                    </div>
+                    <div className={`p-2.5 rounded-xl ${c.color}`}>
+                      <c.icon className="w-5 h-5" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Filter / Search Bar */}
+              <div className="bg-cardBg border border-border/45 rounded-2xl p-4 flex flex-col md:flex-row md:items-center gap-3 shadow-xs">
+                <div className="flex-1 flex items-center bg-slate-50 border border-border/50 rounded-xl px-3 py-2">
+                  <Search className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search by student name, email or test..."
+                    value={attemptsSearch}
+                    onChange={e => setAttemptsSearch(e.target.value)}
+                    className="w-full bg-transparent text-xs text-text-primary placeholder-gray-400 outline-none"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={attemptsTestFilter}
+                    onChange={e => setAttemptsTestFilter(e.target.value)}
+                    className="px-3 py-2 bg-slate-50 border border-border/50 rounded-xl text-xs font-bold text-text-secondary outline-none focus:border-accent"
+                  >
+                    <option value="All Tests">All Tests</option>
+                    {uniqueTests.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <div className="flex rounded-xl border border-border/50 overflow-hidden text-[11px] font-bold">
+                    {(['all', 'passed', 'failed'] as const).map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setAttemptsStatusFilter(s)}
+                        className={`px-3 py-2 capitalize transition-colors ${
+                          attemptsStatusFilter === s
+                            ? s === 'passed' ? 'bg-emerald-500 text-white' : s === 'failed' ? 'bg-rose-500 text-white' : 'bg-accent text-white'
+                            : 'bg-slate-50 text-text-secondary hover:bg-slate-100'
+                        }`}
+                      >
+                        {s === 'all' ? 'All' : s === 'passed' ? 'Passed' : 'Failed'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {attempts.length === 0 ? (
-                <div className="p-12 text-center text-text-secondary font-bold text-xs">
-                  No student attempts recorded yet.
+              {/* Results Table */}
+              <div className="bg-cardBg border border-border/40 rounded-3xl overflow-hidden shadow-xs">
+                <div className="p-5 border-b border-border/40 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider">Student Test Results</h3>
+                    <p className="text-[11px] text-text-secondary font-medium mt-0.5">
+                      {filteredAttempts.length} result{filteredAttempts.length !== 1 ? 's' : ''} found
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <div className="overflow-x-auto font-sans">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-55 border-b border-border/40 text-[10px] font-bold text-text-secondary uppercase tracking-wider">
-                        <th className="py-3 px-5">Student</th>
-                        <th className="py-3 px-4">Test Title</th>
-                        <th className="py-3 px-4 text-center">Score</th>
-                        <th className="py-3 px-4 text-center">Accuracy</th>
-                        <th className="py-3 px-4 text-center">Duration</th>
-                        <th className="py-3 px-4">Date</th>
-                        <th className="py-3 px-5 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/30">
-                      {attempts.map((att) => (
-                        <tr key={att.id} className="hover:bg-slate-50/50 transition-colors text-xs font-semibold text-text-primary">
-                          <td className="py-4 px-5">
-                            <div>
-                              <p className="font-extrabold">{att.studentName}</p>
-                              <p className="text-[10px] text-text-secondary font-medium">{att.studentEmail}</p>
-                            </div>
-                          </td>
-                          <td className="py-4 px-4 text-accent font-extrabold">{att.testTitle}</td>
-                          <td className="py-4 px-4 text-center font-bold">{att.totalScore} pts</td>
-                          <td className="py-4 px-4 text-center font-bold text-emerald-600">{att.accuracy}%</td>
-                          <td className="py-4 px-4 text-center text-text-secondary font-bold">
-                            {Math.floor(att.timeTaken / 60)}m {att.timeTaken % 60}s
-                          </td>
-                          <td className="py-4 px-4 text-text-secondary font-medium">
-                            {new Date(att.createdAt).toLocaleDateString(undefined, {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </td>
-                          <td className="py-4 px-5 text-center">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                              att.passed ? 'bg-emerald-500/10 text-emerald-700' : 'bg-rose-500/10 text-rose-700'
-                            }`}>
-                              {att.passed ? 'Passed' : 'Failed'}
-                            </span>
-                          </td>
+
+                {filteredAttempts.length === 0 ? (
+                  <div className="p-14 text-center">
+                    <div className="w-12 h-12 rounded-xl bg-slate-50 text-gray-400 flex items-center justify-center mx-auto shadow-inner mb-3">
+                      <FileText className="w-5 h-5 stroke-[1.5]" />
+                    </div>
+                    <p className="text-xs font-extrabold text-text-primary">No Results Found</p>
+                    <p className="text-[11px] text-text-secondary mt-1">Try adjusting your search or filters.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[900px]">
+                      <thead>
+                        <tr className="bg-slate-50/80 border-b border-border/40 text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                          <th className="py-3 px-4 w-8 text-center">#</th>
+                          <th className="py-3 px-4">Student</th>
+                          <th className="py-3 px-4">Test</th>
+                          <th className="py-3 px-4 text-center">Score</th>
+                          <th className="py-3 px-4 text-center">Accuracy</th>
+                          <th className="py-3 px-3 text-center text-emerald-700">✓ Correct</th>
+                          <th className="py-3 px-3 text-center text-rose-600">✗ Wrong</th>
+                          <th className="py-3 px-3 text-center text-amber-600">— Skipped</th>
+                          <th className="py-3 px-4 text-center">Rank</th>
+                          <th className="py-3 px-4 text-center">Duration</th>
+                          <th className="py-3 px-4">Date</th>
+                          <th className="py-3 px-4 text-center">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody className="divide-y divide-border/25">
+                        {filteredAttempts.map((att, idx) => (
+                          <tr key={att.id} className="hover:bg-slate-50/60 transition-colors text-xs font-semibold text-text-primary">
+                            <td className="py-4 px-4 text-center text-text-secondary font-bold">{idx + 1}</td>
+                            <td className="py-4 px-4">
+                              <div>
+                                <p className="font-extrabold text-text-primary">{att.studentName}</p>
+                                <p className="text-[10px] text-text-secondary font-medium">{att.studentEmail}</p>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <p className="font-extrabold text-accent max-w-[180px] truncate" title={att.testTitle}>{att.testTitle}</p>
+                            </td>
+                            <td className="py-4 px-4 text-center">
+                              <div className="inline-flex flex-col items-center">
+                                <span className="font-black text-text-primary text-sm">{att.totalScore}</span>
+                                <span className="text-[9px] text-text-secondary font-medium">/ {att.totalMarks}</span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4 text-center">
+                              <div className="inline-flex items-center space-x-1">
+                                <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      att.accuracy >= 70 ? 'bg-emerald-500' : att.accuracy >= 40 ? 'bg-amber-400' : 'bg-rose-400'
+                                    }`}
+                                    style={{ width: `${att.accuracy}%` }}
+                                  />
+                                </div>
+                                <span className={`font-bold ${
+                                  att.accuracy >= 70 ? 'text-emerald-600' : att.accuracy >= 40 ? 'text-amber-600' : 'text-rose-600'
+                                }`}>{att.accuracy}%</span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-3 text-center">
+                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg font-black text-[11px]">{att.correct}</span>
+                            </td>
+                            <td className="py-4 px-3 text-center">
+                              <span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded-lg font-black text-[11px]">{att.wrong}</span>
+                            </td>
+                            <td className="py-4 px-3 text-center">
+                              <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-lg font-black text-[11px]">{att.skipped}</span>
+                            </td>
+                            <td className="py-4 px-4 text-center">
+                              <span className={`px-2 py-0.5 rounded-lg font-black text-[11px] ${
+                                att.rank === 1 ? 'bg-yellow-50 text-yellow-600' :
+                                att.rank === 2 ? 'bg-slate-100 text-slate-600' :
+                                att.rank === 3 ? 'bg-orange-50 text-orange-600' :
+                                'bg-slate-50 text-text-secondary'
+                              }`}>
+                                #{att.rank}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4 text-center text-text-secondary font-bold">
+                              {Math.floor(att.timeTaken / 60)}m {att.timeTaken % 60}s
+                            </td>
+                            <td className="py-4 px-4 text-text-secondary font-medium text-[11px]">
+                              {new Date(att.createdAt).toLocaleDateString(undefined, {
+                                year: 'numeric', month: 'short', day: 'numeric',
+                              })}
+                              <br />
+                              <span className="text-[10px]">{new Date(att.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+                            </td>
+                            <td className="py-4 px-4 text-center">
+                              <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                att.passed ? 'bg-emerald-500/10 text-emerald-700' : 'bg-rose-500/10 text-rose-700'
+                              }`}>
+                                {att.passed ? '✓ Passed' : '✗ Failed'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
       </div>
 
