@@ -65,6 +65,7 @@ export default function StudentManagementPage() {
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
   const [courseSearchQuery, setCourseSearchQuery] = useState('');
   const [isRevokingId, setIsRevokingId] = useState<string | null>(null);
+  const [enrollmentToRevoke, setEnrollmentToRevoke] = useState<{ id: string; title: string } | null>(null);
   const [isEnrollingId, setIsEnrollingId] = useState<string | null>(null);
   
   // Student Form & Delete States
@@ -206,17 +207,20 @@ export default function StudentManagementPage() {
     }
   };
 
-  const handleRevoke = async (enrollmentId: string, courseTitle: string) => {
-    if (!selectedStudent) return;
-    if (window.confirm(`Are you sure you want to revoke enrollment for course "${courseTitle}"?`)) {
-      setIsRevokingId(enrollmentId);
-      try {
-        await revokeMutation.mutateAsync(enrollmentId);
-      } catch (err) {
-        console.error('Failed to revoke enrollment:', err);
-      } finally {
-        setIsRevokingId(null);
-      }
+  const handleRevoke = (enrollmentId: string, courseTitle: string) => {
+    setEnrollmentToRevoke({ id: enrollmentId, title: courseTitle });
+  };
+
+  const handleConfirmRevoke = async () => {
+    if (!enrollmentToRevoke) return;
+    setIsRevokingId(enrollmentToRevoke.id);
+    try {
+      await revokeMutation.mutateAsync(enrollmentToRevoke.id);
+    } catch (err) {
+      console.error('Failed to revoke enrollment:', err);
+    } finally {
+      setIsRevokingId(null);
+      setEnrollmentToRevoke(null);
     }
   };
 
@@ -1856,6 +1860,16 @@ export default function StudentManagementPage() {
         onConfirm={handleConfirmDeleteStudent}
         title="Delete Student Profile"
         message={`Are you sure you want to permanently delete student "${studentToDelete?.name}"? All associated enrollments and profiles will be deleted.`}
+      />
+
+      <ConfirmModal
+        isOpen={enrollmentToRevoke !== null}
+        onClose={() => setEnrollmentToRevoke(null)}
+        onConfirm={handleConfirmRevoke}
+        title="Revoke Course Enrollment"
+        message={`Are you sure you want to revoke the enrollment for course "${enrollmentToRevoke?.title}"?`}
+        confirmText="Revoke"
+        type="danger"
       />
 
     </div>

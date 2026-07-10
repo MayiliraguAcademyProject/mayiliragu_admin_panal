@@ -312,9 +312,14 @@ export interface StudentTestAttempt {
   studentName: string;
   studentEmail: string;
   totalScore: number;
+  totalMarks: number;
   accuracy: number;
   timeTaken: number;
   passed: boolean;
+  correct: number;
+  wrong: number;
+  skipped: number;
+  rank: number;
   createdAt: string;
 }
 
