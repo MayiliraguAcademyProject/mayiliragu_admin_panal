@@ -192,7 +192,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="pt-6 border-t border-white/20 text-[11px] text-orange-100 font-medium">
-            Mayiliragu LMS Panel v1.0 • React Web Migration
+            Mayiliragu Admin Portal v1.0 • React Web Migration
           </div>
         </div>
 

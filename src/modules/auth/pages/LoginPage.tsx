@@ -72,10 +72,10 @@ export default function LoginPage() {
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-extrabold text-text-primary text-center tracking-tight">
-            Mayiliragu LMS
+            Mayiliragu Admin Portal
           </h2>
           <p className="text-text-secondary text-sm font-medium mt-1.5 text-center">
-            Admin Management Portal
+            Learning Management System
           </p>
 
           {/* Form */}

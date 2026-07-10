@@ -106,7 +106,7 @@ export default function TestsPage() {
 
   const { data: coursesData } = useCoursesList(1, 50);
   const { data: selectedCourseDetail } = useCourseDetail(newConnCourseId);
-  const { data: analyticsStats, refetch: refetchAnalytics } = useTestAnalytics();
+  const { refetch: refetchAnalytics } = useTestAnalytics();
   const { data: attempts = [], refetch: refetchAttempts } = useAllTestAttempts();
 
   const handleRefreshAll = () => {
