@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth-store';
-import { 
-  LayoutDashboard, 
-  BookOpen, 
-  Users, 
-  GraduationCap, 
-  LogOut, 
-  Menu, 
-  X, 
+import {
+  LayoutDashboard,
+  BookOpen,
+  Users,
+  GraduationCap,
+  LogOut,
+  Menu,
+  X,
   User as UserIcon,
   ChevronRight,
   Image,
@@ -17,8 +17,11 @@ import {
   TrendingUp,
   ShoppingBag,
   Download,
-  Bell
+  Bell,
+  Sun,
+  Moon
 } from 'lucide-react';
+import { useThemeStore } from '../../store/theme-store';
 
 interface NavItem {
   name: string;
@@ -32,6 +35,7 @@ export default function MainLayoutShell() {
   const logout = useAuthStore((state) => state.logout);
   const location = useLocation();
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useThemeStore();
 
   const navItems: NavItem[] = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -82,22 +86,21 @@ export default function MainLayoutShell() {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden font-sans bg-gradient-to-br from-background-start via-[#EFF5FF] to-background-end">
+    <div className="flex h-screen w-screen overflow-hidden font-sans bg-gradient-to-br from-background-start to-background-end">
       {/* Sidebar - Desktop */}
-      <aside 
-        className={`bg-primary-container text-white transition-all duration-300 ease-in-out flex flex-col z-20 shadow-xl ${
-          isSidebarOpen ? 'w-64' : 'w-20'
-        } hidden md:flex`}
+      <aside
+        className={`bg-cardBg border-r border-border/80 text-text-primary transition-all duration-300 ease-in-out flex flex-col z-20 shadow-sm ${isSidebarOpen ? 'w-64' : 'w-20'
+          } hidden md:flex`}
       >
         {/* Brand Logo Header */}
-        <div className="h-16 flex items-center px-5 border-b border-[#1E293B]">
+        <div className="h-16 flex items-center px-5 border-b border-border/80">
           <Link to="/dashboard" className="flex items-center space-x-3 overflow-hidden">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-secondary-container to-accent flex items-center justify-center shadow-lg shadow-accent/20">
-              <span className="text-primary font-black text-lg">M</span>
+              <span className="text-white font-black text-lg">M</span>
             </div>
             {isSidebarOpen && (
-              <span className="text-base font-extrabold tracking-wider bg-gradient-to-r from-white via-secondary to-accent bg-clip-text text-transparent transition-opacity duration-300">
-                EDUCATION_APP
+              <span className="text-base font-extrabold tracking-wider bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent transition-opacity duration-300">
+                Mayiliragu
               </span>
             )}
           </Link>
@@ -110,18 +113,17 @@ export default function MainLayoutShell() {
               key={item.name}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${
-                  isActive
-                    ? 'bg-accent text-white shadow-md shadow-accent/30 font-semibold'
-                    : 'text-gray-400 hover:text-white hover:bg-slate-800/50'
+                `flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${isActive
+                  ? 'bg-primary text-white shadow-md shadow-primary/20 font-semibold'
+                  : 'text-text-secondary hover:text-primary hover:bg-secondary'
                 }`
               }
             >
               {({ isActive }) => (
                 <>
-                  <item.icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'}`} />
+                  <item.icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-white' : 'text-text-secondary group-hover:text-primary'}`} />
                   {isSidebarOpen && <span className="ml-3 text-sm tracking-wide">{item.name}</span>}
-                  
+
                   {/* Left indicator line */}
                   {isActive && (
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-md" />
@@ -133,12 +135,11 @@ export default function MainLayoutShell() {
         </nav>
 
         {/* Sidebar Footer User & Logout */}
-        <div className="p-4 border-t border-[#1E293B] bg-slate-950/20">
+        <div className="p-4 border-t border-border/80 bg-background-end/20">
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center px-4 py-3 text-sm rounded-xl text-red-400 hover:text-red-350 hover:bg-red-950/20 transition-all duration-200 group ${
-              isSidebarOpen ? 'justify-start' : 'justify-center'
-            }`}
+            className={`w-full flex items-center px-4 py-3 text-sm rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 group ${isSidebarOpen ? 'justify-start' : 'justify-center'
+              }`}
           >
             <LogOut className="w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" />
             {isSidebarOpen && <span className="ml-3 font-semibold">Sign Out</span>}
@@ -148,28 +149,27 @@ export default function MainLayoutShell() {
 
       {/* Mobile Drawer Navigation overlay */}
       {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-30 md:hidden transition-opacity duration-300"
+        <div
+          className="fixed inset-0 bg-black/40 z-30 md:hidden transition-opacity duration-300"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar - Mobile Drawer */}
-      <aside 
-        className={`fixed top-0 bottom-0 left-0 w-64 bg-primary-container text-white z-40 flex flex-col md:hidden transition-transform duration-300 ease-in-out shadow-2xl ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+      <aside
+        className={`fixed top-0 bottom-0 left-0 w-64 bg-cardBg border-r border-border/80 text-text-primary z-40 flex flex-col md:hidden transition-transform duration-300 ease-in-out shadow-2xl ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
-        <div className="h-16 flex items-center justify-between px-5 border-b border-[#1E293B]">
+        <div className="h-16 flex items-center justify-between px-5 border-b border-border/80">
           <Link to="/dashboard" className="flex items-center space-x-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-secondary-container to-accent flex items-center justify-center">
-              <span className="text-primary font-black text-lg">M</span>
+              <span className="text-white font-black text-lg">M</span>
             </div>
-            <span className="text-base font-extrabold tracking-wider bg-gradient-to-r from-white to-secondary bg-clip-text text-transparent">
-              EDUCATION_APP
+            <span className="text-base font-extrabold tracking-wider bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Mayiliragu
             </span>
           </Link>
-          <button onClick={() => setIsSidebarOpen(false)} className="text-gray-400 hover:text-white">
+          <button onClick={() => setIsSidebarOpen(false)} className="text-text-secondary hover:text-text-primary">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -181,10 +181,9 @@ export default function MainLayoutShell() {
               to={item.path}
               onClick={() => setIsSidebarOpen(false)}
               className={({ isActive }) =>
-                `flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative overflow-hidden ${
-                  isActive
-                    ? 'bg-accent text-white shadow-lg shadow-accent/20 font-semibold'
-                    : 'text-gray-400 hover:text-white hover:bg-slate-800/50'
+                `flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative overflow-hidden ${isActive
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20 font-semibold'
+                  : 'text-text-secondary hover:text-primary hover:bg-secondary'
                 }`
               }
             >
@@ -194,10 +193,10 @@ export default function MainLayoutShell() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-[#1E293B] bg-slate-950/20">
+        <div className="p-4 border-t border-border/80 bg-background-end/20">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center px-4 py-3 text-sm rounded-xl text-red-400 hover:text-red-300 hover:bg-red-950/20 transition-all duration-200"
+            className="w-full flex items-center px-4 py-3 text-sm rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200"
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
             <span className="ml-3 font-semibold">Sign Out</span>
@@ -211,19 +210,32 @@ export default function MainLayoutShell() {
         <header className="h-16 bg-cardBg border-b border-border/80 flex items-center justify-between px-6 z-10 shadow-sm">
           {/* Collapse sidebar controls */}
           <div className="flex items-center space-x-4">
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-1.5 rounded-lg hover:bg-background-end text-text-primary transition-colors focus:outline-none"
             >
               <Menu className="w-5 h-5" />
             </button>
-            
+
             {/* Dynamic Breadcrumbs */}
             {getBreadcrumbs()}
           </div>
 
           {/* User Section dropdown */}
           <div className="flex items-center space-x-4">
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-xl text-text-secondary hover:text-primary hover:bg-background-end transition-all duration-200 focus:outline-none"
+              aria-label="Toggle Theme"
+            >
+              {theme === 'light' ? (
+                <Moon className="w-5 h-5" />
+              ) : (
+                <Sun className="w-5 h-5 text-amber-500" />
+              )}
+            </button>
+
             {/* User details card */}
             <div className="flex items-center space-x-3 border-l border-border/85 pl-4 py-1.5">
               <div className="w-9 h-9 rounded-full bg-[#E5EEFF] flex items-center justify-center text-accent font-semibold shadow-inner">

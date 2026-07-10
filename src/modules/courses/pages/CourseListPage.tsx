@@ -52,15 +52,19 @@ export default function CourseListPage() {
     setEditingCourse(null);
   };
 
-  const onSubmit = async (values: CourseFormValues) => {
+  const onSubmit = async (values: CourseFormValues, file?: File | null) => {
     try {
       if (editingCourse) {
         await updateCourseMutation.mutateAsync({
           id: editingCourse.id,
           data: values,
+          file: file || undefined,
         });
       } else {
-        await createCourseMutation.mutateAsync(values);
+        await createCourseMutation.mutateAsync({
+          ...values,
+          file: file || undefined,
+        });
       }
       handleCloseDialog();
     } catch (err) {

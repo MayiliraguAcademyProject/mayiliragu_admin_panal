@@ -148,12 +148,18 @@ export default function CategoryDetailPage() {
 
       // Filter by topic if selected
       if (selectedTop) {
-        const qTopicId = q.topic_id?.toLowerCase();
-        const topName = selectedTop.name.toLowerCase();
-        if (qTopicId && (qTopicId.includes(topName) || topName.includes(qTopicId))) {
+        const normalize = (str: string) => str.toLowerCase().replace(/[\s_]+/g, '');
+        const qTopicId = q.topic_id ? normalize(q.topic_id) : '';
+        const topName = normalize(selectedTop.name);
+        const topId = normalize(selectedTop.id);
+
+        if (qTopicId && (qTopicId.includes(topName) || topName.includes(qTopicId) || qTopicId.includes(topId) || topId.includes(qTopicId))) {
           return true;
         }
-        return q.tags.some((tag) => tag.toLowerCase().includes(topName));
+        return q.tags.some((tag) => {
+          const tagNorm = normalize(tag);
+          return tagNorm.includes(topName) || tagNorm.includes(topId);
+        });
       }
 
       return true;
@@ -192,13 +198,13 @@ export default function CategoryDetailPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-slate-50">
+    <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-transparent">
       
       {/* Header Panel */}
       <div className="bg-cardBg border-b border-border/40 px-6 py-4 flex items-center space-x-4 flex-shrink-0">
         <button
           onClick={() => navigate('/tests')}
-          className="p-2 bg-slate-50 border border-border/40 hover:border-slate-350 hover:bg-slate-100 rounded-xl text-text-secondary transition-colors"
+          className="p-2 bg-cardBg border border-border/40 hover:border-accent/40 hover:bg-slate-50 dark:hover:bg-stone-800 rounded-xl text-text-secondary transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
@@ -307,10 +313,10 @@ export default function CategoryDetailPage() {
                                   setSelectedSub(sub);
                                   setSelectedTop(top);
                                 }}
-                                className={`p-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer truncate ${
+                                className={`p-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer truncate border ${
                                   isTopSelected
-                                    ? 'bg-slate-900 text-white font-extrabold'
-                                    : 'text-text-secondary hover:bg-slate-50'
+                                    ? 'bg-accent/20 dark:bg-accent/25 text-accent border-accent/30 font-extrabold'
+                                    : 'text-text-secondary hover:bg-slate-50 border-transparent'
                                 }`}
                               >
                                 {top.name}
@@ -397,7 +403,7 @@ export default function CategoryDetailPage() {
               <div className="overflow-y-auto h-full max-h-full">
                  <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-slate-55 border-b border-border/40 text-[10px] font-bold text-text-secondary uppercase tracking-wider sticky top-0 bg-slate-50/90 backdrop-blur-xs">
+                    <tr className="bg-cardBg border-b border-border/40 text-[10px] font-bold text-text-secondary uppercase tracking-wider sticky top-0 bg-cardBg/90 backdrop-blur-xs">
                       <th className="py-3 px-5 w-12 text-center">#</th>
                       <th className="py-3 px-4">Question Text</th>
                       <th className="py-3 px-4 w-32">Type</th>
@@ -409,12 +415,12 @@ export default function CategoryDetailPage() {
                   <tbody className="divide-y divide-border/30">
                     {filteredQuestions.map((q, idx) => {
                       const difficultyColors: Record<string, string> = {
-                        easy: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                        medium: 'bg-amber-50 text-amber-700 border-amber-200',
-                        hard: 'bg-rose-50 text-rose-700 border-rose-200',
+                        easy: 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/30',
+                        medium: 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/30',
+                        hard: 'bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/30',
                       };
                       return (
-                        <tr key={q.id} className="hover:bg-slate-50/50 transition-colors text-xs font-medium text-text-primary">
+                        <tr key={q.id} className="hover:bg-slate-50/50 dark:hover:bg-stone-800/20 transition-colors text-xs font-medium text-text-primary">
                           <td className="py-4 px-5 text-center text-text-secondary font-bold">{idx + 1}</td>
                           <td className="py-4 px-4 space-y-1">
                             <p className="font-extrabold text-text-primary leading-relaxed">{q.question_text_en}</p>
@@ -427,14 +433,14 @@ export default function CategoryDetailPage() {
                           </td>
                           <td className="py-4 px-4">
                             <span className={`px-2.5 py-1 border rounded-lg text-[9px] font-black uppercase tracking-wider ${
-                              difficultyColors[q.difficulty] || 'bg-slate-50 text-slate-700'
+                              difficultyColors[q.difficulty] || 'bg-slate-50 dark:bg-stone-800 text-slate-700 dark:text-stone-300 border-border/40'
                             }`}>
                               {q.difficulty}
                             </span>
                           </td>
                           <td className="py-4 px-4">
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                              q.is_published ? 'bg-emerald-500/10 text-emerald-700' : 'bg-slate-100 text-text-secondary'
+                              q.is_published ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-slate-100 dark:bg-stone-800/50 text-text-secondary'
                             }`}>
                               {q.is_published ? 'Published' : 'Draft'}
                             </span>
@@ -443,14 +449,14 @@ export default function CategoryDetailPage() {
                             <button
                               type="button"
                               onClick={() => handleEditQuestionClick(q)}
-                              className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg hover:border-accent hover:text-accent font-bold text-[10px] transition-colors"
+                              className="px-2 py-1 bg-slate-50 dark:bg-stone-800/40 border border-border/40 rounded-lg hover:border-accent hover:text-accent font-bold text-[10px] transition-colors"
                             >
                               Edit
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDeleteQuestion(q.id)}
-                              className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg hover:border-rose-400 hover:text-rose-600 font-bold text-[10px] transition-colors"
+                              className="px-2 py-1 bg-slate-50 dark:bg-stone-800/40 border border-border/40 rounded-lg hover:border-rose-400 hover:text-rose-500 dark:hover:text-rose-450 font-bold text-[10px] transition-colors"
                             >
                               Delete
                             </button>

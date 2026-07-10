@@ -1,9 +1,9 @@
 import { useAdminStats } from '../../../core/api/endpoints';
-import { 
-  Users, 
-  BookOpen, 
-  Video, 
-  GraduationCap, 
+import {
+  Users,
+  BookOpen,
+  Video,
+  GraduationCap,
   ArrowRight,
   TrendingUp,
   BookMarked
@@ -83,7 +83,7 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 sm:p-8 space-y-8 animate-fade-in">
-      
+
       {/* Header section */}
       <div>
         <h1 className="text-3xl font-black text-text-primary tracking-tight">
@@ -98,46 +98,46 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {isLoading
           ? Array.from({ length: 3 }).map((_, idx) => (
-              <div 
-                key={idx} 
-                className="h-32 bg-cardBg border border-border/60 rounded-3xl p-6 flex flex-col justify-between animate-pulse"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="h-4 w-24 bg-slate-200 rounded" />
-                  <div className="w-10 h-10 rounded-2xl bg-slate-200" />
-                </div>
-                <div className="h-8 w-16 bg-slate-200 rounded" />
+            <div
+              key={idx}
+              className="h-32 bg-cardBg border border-border/60 rounded-3xl p-6 flex flex-col justify-between animate-pulse"
+            >
+              <div className="flex justify-between items-start">
+                <div className="h-4 w-24 bg-slate-200 rounded" />
+                <div className="w-10 h-10 rounded-2xl bg-slate-200" />
               </div>
-            ))
+              <div className="h-8 w-16 bg-slate-200 rounded" />
+            </div>
+          ))
           : cards.map((card) => {
-              const Icon = card.icon;
-              return (
-                <div
-                  key={card.title}
-                  className={`bg-cardBg border border-border/70 rounded-3xl p-6 shadow-xl ${card.shadowClass} flex items-center justify-between hover:scale-[1.02] hover:shadow-2xl transition-all duration-300 group`}
-                >
-                  <div className="space-y-2.5">
-                    <p className="text-xs font-extrabold text-text-secondary uppercase tracking-wider">
-                      {card.title}
-                    </p>
-                    <h3 className="text-3xl font-black text-text-primary">
-                      {card.value}
-                    </h3>
-                    <p className="text-[11px] text-text-secondary font-medium">
-                      {card.description}
-                    </p>
-                  </div>
-                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-tr ${card.colorClass} flex items-center justify-center text-white shadow-lg transition-transform duration-300 group-hover:rotate-6`}>
-                    <Icon className="w-6 h-6" />
-                  </div>
+            const Icon = card.icon;
+            return (
+              <div
+                key={card.title}
+                className={`bg-cardBg border border-border/70 rounded-3xl p-6 shadow-xl ${card.shadowClass} flex items-center justify-between hover:scale-[1.02] hover:shadow-2xl transition-all duration-300 group`}
+              >
+                <div className="space-y-2.5">
+                  <p className="text-xs font-extrabold text-text-secondary uppercase tracking-wider">
+                    {card.title}
+                  </p>
+                  <h3 className="text-3xl font-black text-text-primary">
+                    {card.value}
+                  </h3>
+                  <p className="text-[11px] text-text-secondary font-medium">
+                    {card.description}
+                  </p>
                 </div>
-              );
-            })}
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-tr ${card.colorClass} flex items-center justify-center text-white shadow-lg transition-transform duration-300 group-hover:rotate-6`}>
+                  <Icon className="w-6 h-6" />
+                </div>
+              </div>
+            );
+          })}
       </div>
 
       {/* Main sections */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+
         {/* Quick actions panel */}
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center space-x-2.5">
@@ -146,7 +146,7 @@ export default function DashboardPage() {
               Management Operations
             </h2>
           </div>
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {shortcuts.map((shortcut) => {
               const Icon = shortcut.icon;
@@ -178,21 +178,21 @@ export default function DashboardPage() {
         </div>
 
         {/* Info tips card */}
-        <div className="bg-gradient-to-br from-primary-container to-slate-900 text-white rounded-3xl p-6 flex flex-col justify-between shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
-          
+        <div className="bg-gradient-to-br from-primary to-accent text-white rounded-3xl p-6 flex flex-col justify-between shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+
           <div className="space-y-4">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-secondary-container" />
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+              <GraduationCap className="w-5 h-5 text-white" />
             </div>
             <h3 className="text-lg font-extrabold tracking-tight">Academic Clarity Design</h3>
-            <p className="text-xs text-gray-300 leading-relaxed">
+            <p className="text-xs text-orange-50 leading-relaxed">
               Maintain standard curriculum hierarchies. Ensure course structures contain modules and sequential lessons with valid drive video streamers.
             </p>
           </div>
 
-          <div className="pt-6 border-t border-white/10 text-[11px] text-gray-400 font-medium">
-            EducationApp LMS Panel v1.0 • React Web Migration
+          <div className="pt-6 border-t border-white/20 text-[11px] text-orange-100 font-medium">
+            Mayiliragu LMS Panel v1.0 • React Web Migration
           </div>
         </div>
 

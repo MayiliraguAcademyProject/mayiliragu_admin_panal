@@ -8,7 +8,7 @@ import {
   Loader2, 
   FileSpreadsheet 
 } from 'lucide-react';
-import { useImportQuestions, downloadImportTemplate } from '../../../core/api/endpoints';
+import { useImportQuestions, downloadImportTemplate, useTestsList } from '../../../core/api/endpoints';
 
 interface BulkImportModalProps {
   isOpen: boolean;
@@ -23,6 +23,9 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
   const [errorDetails, setErrorDetails] = useState<any[]>([]);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  
+  const [selectedTestId, setSelectedTestId] = useState<string>('');
+  const { data: tests = [] } = useTestsList();
   
   const importMutation = useImportQuestions();
 
@@ -94,10 +97,11 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
     setSuccessMsg(null);
 
     try {
-      const result = await importMutation.mutateAsync(file);
+      const result = await importMutation.mutateAsync({ file, testId: selectedTestId || undefined });
       if (result.status === 'success') {
         setSuccessMsg(result.message || 'Successfully imported all questions!');
         setFile(null);
+        setSelectedTestId('');
         setTimeout(() => {
           onSuccess();
           onClose();
@@ -163,6 +167,29 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
 
           {/* Drag & Drop Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Test Selection */}
+            <div className="space-y-1.5 text-left">
+              <label htmlFor="test-select" className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                Target Question Paper / Test (Optional)
+              </label>
+              <select
+                id="test-select"
+                value={selectedTestId}
+                onChange={(e) => setSelectedTestId(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-55 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-accent transition-colors"
+              >
+                <option value="">General Pool (No Test Linkage)</option>
+                {tests.map((test) => (
+                  <option key={test.id} value={test.id}>
+                    {test.title}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-slate-400 font-medium">
+                Selecting a test will link all imported questions to that specific test.
+              </p>
+            </div>
+
             <div 
               onDragEnter={handleDrag}
               onDragOver={handleDrag}

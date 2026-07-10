@@ -404,6 +404,14 @@ export default function TestsPage() {
                 </button>
 
                 <button
+                  onClick={() => navigate('/tests/pdf-imports')}
+                  className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-border/50 text-text-secondary font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all"
+                >
+                  <FileText className="w-3.5 h-3.5 text-accent" />
+                  <span className="text-accent">PDF Ingest</span>
+                </button>
+
+                <button
                   onClick={handleExportQuestions}
                   disabled={isExporting}
                   className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-border/50 text-text-secondary font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all disabled:opacity-50"
@@ -700,7 +708,14 @@ export default function TestsPage() {
                         <tr key={t.id} className="hover:bg-slate-50/50 transition-colors text-xs font-medium text-text-primary">
                           <td className="py-4 px-5 text-center text-text-secondary font-bold">{idx + 1}</td>
                           <td className="py-4 px-4 space-y-0.5">
-                            <p className="font-extrabold text-text-primary leading-snug">{t.title}</p>
+                            <div className="flex items-center space-x-2">
+                              <p className="font-extrabold text-text-primary leading-snug">{t.title}</p>
+                              {t.is_sectioned && (
+                                <span className="px-1.5 py-0.5 bg-accent/10 border border-accent/20 text-[9px] font-black text-accent uppercase rounded-md tracking-wider">
+                                  Sectioned
+                                </span>
+                              )}
+                            </div>
                             {t.description && (
                               <p className="text-[10px] text-text-secondary font-medium truncate max-w-sm">{t.description}</p>
                             )}

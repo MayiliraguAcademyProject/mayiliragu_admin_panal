@@ -8,29 +8,29 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#000000',
-          container: '#131B2E', // Midnight Blue
+          DEFAULT: '#ea580c',
+          container: '#2c1404',
         },
         secondary: {
-          DEFAULT: '#E5EEFF', // surface-container
-          container: '#86F2E4', // Vibrant Teal container
+          DEFAULT: '#fff7ed',
+          container: '#ffedd5',
         },
         accent: {
-          DEFAULT: '#006A61', // Vibrant Teal
-          dark: '#131B2E', // Midnight Blue
-          onContainer: '#006F66',
+          DEFAULT: '#f97316',
+          dark: '#431407',
+          onContainer: '#c2410c',
         },
         error: '#BA1A1A',
         background: {
-          start: '#F8F9FF', // surface
-          end: '#EFF4FF', // surface-container-low
+          start: '#fffdfb',
+          end: '#fff3e5',
         },
         text: {
-          primary: '#0B1C30', // on-surface
-          secondary: '#45464D', // on-surface-variant
+          primary: '#26160c',
+          secondary: '#605247',
         },
-        border: '#C6C6CD', // outline-variant
-        cardBg: '#FFFFFF', // surface-container-lowest
+        border: '#eaddd0',
+        cardBg: '#ffffff',
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],

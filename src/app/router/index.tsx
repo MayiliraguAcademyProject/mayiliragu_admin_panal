@@ -12,6 +12,8 @@ const CourseDetailPage = React.lazy(() => import('../../modules/courses/pages/Co
 const StudentManagementPage = React.lazy(() => import('../../modules/students/pages/StudentManagementPage'));
 const TestsPage = React.lazy(() => import('../../modules/tests/pages/TestsPage'));
 const CategoryDetailPage = React.lazy(() => import('../../modules/tests/pages/CategoryDetailPage'));
+const PDFImportsPage = React.lazy(() => import('../../modules/tests/pages/PDFImportsPage'));
+const BatchVerificationPage = React.lazy(() => import('../../modules/tests/pages/BatchVerificationPage'));
 const BannerListPage = React.lazy(() => import('../../modules/banners/pages/BannerListPage'));
 const CurrentAffairsPage = React.lazy(() => import('../../modules/current-affairs/pages/CurrentAffairsPage'));
 const StudyMaterialsPage = React.lazy(() => import('../../modules/study-materials/pages/StudyMaterialsPage'));
@@ -151,6 +153,22 @@ export const router = createBrowserRouter([
         element: (
           <React.Suspense fallback={<SuspenseFallback />}>
             <CategoryDetailPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'tests/pdf-imports',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <PDFImportsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'tests/parsed-verification/:batchId',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <BatchVerificationPage />
           </React.Suspense>
         ),
       },

@@ -1,19 +1,20 @@
 import { useState } from 'react';
-import { 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  Image as ImageIcon, 
-  Loader2, 
-  Link as LinkIcon, 
+import {
+  Plus,
+  Trash2,
+  Edit2,
+  Image as ImageIcon,
+  Loader2,
+  Link as LinkIcon,
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react';
-import { 
-  useBannersAdminList, 
-  useCreateBanner, 
-  useUpdateBanner, 
-  useToggleBannerStatus, 
+import {
+  useBannersAdminList,
+  useCreateBanner,
+  useUpdateBanner,
+  useToggleBannerStatus,
   useDeleteBanner,
   useCoursesList
 } from '../../../core/api/endpoints';
@@ -26,11 +27,12 @@ export default function BannerListPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [bannerToDelete, setBannerToDelete] = useState<string | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   // Queries & Mutations
   const { data: banners, isLoading, error } = useBannersAdminList();
   const { data: coursesData } = useCoursesList(1, 50);
-  
+
   const createBannerMutation = useCreateBanner();
   const updateBannerMutation = useUpdateBanner();
   const deleteBannerMutation = useDeleteBanner();
@@ -158,23 +160,23 @@ export default function BannerListPage() {
         /* Grid list of banners */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {banners?.map((banner) => (
-            <div 
-              key={banner.id} 
-              className={`bg-cardBg border border-border/80 rounded-3xl overflow-hidden shadow-md flex flex-col group hover:shadow-lg transition-all duration-300 relative ${
-                !banner.isActive ? 'opacity-75' : ''
-              }`}
+            <div
+              key={banner.id}
+              className={`bg-cardBg border border-border/80 rounded-3xl overflow-hidden shadow-md flex flex-col group hover:shadow-lg transition-all duration-300 relative ${!banner.isActive ? 'opacity-75' : ''
+                }`}
             >
               {/* Banner Image Preview Container */}
-              <div className="aspect-[2.5/1] bg-slate-100 relative overflow-hidden border-b border-border/40">
-                <img 
-                  src={banner.imageUrl} 
-                  alt={banner.title} 
+              <div className="aspect-square bg-slate-100 relative overflow-hidden border-b border-border/40 cursor-zoom-in">
+                <img
+                  src={banner.imageUrl}
+                  alt={banner.title}
+                  onClick={() => setPreviewImageUrl(banner.imageUrl)}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=640&auto=format&fit=crop';
                   }}
                 />
-                
+
                 {/* Actions Overlay */}
                 <div className="absolute top-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-slate-900/60 p-1.5 rounded-xl backdrop-blur-sm">
                   <button
@@ -205,7 +207,7 @@ export default function BannerListPage() {
                   <h3 className="font-extrabold text-sm text-text-primary tracking-tight line-clamp-1">
                     {banner.title}
                   </h3>
-                  
+
                   {/* Linked course/destination */}
                   <div className="mt-2 flex items-center space-x-1.5 text-xs text-text-secondary font-semibold">
                     <LinkIcon className="w-3.5 h-3.5 text-accent flex-shrink-0" />
@@ -224,19 +226,17 @@ export default function BannerListPage() {
                   <span className="text-xs font-bold text-text-secondary">
                     {banner.isActive ? 'Active & Visible' : 'Disabled'}
                   </span>
-                  
+
                   {/* Toggle button */}
                   <button
                     type="button"
                     onClick={() => handleToggleActive(banner.id)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      banner.isActive ? 'bg-accent' : 'bg-slate-350'
-                    }`}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${banner.isActive ? 'bg-accent' : 'bg-slate-350'
+                      }`}
                   >
                     <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        banner.isActive ? 'translate-x-5' : 'translate-x-0'
-                      }`}
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${banner.isActive ? 'translate-x-5' : 'translate-x-0'
+                        }`}
                     />
                   </button>
                 </div>
@@ -264,6 +264,26 @@ export default function BannerListPage() {
         message="This action is permanent and will remove this banner from the student app carousel."
         confirmText="Delete Banner"
       />
+
+      {/* Fullscreen Banner Preview Modal */}
+      {previewImageUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="relative max-w-5xl max-h-[90vh] flex flex-col items-center justify-center">
+            <button
+              onClick={() => setPreviewImageUrl(null)}
+              className="absolute -top-16 right-2 md:-right-16 text-white hover:text-primary hover:scale-110 bg-white/10 hover:bg-white p-3 rounded-full transition-all duration-200 shadow-lg focus:outline-none"
+              title="Close Preview"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={previewImageUrl}
+              alt="Widescreen Banner Preview"
+              className="max-w-full max-h-[80vh] rounded-3xl object-contain shadow-2xl border-4 border-white/20 bg-slate-950"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

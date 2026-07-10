@@ -59,14 +59,14 @@ export default function LessonModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <form 
         onSubmit={handleSubmit(onSubmit)}
-        className="w-full max-w-lg bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+        className="w-full max-w-3xl bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
       >
         <div className="p-6 border-b border-border/40 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-extrabold text-text-primary tracking-tight">
               {editingLesson ? 'Edit Lesson Details' : 'Create New Lesson'}
             </h3>
-            <p className="text-xs text-text-secondary mt-0.5">
+            <p className="text-xs text-text-secondary mt-10">
               Fill in lesson title, description, and link Google Drive video ID.
             </p>
           </div>
@@ -137,7 +137,7 @@ export default function LessonModal({
               Description / Summary
             </label>
             <textarea
-              rows={2}
+              rows={5}
               placeholder="Outline what students will learn in this session..."
               {...register('description')}
               disabled={isSubmitting}

@@ -1,22 +1,40 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #000000;
-  --color-primary-container: #131B2E;
-  --color-secondary: #E5EEFF;
-  --color-secondary-container: #86F2E4;
-  --color-accent: #006A61;
-  --color-accent-dark: #131B2E;
-  --color-accent-onContainer: #006F66;
+  --color-primary: #ea580c;
+  --color-primary-container: #2c1404;
+  --color-secondary: #fff7ed;
+  --color-secondary-container: #ffedd5;
+  --color-accent: #f97316;
+  --color-accent-dark: #431407;
+  --color-accent-onContainer: #c2410c;
   --color-error: #BA1A1A;
-  --color-background-start: #F8F9FF;
-  --color-background-end: #EFF4FF;
-  --color-text-primary: #0B1C30;
-  --color-text-secondary: #45464D;
-  --color-border: #C6C6CD;
-  --color-cardBg: #FFFFFF;
+  --color-background-start: #fffdfb;
+  --color-background-end: #fff3e5;
+  --color-text-primary: #26160c;
+  --color-text-secondary: #605247;
+  --color-border: #eaddd0;
+  --color-cardBg: #ffffff;
   
   --font-sans: "Inter", "sans-serif";
+}
+
+@variant dark (&:where(.dark, .dark *));
+
+.dark {
+  --color-primary: #f97316;
+  --color-primary-container: #1c1917;
+  --color-secondary: #292524;
+  --color-secondary-container: #44403c;
+  --color-accent: #fdba74;
+  --color-accent-dark: #7c2d12;
+  --color-accent-onContainer: #ffedd5;
+  --color-background-start: #0c0a09;
+  --color-background-end: #1c1917;
+  --color-text-primary: #f5f5f4;
+  --color-text-secondary: #a8a29e;
+  --color-border: #292524;
+  --color-cardBg: #1c1917;
 }
 
 /* Custom scrollbar and reset rules */
@@ -35,4 +53,60 @@ body {
   height: 100vh;
   margin: 0;
   padding: 0;
+}
+
+/* Dark mode utility class overrides */
+.dark {
+  .bg-white {
+    background-color: var(--color-cardBg) !important;
+  }
+  .bg-slate-50 {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+  }
+  .bg-slate-50\/50 {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+  }
+  .bg-slate-100 {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+  }
+  .bg-slate-150 {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+  }
+  .hover\:bg-slate-50:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+  }
+  .hover\:bg-slate-50\/50:hover {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+  }
+  .hover\:bg-slate-100:hover {
+    background-color: rgba(255, 255, 255, 0.12) !important;
+  }
+  .hover\:bg-slate-200:hover {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+  }
+  .border-slate-100 {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+  }
+  .border-border\/60 {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+  }
+  .border-border\/80 {
+    border-color: rgba(255, 255, 255, 0.15) !important;
+  }
+  .border-border\/90 {
+    border-color: rgba(255, 255, 255, 0.18) !important;
+  }
+  
+  /* Student management page via gradient fix */
+  .via-\[\#EFF5FF\] {
+    --tw-gradient-via: var(--color-background-start) !important;
+  }
+  
+  /* Fix the teal gradient to orange */
+  .from-\[\#008A7C\] {
+    --tw-gradient-from: var(--color-primary) !important;
+  }
+  .to-\[\#006A61\] {
+    --tw-gradient-to: var(--color-accent) !important;
+  }
 }

@@ -198,6 +198,8 @@ export interface Question {
   type: string;
   question_text_en: string;
   question_text_ta?: string;
+  section_id?: string | null;
+  section_temp_id?: string | null;
   subject_id?: string;
   topic_id?: string;
   exam_category: string;
@@ -221,9 +223,17 @@ export interface Question {
   correct_answer?: boolean;
   accepted_answers?: any;
   hint?: string;
-  max_characters?: number;
   model_answer?: string;
   word_limit?: number;
+  images?: any;
+  shared_context_en?: string;
+  shared_context_ta?: string;
+  table_data?: any;
+  sharedContextEn?: string;
+  sharedContextTa?: string;
+  tableData?: any;
+  question_image_url?: string;
+  questionTextEn?: string;
 }
 
 export interface QuestionStats {
@@ -240,6 +250,9 @@ export interface Test {
   duration: number;
   cutoff_marks: number;
   total_marks: number;
+  is_sectioned?: boolean;
+  sections_count?: number;
+  sections?: any[];
   course_id?: string;
   module_id?: string;
   category_id?: string;
@@ -472,6 +485,7 @@ export interface BookOrder {
   shippingName?: string | null;
   shippingPhone?: string | null;
   shippingAddress?: string | null;
+  paymentScreenshotUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   items?: BookOrderItem[];

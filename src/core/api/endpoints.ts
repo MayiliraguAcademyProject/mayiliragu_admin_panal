@@ -121,8 +121,20 @@ export function useCourseDetail(courseId: string) {
 export function useCreateCourse() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { title: string; description: string; thumbnail: string }) => {
-      const response = await apiClient.post(ApiConstants.courses.base, data);
+    mutationFn: async (data: { title: string; description: string; thumbnail?: string; file?: File }) => {
+      const formData = new FormData();
+      formData.append('title', data.title);
+      formData.append('description', data.description);
+      if (data.thumbnail) {
+        formData.append('thumbnail', data.thumbnail);
+      }
+      if (data.file) {
+        formData.append('file', data.file);
+      }
+
+      const response = await apiClient.post(ApiConstants.courses.base, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -134,8 +146,18 @@ export function useCreateCourse() {
 export function useUpdateCourse() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Course> }) => {
-      const response = await apiClient.put(ApiConstants.courses.detail(id), data);
+    mutationFn: async ({ id, data, file }: { id: string; data: Partial<Course>; file?: File }) => {
+      const formData = new FormData();
+      if (data.title !== undefined) formData.append('title', data.title);
+      if (data.description !== undefined) formData.append('description', data.description);
+      if (data.thumbnail !== undefined) formData.append('thumbnail', data.thumbnail || '');
+      if (file) {
+        formData.append('file', file);
+      }
+
+      const response = await apiClient.put(ApiConstants.courses.detail(id), formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       return response.data;
     },
     onSuccess: (_, variables) => {
@@ -806,9 +828,12 @@ export async function exportQuestionsToExcel(filters: {
 export function useImportQuestions() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, testId }: { file: File; testId?: string }) => {
       const formData = new FormData();
       formData.append('file', file);
+      if (testId) {
+        formData.append('testId', testId);
+      }
       const response = await apiClient.post(ApiConstants.questions.import, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -1342,6 +1367,45 @@ export function useUpdateOrderPaymentStatus() {
     },
   });
 }
+
+export function useLessonStats(lessonId: string) {
+  return useQuery({
+    queryKey: ['lessonStats', lessonId],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.progress.lessonStats(lessonId));
+      return response.data.data;
+    },
+    enabled: !!lessonId,
+  });
+}
+
+export function usePaymentQr() {
+  return useQuery({
+    queryKey: ['paymentQr'],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.books.paymentQr);
+      return response.data.data;
+    },
+  });
+}
+
+export function useUpdatePaymentQr() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (qrFile: File) => {
+      const formData = new FormData();
+      formData.append('qrImage', qrFile);
+      const response = await apiClient.post(ApiConstants.books.adminPaymentQr, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentQr'] });
+    },
+  });
+}
+
 
 
 
