@@ -1110,36 +1110,46 @@ export default function TestBuilderWizardModal({
                               })()
                             )}
 
-                            {/* Image Asset */}
+                            {/* Image Assets */}
                             {(() => {
-                              const imageUrl = (() => {
-                                if (!q.images) return q.question_image_url || '';
-                                if (Array.isArray(q.images)) {
-                                  return (q.images[0] as any)?.url || q.images[0] || '';
-                                }
-                                if (typeof q.images === 'string') {
-                                  try {
-                                    const parsed = JSON.parse(q.images);
-                                    if (Array.isArray(parsed)) {
-                                      return parsed[0]?.url || parsed[0] || '';
-                                    }
-                                    return parsed.url || parsed || '';
-                                  } catch (e) {
-                                    return q.images;
-                                  }
-                                }
-                                return '';
-                              })();
+                              let imagesToRender: string[] = [];
+                              if (q.question_image_url) {
+                                imagesToRender.push(q.question_image_url);
+                              }
                               
-                              if (!imageUrl) return null;
+                              if (q.images) {
+                                let parsedImages = q.images;
+                                if (typeof parsedImages === 'string') {
+                                  try { parsedImages = JSON.parse(parsedImages); } catch (e) {}
+                                }
+                                
+                                if (Array.isArray(parsedImages)) {
+                                  parsedImages.forEach(img => {
+                                    const url = (img as any)?.url || img;
+                                    if (typeof url === 'string' && url) imagesToRender.push(url);
+                                  });
+                                } else if (parsedImages && typeof parsedImages === 'object') {
+                                  const url = (parsedImages as any).url;
+                                  if (typeof url === 'string' && url) imagesToRender.push(url);
+                                }
+                              }
+                              
+                              // Deduplicate
+                              imagesToRender = [...new Set(imagesToRender)];
+                              
+                              if (imagesToRender.length === 0) return null;
                               
                               return (
-                                <div className="border border-border/60 rounded-2xl overflow-hidden max-h-56 bg-white flex justify-center p-2 shadow-xs">
-                                  <img
-                                    src={imageUrl}
-                                    alt="Question Asset"
-                                    className="max-h-52 w-auto object-contain"
-                                  />
+                                <div className="space-y-3">
+                                  {imagesToRender.map((url, idx) => (
+                                    <div key={idx} className="border border-border/60 rounded-2xl overflow-hidden max-h-56 bg-white flex justify-center p-2 shadow-xs">
+                                      <img
+                                        src={url}
+                                        alt={`Question Asset ${idx + 1}`}
+                                        className="max-h-52 w-auto object-contain"
+                                      />
+                                    </div>
+                                  ))}
                                 </div>
                               );
                             })()}
@@ -1168,7 +1178,15 @@ export default function TestBuilderWizardModal({
                                       <div className="w-2 h-2 rounded-full bg-transparent"></div>
                                     </div>
                                     <div className="text-[11px] leading-relaxed text-text-primary flex-1">
-                                      <span className="font-extrabold text-accent">{opt.label || opt.key || String.fromCharCode(65 + oIdx)}.</span> {opt.text_en || opt.text}
+                                      <div className="flex items-start">
+                                        <span className="font-extrabold text-accent mr-1">{opt.label || opt.key || String.fromCharCode(65 + oIdx)}.</span> 
+                                        <span>{opt.text_en || opt.text}</span>
+                                      </div>
+                                      {(opt.image_url || opt.image || opt.imageUrl) && (
+                                        <div className="mt-2 border border-border/40 rounded-lg overflow-hidden bg-white p-1 inline-block">
+                                          <img src={opt.image_url || opt.image || opt.imageUrl} alt={`Option ${opt.label || String.fromCharCode(65 + oIdx)}`} className="max-h-24 w-auto object-contain" />
+                                        </div>
+                                      )}
                                     </div>
                                     {opt.is_correct && (
                                       <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold px-1.5 py-0.5 rounded-lg flex-shrink-0">

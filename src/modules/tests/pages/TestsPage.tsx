@@ -408,13 +408,13 @@ export default function TestsPage() {
                   <span>Import</span>
                 </button>
 
-                <button
+                {/* <button
                   onClick={() => navigate('/tests/pdf-imports')}
                   className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-border/50 text-text-secondary font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all"
                 >
                   <FileText className="w-3.5 h-3.5 text-accent" />
                   <span className="text-accent">PDF Ingest</span>
-                </button>
+                </button> */}
 
                 <button
                   onClick={handleExportQuestions}

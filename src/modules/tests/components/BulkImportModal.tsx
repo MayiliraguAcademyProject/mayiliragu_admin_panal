@@ -144,7 +144,7 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* Download Template Panel */}
+          {/* Download Template Panel
           <div className="p-4 rounded-2xl bg-gradient-to-r from-accent/5 to-blue-500/5 border border-accent/10 flex items-center justify-between">
             <div className="flex items-center space-x-3.5">
               <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center">
@@ -163,12 +163,12 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
               <Download className="w-3.5 h-3.5" />
               <span>Download Template</span>
             </button>
-          </div>
+          </div> */}
 
           {/* Drag & Drop Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Test Selection */}
-            <div className="space-y-1.5 text-left">
+            {/* <div className="space-y-1.5 text-left">
               <label htmlFor="test-select" className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
                 Target Question Paper / Test (Optional)
               </label>
@@ -188,7 +188,7 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
               <p className="text-[10px] text-slate-400 font-medium">
                 Selecting a test will link all imported questions to that specific test.
               </p>
-            </div>
+            </div> */}
 
             <div 
               onDragEnter={handleDrag}
