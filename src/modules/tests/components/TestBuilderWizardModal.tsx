@@ -46,8 +46,8 @@ export default function TestBuilderWizardModal({
   // Step 1: Metadata State
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [duration, setDuration] = useState(60);
-  const [cutoffMarks, setCutoffMarks] = useState(35);
+  const [duration, setDuration] = useState<number | string>(60);
+  const [cutoffMarks, setCutoffMarks] = useState<number | string>(35);
   const [categoryId, setCategoryId] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
@@ -381,7 +381,10 @@ export default function TestBuilderWizardModal({
                     <input
                       type="number"
                       value={duration}
-                      onChange={(e) => setDuration(Math.max(1, Number(e.target.value)))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDuration(val === '' ? '' : Math.max(1, Number(val)));
+                      }}
                       required
                       className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
                     />
@@ -395,7 +398,10 @@ export default function TestBuilderWizardModal({
                     <input
                       type="number"
                       value={cutoffMarks}
-                      onChange={(e) => setCutoffMarks(Math.max(0, Number(e.target.value)))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCutoffMarks(val === '' ? '' : Math.max(0, Number(val)));
+                      }}
                       required
                       className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
                     />
@@ -808,7 +814,7 @@ export default function TestBuilderWizardModal({
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] font-extrabold text-text-secondary uppercase">
-                      Cutoff: {((cutoffMarks / 100) * totalMarks).toFixed(1)} / {totalMarks}
+                      Cutoff: {((Number(cutoffMarks) / 100) * totalMarks).toFixed(1)} / {totalMarks}
                     </span>
                   </div>
                 </div>
@@ -939,7 +945,7 @@ export default function TestBuilderWizardModal({
                       <div>
                         <span className="block text-[10px] font-bold text-text-secondary uppercase">Passing Score</span>
                         <span className="font-extrabold text-text-primary">
-                          {((cutoffMarks / 100) * totalMarks).toFixed(1)} / {totalMarks} Marks
+                          {((Number(cutoffMarks) / 100) * totalMarks).toFixed(1)} / {totalMarks} Marks
                         </span>
                       </div>
                       <div>

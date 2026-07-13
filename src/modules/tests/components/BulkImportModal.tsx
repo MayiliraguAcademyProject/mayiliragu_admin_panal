@@ -2,13 +2,11 @@ import React, { useState, useRef } from 'react';
 import { 
   X, 
   Upload, 
-  Download, 
   AlertTriangle, 
   CheckCircle, 
-  Loader2, 
-  FileSpreadsheet 
+  Loader2 
 } from 'lucide-react';
-import { useImportQuestions, downloadImportTemplate, useTestsList } from '../../../core/api/endpoints';
+import { useImportQuestions } from '../../../core/api/endpoints';
 
 interface BulkImportModalProps {
   isOpen: boolean;
@@ -25,7 +23,6 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   
   const [selectedTestId, setSelectedTestId] = useState<string>('');
-  const { data: tests = [] } = useTestsList();
   
   const importMutation = useImportQuestions();
 
@@ -78,14 +75,6 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
     }
 
     setFile(selectedFile);
-  };
-
-  const handleDownloadTemplate = async () => {
-    try {
-      await downloadImportTemplate();
-    } catch (err: any) {
-      setGeneralError('Failed to download template. Please try again.');
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
