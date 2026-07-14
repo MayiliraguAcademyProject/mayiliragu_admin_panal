@@ -26,3 +26,8 @@ dist-ssr
 # Deploy scripts
 deploy.bat
 deploy.ps1
+
+# Environments
+.env
+.env.*
+*.env
