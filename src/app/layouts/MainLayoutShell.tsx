@@ -19,7 +19,8 @@ import {
   Download,
   Bell,
   Sun,
-  Moon
+  Moon,
+  Smartphone
 } from 'lucide-react';
 import { useThemeStore } from '../../store/theme-store';
 
@@ -49,6 +50,7 @@ export default function MainLayoutShell() {
     { name: 'Video Downloads', path: '/video-downloads', icon: Download },
     { name: 'Push Notifications', path: '/notifications', icon: Bell },
     { name: 'Performance Analytics', path: '/performance-analytics', icon: TrendingUp },
+    { name: 'App Config', path: '/app-config', icon: Smartphone },
   ];
 
   const handleLogout = () => {

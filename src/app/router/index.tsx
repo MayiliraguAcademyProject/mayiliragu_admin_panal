@@ -21,6 +21,7 @@ const PerformanceAnalyticsPage = React.lazy(() => import('../../modules/performa
 const BookStorePage = React.lazy(() => import('../../modules/book-store/pages/BookStorePage'));
 const VideoDownloadsPage = React.lazy(() => import('../../modules/downloads/pages/VideoDownloadsPage'));
 const NotificationsPage = React.lazy(() => import('../../modules/notifications/pages/NotificationsPage'));
+const AppConfigPage = React.lazy(() => import('../../modules/app-config/pages/AppConfigPage'));
 
 // Loading fallback component
 const SuspenseFallback = () => (
@@ -145,6 +146,14 @@ export const router = createBrowserRouter([
         element: (
           <React.Suspense fallback={<SuspenseFallback />}>
             <NotificationsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'app-config',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <AppConfigPage />
           </React.Suspense>
         ),
       },

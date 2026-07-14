@@ -543,6 +543,20 @@ export function useDeleteQuestion() {
   });
 }
 
+export function useDeleteAllQuestions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.delete(ApiConstants.questions.base);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['questions'] });
+      queryClient.invalidateQueries({ queryKey: ['questionStats'] });
+    },
+  });
+}
+
 // ==========================================
 // TESTS & TEST BUILDER ENDPOINTS
 // ==========================================
@@ -752,6 +766,45 @@ export function useCreateTopic() {
     mutationFn: async (data: { subjectId: string; name: string }) => {
       const response = await apiClient.post(ApiConstants.tests.topics, data);
       return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['examCategories'] });
+    },
+  });
+}
+
+export function useDeleteCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiClient.delete(`${ApiConstants.tests.categories}/${id}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['examCategories'] });
+    },
+  });
+}
+
+export function useDeleteSubject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiClient.delete(`${ApiConstants.tests.subjects}/${id}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['examCategories'] });
+    },
+  });
+}
+
+export function useDeleteTopic() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiClient.delete(`${ApiConstants.tests.topics}/${id}`);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['examCategories'] });

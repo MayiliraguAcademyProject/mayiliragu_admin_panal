@@ -102,4 +102,7 @@ export const ApiConstants = {
   progress: {
     lessonStats: (lessonId: string) => `/progress/lesson/${lessonId}/stats`,
   },
+  appConfig: {
+    base: '/app-config',
+  },
 } as const;

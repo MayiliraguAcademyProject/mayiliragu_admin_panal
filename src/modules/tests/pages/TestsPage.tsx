@@ -8,6 +8,7 @@ import {
   useCreateQuestion,
   useUpdateQuestion,
   useDeleteQuestion,
+  useDeleteAllQuestions,
   useTestsList,
   useCreateTest,
   useUpdateTest,
@@ -15,6 +16,7 @@ import {
   useTestDetail,
   useExamCategories,
   useCreateCategory,
+  useDeleteCategory,
   useTestAnalytics,
   useAllTestAttempts
 } from '../../../core/api/endpoints';
@@ -66,6 +68,24 @@ export default function TestsPage() {
   // Zustand Store replaced with API queries/mutations
   const { data: categories = [] } = useExamCategories();
   const createCategoryMutation = useCreateCategory();
+  const deleteCategoryMutation = useDeleteCategory();
+
+  const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  const handleDeleteCategory = (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation();
+    setCategoryToDelete({ id, name });
+  };
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    try {
+      await deleteCategoryMutation.mutateAsync(categoryToDelete.id);
+      refetchStats();
+    } catch (error) {
+      alert('Failed to delete category.');
+    }
+  };
 
   const subjects = useMemo(() => {
     return categories.flatMap((cat) => cat.subjects || []);
@@ -120,12 +140,19 @@ export default function TestsPage() {
   const createQuestionMutation = useCreateQuestion();
   const updateQuestionMutation = useUpdateQuestion();
   const deleteQuestionMutation = useDeleteQuestion();
+  const deleteAllQuestionsMutation = useDeleteAllQuestions();
 
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | undefined>(undefined);
   const [questionIdToDelete, setQuestionIdToDelete] = useState<string | null>(null);
+  const [isDeleteAllConfirmOpen, setIsDeleteAllConfirmOpen] = useState(false);
+
+  const handleConfirmDeleteAllQuestions = async () => {
+    await deleteAllQuestionsMutation.mutateAsync();
+    setIsDeleteAllConfirmOpen(false);
+  };
 
   const handleExportQuestions = async () => {
     try {
@@ -180,24 +207,24 @@ export default function TestsPage() {
   const deleteTestMutation = useDeleteTest();
 
   // Derive connections from tests
-  const connections = useMemo(() => {
-    return tests
-      .filter((t) => t.course_id !== null && t.course_id !== undefined)
-      .map((t) => {
-        const course = coursesData?.data?.find((c: any) => c.id === t.course_id);
-        const module = course?.modules?.find((m: any) => m.id === t.module_id);
-        return {
-          id: t.id,
-          courseId: t.course_id!,
-          courseTitle: course?.title || 'Unknown Course',
-          moduleId: t.module_id || undefined,
-          moduleTitle: module?.title || 'Entire Course Syllabus',
-          testTitle: t.title,
-          questionCount: `${t.question_count || 0} Questions`,
-          status: t.is_published ? 'Active' : 'Draft',
-        };
-      });
-  }, [tests, coursesData]);
+  // const connections = useMemo(() => {
+  //   return tests
+  //     .filter((t) => t.course_id !== null && t.course_id !== undefined)
+  //     .map((t) => {
+  //       const course = coursesData?.data?.find((c: any) => c.id === t.course_id);
+  //       const module = course?.modules?.find((m: any) => m.id === t.module_id);
+  //       return {
+  //         id: t.id,
+  //         courseId: t.course_id!,
+  //         courseTitle: course?.title || 'Unknown Course',
+  //         moduleId: t.module_id || undefined,
+  //         moduleTitle: module?.title || 'Entire Course Syllabus',
+  //         testTitle: t.title,
+  //         questionCount: `${t.question_count || 0} Questions`,
+  //         status: t.is_published ? 'Active' : 'Draft',
+  //       };
+  //     });
+  // }, [tests, coursesData]);
 
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [editingTestId, setEditingTestId] = useState<string | undefined>(undefined);
@@ -247,17 +274,17 @@ export default function TestsPage() {
     setNewConnTestId('');
   };
 
-  const deleteConnection = async (id: string) => {
-    if (window.confirm('Are you sure you want to remove this connection?')) {
-      await updateTestMutation.mutateAsync({
-        id,
-        data: {
-          course_id: null,
-          module_id: null,
-        },
-      });
-    }
-  };
+  // const deleteConnection = async (id: string) => {
+  //   if (window.confirm('Are you sure you want to remove this connection?')) {
+  //     await updateTestMutation.mutateAsync({
+  //       id,
+  //       data: {
+  //         course_id: null,
+  //         module_id: null,
+  //       },
+  //     });
+  //   }
+  // };
 
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -408,13 +435,13 @@ export default function TestsPage() {
                   <span>Import</span>
                 </button>
 
-                {/* <button
+                <button
                   onClick={() => navigate('/tests/pdf-imports')}
                   className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-border/50 text-text-secondary font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all"
                 >
                   <FileText className="w-3.5 h-3.5 text-accent" />
                   <span className="text-accent">PDF Ingest</span>
-                </button> */}
+                </button>
 
                 <button
                   onClick={handleExportQuestions}
@@ -423,6 +450,16 @@ export default function TestsPage() {
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>{isExporting ? 'Exporting...' : 'Export'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteAllConfirmOpen(true)}
+                  disabled={questions.length === 0}
+                  className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete All</span>
                 </button>
 
                 <button
@@ -551,13 +588,13 @@ export default function TestsPage() {
                   <span>Add Category</span>
                 </button>
 
-                <button
+                {/* <button
                   onClick={() => setIsConnectionModalOpen(true)}
                   className="flex items-center space-x-1.5 bg-accent hover:bg-accent-onContainer text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-md shadow-accent/15 transition-all active:scale-[0.98]"
                 >
                   <Plus className="w-4 h-4" />
                   <span>New Connection</span>
-                </button>
+                </button> */}
               </div>
             </div>
 
@@ -589,7 +626,16 @@ export default function TestsPage() {
                           </p>
                         </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-accent group-hover:translate-x-0.5 transition-all mt-2.5 flex-shrink-0" />
+                      <div className="flex flex-col items-end justify-between self-stretch">
+                        <button
+                          onClick={(e) => handleDeleteCategory(e, cat.id, cat.name)}
+                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Delete Category"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-accent group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-auto" />
+                      </div>
                     </div>
                   );
                 })}
@@ -597,7 +643,7 @@ export default function TestsPage() {
             </div>
 
             {/* Active Connections */}
-            <div className="space-y-4">
+            {/* <div className="space-y-4">
               <h4 className="text-xs font-extrabold text-text-primary uppercase tracking-wider">Active Course Linkings</h4>
               <div className="bg-cardBg border border-border/45 rounded-3xl overflow-hidden shadow-xs">
                 {connections.length === 0 ? (
@@ -649,7 +695,7 @@ export default function TestsPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </div> */}
           </div>
         )}
 
@@ -1044,6 +1090,22 @@ export default function TestsPage() {
         onConfirm={handleConfirmDeleteQuestion}
         title="Delete Question"
         message="Are you sure you want to permanently delete this question from the database? This action cannot be undone."
+      />
+
+      <ConfirmModal
+        isOpen={isDeleteAllConfirmOpen}
+        onClose={() => setIsDeleteAllConfirmOpen(false)}
+        onConfirm={handleConfirmDeleteAllQuestions}
+        title="Delete All Questions"
+        message="Are you sure you want to permanently delete ALL questions from the database? This action is irreversible and cannot be undone."
+      />
+
+      <ConfirmModal
+        isOpen={categoryToDelete !== null}
+        onClose={() => setCategoryToDelete(null)}
+        onConfirm={handleConfirmDeleteCategory}
+        title="Delete Category"
+        message={`Are you sure you want to delete the category "${categoryToDelete?.name}"? This will delete all associated subjects and topics.`}
       />
 
     </div>
