@@ -6,13 +6,10 @@ import {
   Save, 
   AlertCircle, 
   CheckCircle, 
-  Download, 
   FileText 
 } from 'lucide-react';
 
 export default function AppConfigPage() {
-  const [requiredVersion, setRequiredVersion] = useState('');
-  const [apkDownloadUrl, setApkDownloadUrl] = useState('');
   const [releaseTag, setReleaseTag] = useState('');
   const [releaseNotes, setReleaseNotes] = useState('');
   
@@ -53,9 +50,7 @@ export default function AppConfigPage() {
     try {
       const response = await apiClient.get(ApiConstants.appConfig.base);
       if (response.data?.status === 'success') {
-        const { requiredVersion, apkDownloadUrl, releaseNotes } = response.data.data;
-        setRequiredVersion(requiredVersion || '');
-        setApkDownloadUrl(apkDownloadUrl || '');
+        const { apkDownloadUrl, releaseNotes } = response.data.data;
         setReleaseTag(extractTag(apkDownloadUrl));
         setReleaseNotes(releaseNotes || '');
       }
@@ -96,9 +91,7 @@ export default function AppConfigPage() {
 
       if (response.data?.status === 'success') {
         setMessage({ type: 'success', text: response.data.message || 'App configuration updated successfully!' });
-        const { requiredVersion, apkDownloadUrl, releaseNotes } = response.data.data;
-        setRequiredVersion(requiredVersion || '');
-        setApkDownloadUrl(apkDownloadUrl || '');
+        const { apkDownloadUrl, releaseNotes } = response.data.data;
         setReleaseTag(extractTag(apkDownloadUrl));
         setReleaseNotes(releaseNotes || '');
       }
