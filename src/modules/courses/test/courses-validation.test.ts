@@ -54,8 +54,16 @@ describe('Courses Module Validation Schemas', () => {
       });
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Enter ONLY the File ID itself, not the full Drive URL');
+        expect(result.error.issues[0].message).toBe('Enter a valid YouTube URL, Video ID, or legacy Drive ID (full Drive URLs are not supported)');
       }
+    });
+
+    it('should accept valid YouTube URL', () => {
+      const result = lessonSchema.safeParse({
+        ...validLesson,
+        driveFileId: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      });
+      expect(result.success).toBe(true);
     });
 
     it('should reject invalid duration inputs', () => {

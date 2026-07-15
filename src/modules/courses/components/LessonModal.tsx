@@ -67,7 +67,7 @@ export default function LessonModal({
               {editingLesson ? 'Edit Lesson Details' : 'Create New Lesson'}
             </h3>
             <p className="text-xs text-text-secondary mt-10">
-              Fill in lesson title, description, and link Google Drive video ID.
+              Fill in lesson title, description, and configure the YouTube video source.
             </p>
           </div>
           <button 
@@ -81,35 +81,18 @@ export default function LessonModal({
 
         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
           {/* Instructions Box */}
-          <div className="bg-[#F4F8FF] border border-[#D0E2FF] rounded-2xl p-4 space-y-2">
-            <h4 className="text-xs font-extrabold text-[#002D70] uppercase tracking-wider flex items-center gap-1.5">
-              Google Drive Streaming Setup
+          <div className="bg-[#FFF8F2] border border-[#FFE0C2] rounded-2xl p-4 space-y-2">
+            <h4 className="text-xs font-extrabold text-[#8A3800] uppercase tracking-wider flex items-center gap-1.5">
+              YouTube Video Setup Guide
             </h4>
-            <p className="text-[11px] text-[#002D70]/80 leading-relaxed font-semibold">
-              Before setting a video ID, ensure your Google Drive file is shared with the application service account:
+            <p className="text-[11px] text-[#8A3800]/90 leading-relaxed font-semibold">
+              To embed a lesson video from YouTube, configure your YouTube video settings as follows:
             </p>
-            <div className="flex items-center justify-between bg-white border border-[#B8D6FF] rounded-xl px-3 py-1.5 mt-2">
-              <span className="text-[10px] text-text-primary font-mono select-all truncate max-w-[80%]">
-                mayiliraguacadamy@mayiliragu-501911.iam.gserviceaccount.com
-              </span>
-              <button
-                type="button"
-                onClick={onCopyEmail}
-                className="flex items-center space-x-1 text-[10px] font-black text-accent hover:text-accent-onContainer flex-shrink-0"
-              >
-                {copiedEmail ? (
-                  <>
-                    <Check className="w-3 h-3 stroke-[3]" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
+            <ul className="text-[10px] text-[#8A3800]/80 list-disc list-inside space-y-1 font-medium pl-1">
+              <li>Upload your video as <strong>Unlisted</strong> so it isn't publicly searchable on YouTube.</li>
+              <li>Make sure <strong>Allow embedding</strong> is enabled under content settings.</li>
+              <li>Enable comments if you want students to ask questions.</li>
+            </ul>
           </div>
 
           {/* Title */}
@@ -151,14 +134,14 @@ export default function LessonModal({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* Drive ID */}
+            {/* YouTube Video ID / URL */}
             <div className="space-y-1.5">
               <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                Google Drive Video ID
+                YouTube Video ID or URL
               </label>
               <input
                 type="text"
-                placeholder="e.g. 1a2b3c4d5e6f..."
+                placeholder="e.g. dQw4w9WgXcQ or https://youtu.be/..."
                 {...register('driveFileId')}
                 disabled={isSubmitting}
                 className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${

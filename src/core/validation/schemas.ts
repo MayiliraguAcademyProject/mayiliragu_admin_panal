@@ -29,9 +29,15 @@ export type ModuleFormValues = z.infer<typeof moduleSchema>;
 export const lessonSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100),
   description: z.string().min(10, 'Description must be at least 10 characters'),
-  driveFileId: z.string().min(1, 'Google Drive File ID is required').refine(
-    isValidDriveFileId,
-    'Enter ONLY the File ID itself, not the full Drive URL'
+  driveFileId: z.string().min(1, 'Video ID or URL is required').refine(
+    (val) => {
+      if (!val || val.trim() === '') return false;
+      const clean = val.trim();
+      if (!clean.includes('/') && !clean.includes('http')) return true;
+      if (clean.includes('youtube.com') || clean.includes('youtu.be')) return true;
+      return false;
+    },
+    'Enter a valid YouTube URL, Video ID, or legacy Drive ID (full Drive URLs are not supported)'
   ),
   durationMinutes: z.number().int().positive('Duration must be a positive integer'),
   downloadEnabled: z.boolean().optional(),
