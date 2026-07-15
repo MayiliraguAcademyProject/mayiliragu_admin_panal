@@ -35,6 +35,7 @@ export const lessonSchema = z.object({
   ),
   durationMinutes: z.number().int().positive('Duration must be a positive integer'),
   downloadEnabled: z.boolean().optional(),
+  hlsUrl: z.string().url('Invalid HLS URL format').or(z.literal('')).optional().nullable(),
 });
 
 export type LessonFormValues = z.infer<typeof lessonSchema>;

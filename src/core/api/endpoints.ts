@@ -230,7 +230,7 @@ export function useDeleteModule(courseId: string) {
 export function useCreateLesson(courseId: string, moduleId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { title: string; description: string; driveFileId: string; duration: number; order: number; downloadEnabled?: boolean }) => {
+    mutationFn: async (data: { title: string; description: string; driveFileId: string; duration: number; order: number; downloadEnabled?: boolean; hlsUrl?: string | null }) => {
       const response = await apiClient.post(ApiConstants.lessons.base, { ...data, moduleId });
       return response.data;
     },
@@ -243,7 +243,7 @@ export function useCreateLesson(courseId: string, moduleId: string) {
 export function useUpdateLesson(courseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { title?: string; description?: string; driveFileId?: string; duration?: number; order?: number; downloadEnabled?: boolean } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { title?: string; description?: string; driveFileId?: string; duration?: number; order?: number; downloadEnabled?: boolean; hlsUrl?: string | null } }) => {
       const response = await apiClient.put(ApiConstants.lessons.detail(id), data);
       return response.data;
     },

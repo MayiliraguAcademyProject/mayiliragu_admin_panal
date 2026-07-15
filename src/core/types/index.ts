@@ -13,6 +13,7 @@ export interface Lesson {
   title: string;
   description: string;
   driveFileId: string;
+  hlsUrl?: string;
   duration: number; // in seconds
   order: number;
   downloadEnabled?: boolean;

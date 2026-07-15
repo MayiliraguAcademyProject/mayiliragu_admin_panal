@@ -14,7 +14,6 @@ import type { Module, Lesson } from '../../../core/types';
 import {
   ArrowLeft,
   BookOpen,
-  Video,
   Plus,
   Edit,
   Trash2,
@@ -25,7 +24,8 @@ import {
   ChevronRight,
   AlertCircle,
   Download,
-  Users
+  Users,
+  Play
 } from 'lucide-react';
 
 import type { ModuleFormValues, LessonFormValues } from '../../../core/validation';
@@ -45,16 +45,9 @@ export default function CourseDetailPage() {
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false);
   const [targetModuleId, setTargetModuleId] = useState<string>('');
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
-  const [copiedEmail, setCopiedEmail] = useState(false);
   const [selectedLessonForStats, setSelectedLessonForStats] = useState<Lesson | null>(null);
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
   const [deletingLessonTitle, setDeletingLessonTitle] = useState<string>('');
-
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText('mayiliraguacadamy@mayiliragu-501911.iam.gserviceaccount.com');
-    setCopiedEmail(true);
-    setTimeout(() => setCopiedEmail(false), 2000);
-  };
 
   // Queries & Mutations
   const { data: course, isLoading, isError, refetch } = useCourseDetail(courseId);
@@ -102,6 +95,7 @@ export default function CourseDetailPage() {
             driveFileId: values.driveFileId,
             duration: durationSeconds,
             downloadEnabled: values.downloadEnabled,
+            hlsUrl: values.hlsUrl,
           },
         });
       } else {
@@ -114,6 +108,7 @@ export default function CourseDetailPage() {
           duration: durationSeconds,
           order,
           downloadEnabled: values.downloadEnabled,
+          hlsUrl: values.hlsUrl,
         });
       }
       setIsLessonDialogOpen(false);
@@ -447,14 +442,16 @@ export default function CourseDetailPage() {
                                       <Clock className="w-3.5 h-3.5 text-accent" />
                                       <span>{Math.round(lesson.duration / 60)} minutes</span>
                                     </span>
-                                    <span className="flex items-center space-x-1">
-                                      <Video className="w-3.5 h-3.5 text-indigo-500" />
-                                      <span className="font-mono">ID: {lesson.driveFileId}</span>
-                                    </span>
                                     <span className={`flex items-center space-x-1 ${lesson.downloadEnabled ? 'text-green-600' : 'text-slate-400'}`}>
                                       <Download className="w-3.5 h-3.5" />
                                       <span>{lesson.downloadEnabled ? 'Download Enabled' : 'Download Disabled'}</span>
                                     </span>
+                                    {lesson.hlsUrl && (
+                                      <span className="flex items-center space-x-1 text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">
+                                        <Play className="w-3 h-3 text-teal-600" />
+                                        <span className="font-mono text-[9px] truncate max-w-[240px]" title={lesson.hlsUrl}>HLS: {lesson.hlsUrl}</span>
+                                      </span>
+                                    )}
                                     <button
                                       onClick={() => setSelectedLessonForStats(lesson)}
                                       className="flex items-center space-x-1 text-accent hover:underline cursor-pointer transition-all hover:scale-105 font-bold"
@@ -510,8 +507,6 @@ export default function CourseDetailPage() {
         onClose={() => setIsLessonDialogOpen(false)}
         onSubmit={onLessonSubmit}
         editingLesson={editingLesson}
-        copiedEmail={copiedEmail}
-        onCopyEmail={handleCopyEmail}
       />
 
       {/* Student watch stats dialog */}

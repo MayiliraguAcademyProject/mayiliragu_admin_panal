@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, X, Copy, Check } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { lessonSchema, type LessonFormValues } from '../../../core/validation';
 import type { Lesson } from '../../../core/types';
 
@@ -10,8 +10,6 @@ interface LessonModalProps {
   onClose: () => void;
   onSubmit: (values: LessonFormValues) => Promise<void>;
   editingLesson: Lesson | null;
-  copiedEmail: boolean;
-  onCopyEmail: () => void;
 }
 
 export default function LessonModal({
@@ -19,8 +17,6 @@ export default function LessonModal({
   onClose,
   onSubmit,
   editingLesson,
-  copiedEmail,
-  onCopyEmail,
 }: LessonModalProps) {
   const {
     register,
@@ -33,9 +29,10 @@ export default function LessonModal({
     defaultValues: {
       title: '',
       description: '',
-      driveFileId: '',
+      driveFileId: 'hls_video',
       durationMinutes: 5,
       downloadEnabled: false,
+      hlsUrl: '',
     },
   });
 
@@ -44,9 +41,10 @@ export default function LessonModal({
       if (editingLesson) {
         setValue('title', editingLesson.title);
         setValue('description', editingLesson.description);
-        setValue('driveFileId', editingLesson.driveFileId);
+        setValue('driveFileId', editingLesson.driveFileId || 'hls_video');
         setValue('durationMinutes', Math.round(editingLesson.duration / 60));
         setValue('downloadEnabled', editingLesson.downloadEnabled ?? false);
+        setValue('hlsUrl', editingLesson.hlsUrl ?? '');
       } else {
         reset();
       }
@@ -66,8 +64,8 @@ export default function LessonModal({
             <h3 className="text-lg font-extrabold text-text-primary tracking-tight">
               {editingLesson ? 'Edit Lesson Details' : 'Create New Lesson'}
             </h3>
-            <p className="text-xs text-text-secondary mt-10">
-              Fill in lesson title, description, and link Google Drive video ID.
+            <p className="text-xs text-text-secondary mt-1">
+              Fill in lesson title, description, duration, and HLS playlist link.
             </p>
           </div>
           <button 
@@ -80,38 +78,6 @@ export default function LessonModal({
         </div>
 
         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          {/* Instructions Box */}
-          <div className="bg-[#F4F8FF] border border-[#D0E2FF] rounded-2xl p-4 space-y-2">
-            <h4 className="text-xs font-extrabold text-[#002D70] uppercase tracking-wider flex items-center gap-1.5">
-              Google Drive Streaming Setup
-            </h4>
-            <p className="text-[11px] text-[#002D70]/80 leading-relaxed font-semibold">
-              Before setting a video ID, ensure your Google Drive file is shared with the application service account:
-            </p>
-            <div className="flex items-center justify-between bg-white border border-[#B8D6FF] rounded-xl px-3 py-1.5 mt-2">
-              <span className="text-[10px] text-text-primary font-mono select-all truncate max-w-[80%]">
-                mayiliraguacadamy@mayiliragu-501911.iam.gserviceaccount.com
-              </span>
-              <button
-                type="button"
-                onClick={onCopyEmail}
-                className="flex items-center space-x-1 text-[10px] font-black text-accent hover:text-accent-onContainer flex-shrink-0"
-              >
-                {copiedEmail ? (
-                  <>
-                    <Check className="w-3 h-3 stroke-[3]" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
           {/* Title */}
           <div className="space-y-1.5">
             <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
@@ -119,7 +85,7 @@ export default function LessonModal({
             </label>
             <input
               type="text"
-              placeholder="e.g. Setting up Flutter Environment"
+              placeholder="e.g. Introduction to HLS Streaming"
               {...register('title')}
               disabled={isSubmitting}
               className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
@@ -150,26 +116,10 @@ export default function LessonModal({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Drive ID */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                Google Drive Video ID
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 1a2b3c4d5e6f..."
-                {...register('driveFileId')}
-                disabled={isSubmitting}
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
-                  errors.driveFileId ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
-                } text-text-primary bg-slate-50/20`}
-              />
-              {errors.driveFileId && (
-                <p className="text-[11px] text-error font-semibold pl-1">{errors.driveFileId.message}</p>
-              )}
-            </div>
+          {/* Hidden Drive ID field (required by schema/database) */}
+          <input type="hidden" {...register('driveFileId')} />
 
+          <div className="grid grid-cols-1 gap-4">
             {/* Duration */}
             <div className="space-y-1.5">
               <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
@@ -188,6 +138,22 @@ export default function LessonModal({
                 <p className="text-[11px] text-error font-semibold pl-1">{errors.durationMinutes.message}</p>
               )}
             </div>
+          </div>
+
+          {/* HLS Video URL Input */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider pl-1">
+              HLS Video Playlist URL (Optional)
+            </label>
+            <input
+              type="text"
+              {...register('hlsUrl')}
+              placeholder="e.g. https://mayiliragu-cdn.sathish.qzz.io/course-id/lesson-id/master.m3u8"
+              className="w-full bg-white border border-border/70 rounded-2xl px-4 py-3 text-sm font-semibold text-text-primary placeholder-gray-400 focus:outline-none focus:border-accent transition-all duration-200"
+            />
+            {errors.hlsUrl && (
+              <p className="text-[11px] text-error font-semibold pl-1">{errors.hlsUrl.message}</p>
+            )}
           </div>
 
           {/* Download Toggle */}
