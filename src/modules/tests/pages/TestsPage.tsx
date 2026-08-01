@@ -25,6 +25,7 @@ import { type Question, type Test } from '../../../core/types';
 import QuestionFormModal from '../components/QuestionFormModal';
 import BulkImportModal from '../components/BulkImportModal';
 import TestBuilderWizardModal from '../components/TestBuilderWizardModal';
+import TestReviewsModal from '../components/TestReviewsModal';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
 import ConnectionModal from '../components/ConnectionModal';
 import CategoryModal from '../components/CategoryModal';
@@ -43,6 +44,7 @@ import {
   Award,
   AlertCircle,
   TrendingUp,
+  Star,
   Users,
   CheckCircle,
   HelpCircle as QuestionIcon
@@ -229,6 +231,14 @@ export default function TestsPage() {
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [editingTestId, setEditingTestId] = useState<string | undefined>(undefined);
   const { data: editingTestDetail } = useTestDetail(editingTestId);
+
+  const [selectedTestForReviews, setSelectedTestForReviews] = useState<Test | null>(null);
+  const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
+
+  const handleViewReviewsClick = (test: Test) => {
+    setSelectedTestForReviews(test);
+    setIsReviewsModalOpen(true);
+  };
 
   const handleCreateTestClick = () => {
     setEditingTestId(undefined);
@@ -791,6 +801,14 @@ export default function TestsPage() {
                           <td className="py-4 px-4 text-center space-x-1.5 whitespace-nowrap">
                             <button
                               type="button"
+                              onClick={() => handleViewReviewsClick(t)}
+                              className="px-2 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg hover:border-amber-400 font-bold text-[10px] transition-colors inline-flex items-center space-x-1"
+                            >
+                              <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                              <span>Reviews</span>
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => handleEditTestClick(t)}
                               className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg hover:border-accent hover:text-accent font-bold text-[10px] transition-colors"
                             >
@@ -1106,6 +1124,13 @@ export default function TestsPage() {
         onConfirm={handleConfirmDeleteCategory}
         title="Delete Category"
         message={`Are you sure you want to delete the category "${categoryToDelete?.name}"? This will delete all associated subjects and topics.`}
+      />
+
+      <TestReviewsModal
+        isOpen={isReviewsModalOpen}
+        onClose={() => setIsReviewsModalOpen(false)}
+        testId={selectedTestForReviews?.id || ''}
+        testTitle={selectedTestForReviews?.title || ''}
       />
 
     </div>
