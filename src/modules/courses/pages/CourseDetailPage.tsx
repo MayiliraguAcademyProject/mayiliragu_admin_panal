@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   useCourseDetail,
+  useUpdateCourse,
   useCreateModule,
   useUpdateModule,
   useDeleteModule,
@@ -25,7 +26,9 @@ import {
   ChevronRight,
   AlertCircle,
   Download,
-  Users
+  Users,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 import type { ModuleFormValues, LessonFormValues } from '../../../core/validation';
@@ -58,6 +61,19 @@ export default function CourseDetailPage() {
 
   // Queries & Mutations
   const { data: course, isLoading, isError, refetch } = useCourseDetail(courseId);
+  const updateCourseMutation = useUpdateCourse();
+
+  const handleToggleLockMode = async (mode: 'free' | 'sequential') => {
+    if (!course) return;
+    try {
+      await updateCourseMutation.mutateAsync({
+        id: courseId,
+        data: { lockMode: mode },
+      });
+    } catch (err) {
+      console.error('Failed to update course lock mode:', err);
+    }
+  };
 
   const createModuleMutation = useCreateModule(courseId);
   const updateModuleMutation = useUpdateModule(courseId);
@@ -274,6 +290,34 @@ export default function CourseDetailPage() {
             <span className="text-[10px] font-black tracking-widest text-blue-600 uppercase bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">
               {course.totalLessons ?? 0} Lessons
             </span>
+
+            {/* Lock Mode Selector Toggle */}
+            <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200 ml-auto">
+              <button
+                type="button"
+                onClick={() => handleToggleLockMode('free')}
+                className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                  (course.lockMode || 'free') === 'free'
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Unlock className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Free Access</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggleLockMode('sequential')}
+                className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                  course.lockMode === 'sequential'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Sequential Unlock</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

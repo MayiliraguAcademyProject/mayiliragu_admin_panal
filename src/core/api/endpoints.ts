@@ -121,10 +121,13 @@ export function useCourseDetail(courseId: string) {
 export function useCreateCourse() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { title: string; description: string; thumbnail?: string; file?: File }) => {
+    mutationFn: async (data: { title: string; description: string; thumbnail?: string; lockMode?: string; file?: File }) => {
       const formData = new FormData();
       formData.append('title', data.title);
       formData.append('description', data.description);
+      if (data.lockMode) {
+        formData.append('lockMode', data.lockMode);
+      }
       if (data.thumbnail) {
         formData.append('thumbnail', data.thumbnail);
       }
@@ -151,6 +154,7 @@ export function useUpdateCourse() {
       if (data.title !== undefined) formData.append('title', data.title);
       if (data.description !== undefined) formData.append('description', data.description);
       if (data.thumbnail !== undefined) formData.append('thumbnail', data.thumbnail || '');
+      if (data.lockMode !== undefined) formData.append('lockMode', data.lockMode);
       if (file) {
         formData.append('file', file);
       }

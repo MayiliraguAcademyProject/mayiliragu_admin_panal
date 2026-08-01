@@ -51,6 +51,7 @@ export default function QuestionFormModal({
 
   // Image properties state
   const [questionImageUrl, setQuestionImageUrl] = useState('');
+  const [explanationImageUrl, setExplanationImageUrl] = useState('');
 
   // Type specific fields state
   // 1. Choice Options
@@ -73,30 +74,34 @@ export default function QuestionFormModal({
 
     if (question) {
       setType(question.type || 'single_choice');
-      setQuestionTextEn(question.question_text_en || '');
-      setQuestionTextTa(question.question_text_ta || '');
+      setQuestionTextEn(question.question_text_en || question.questionTextEn || '');
+      setQuestionTextTa(question.question_text_ta || question.questionTextTa || '');
       setDifficulty(question.difficulty || 'medium');
-      setExplanationEn(question.explanation_en || '');
-      setExplanationTa(question.explanation_ta || '');
+      setExplanationEn(question.explanation_en || question.explanationEn || '');
+      setExplanationTa(question.explanation_ta || question.explanationTa || '');
+      setExplanationImageUrl(question.explanation_image_url || question.explanationImageUrl || '');
       setHint(question.hint || '');
       setCorrectMarks(question.marks?.correct ?? 1);
       setWrongMarks(question.marks?.wrong ?? 0);
       setPartialMarks(question.marks?.partial ?? 0);
       setNegativeEnabled(!!question.marks?.negative_enabled);
-      setIsPublished(!!question.is_published);
+      setIsPublished(!!(question.is_published ?? question.isPublished));
 
       // Find matching category/subject/topic from store if possible
       // Note: backend subjectId is stored as a string name or id
-      if (question.exam_category) {
-        const cat = categories.find(c => c.name === question.exam_category || c.id === question.exam_category);
+      if (question.exam_category || question.examCategory) {
+        const catName = question.exam_category || question.examCategory;
+        const cat = categories.find(c => c.name === catName || c.id === catName);
         if (cat) setCategoryId(cat.id);
       }
-      if (question.subject_id) {
-        const sub = subjects.find(s => s.name === question.subject_id || s.id === question.subject_id);
+      if (question.subject_id || question.subjectId) {
+        const subId = question.subject_id || question.subjectId;
+        const sub = subjects.find(s => s.name === subId || s.id === subId);
         if (sub) setSubjectId(sub.id);
       }
-      if (question.topic_id) {
-        const top = topics.find(t => t.name === question.topic_id || t.id === question.topic_id);
+      if (question.topic_id || question.topicId) {
+        const topId = question.topic_id || question.topicId;
+        const top = topics.find(t => t.name === topId || t.id === topId);
         if (top) setTopicId(top.id);
       }
 
@@ -110,21 +115,22 @@ export default function QuestionFormModal({
        } else {
          setQuestionImageUrl('');
        }
-       if (question.correct_answer !== undefined) {
-         setCorrectAnswer(!!question.correct_answer);
+       if (question.correct_answer !== undefined || question.correctAnswer !== undefined) {
+         setCorrectAnswer(!!(question.correct_answer ?? question.correctAnswer));
        }
-       if (question.accepted_answers) {
-         setAcceptedAnswers(Array.isArray(question.accepted_answers) ? question.accepted_answers : []);
+       if (question.accepted_answers || question.acceptedAnswers) {
+         setAcceptedAnswers(Array.isArray(question.accepted_answers || question.acceptedAnswers) ? (question.accepted_answers || question.acceptedAnswers) : []);
        }
-       setModelAnswer(question.model_answer || '');
-       setWordLimit(question.word_limit ?? 200);
-     } else {
+       setModelAnswer(question.model_answer || question.modelAnswer || '');
+       setWordLimit(question.word_limit ?? question.wordLimit ?? 200);
+    } else {
        // Create Mode
        setQuestionTextEn('');
        setQuestionTextTa('');
        setDifficulty('medium');
        setExplanationEn('');
        setExplanationTa('');
+       setExplanationImageUrl('');
        setHint('');
        setCorrectMarks(1);
        setWrongMarks(0);
@@ -298,6 +304,7 @@ export default function QuestionFormModal({
       difficulty,
       explanation_en: explanationEn || undefined,
       explanation_ta: explanationTa || undefined,
+      explanation_image_url: explanationImageUrl || undefined,
       hint: hint || undefined,
       marks: {
         correct: Number(correctMarks),
@@ -743,31 +750,79 @@ export default function QuestionFormModal({
           </div>
 
           {/* Explanations & Hints */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1.5">
-                Explanation (English)
-              </label>
-              <textarea
-                value={explanationEn}
-                onChange={(e) => setExplanationEn(e.target.value)}
-                rows={2}
-                placeholder="Detailed explanations in English"
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent font-medium text-slate-700"
-              />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1.5">
+                  Explanation (English)
+                </label>
+                <textarea
+                  value={explanationEn}
+                  onChange={(e) => setExplanationEn(e.target.value)}
+                  rows={2}
+                  placeholder="Detailed explanations in English"
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent font-medium text-slate-700"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1.5">
+                  Explanation (Tamil)
+                </label>
+                <textarea
+                  value={explanationTa}
+                  onChange={(e) => setExplanationTa(e.target.value)}
+                  rows={2}
+                  placeholder="Detailed explanations in Tamil"
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent font-medium text-slate-700"
+                />
+              </div>
             </div>
 
             <div>
               <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1.5">
-                Explanation (Tamil)
+                Explanation Image URL (Optional)
               </label>
-              <textarea
-                value={explanationTa}
-                onChange={(e) => setExplanationTa(e.target.value)}
-                rows={2}
-                placeholder="Detailed explanations in Tamil"
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent font-medium text-slate-700"
-              />
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  placeholder="Paste explanation image URL or upload below"
+                  value={explanationImageUrl}
+                  onChange={(e) => setExplanationImageUrl(e.target.value)}
+                  className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent font-medium text-slate-700"
+                />
+                <label className="flex items-center space-x-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold border border-slate-300/60 cursor-pointer transition-all">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload</span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleImageUpload(file, (url) => setExplanationImageUrl(url));
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              {explanationImageUrl && (
+                <div className="mt-2 relative inline-block">
+                  <img
+                    src={explanationImageUrl}
+                    alt="Explanation Preview"
+                    className="h-20 w-auto rounded-lg border border-slate-200 object-contain bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setExplanationImageUrl('')}
+                    className="absolute -top-1.5 -right-1.5 p-0.5 bg-rose-500 hover:bg-rose-650 text-white rounded-full transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

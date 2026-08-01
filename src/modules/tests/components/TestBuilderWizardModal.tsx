@@ -78,11 +78,13 @@ export default function TestBuilderWizardModal({
   // Client side search matching
   const filteredRepoQuestions = useMemo(() => {
     return repositoryQuestions.filter((q) => {
+      const textEn = q.question_text_en || q.questionTextEn || '';
+      const textTa = q.question_text_ta || q.questionTextTa || '';
       if (!repoSearch) return true;
       const searchLower = repoSearch.toLowerCase();
       return (
-        q.question_text_en.toLowerCase().includes(searchLower) ||
-        (q.question_text_ta && q.question_text_ta.toLowerCase().includes(searchLower))
+        textEn.toLowerCase().includes(searchLower) ||
+        textTa.toLowerCase().includes(searchLower)
       );
     });
   }, [repositoryQuestions, repoSearch]);
@@ -772,7 +774,7 @@ export default function TestBuilderWizardModal({
                           }`}
                         >
                           <div className="flex-1 space-y-1 min-w-0">
-                            <p className="font-extrabold text-text-primary truncate">{q.question_text_en}</p>
+                            <p className="font-extrabold text-text-primary truncate">{q.question_text_en || q.questionTextEn}</p>
                             <div className="flex items-center space-x-2 text-[9px] font-bold text-text-secondary uppercase">
                               <span>{q.type.replace('_', ' ')}</span>
                               <span>•</span>
@@ -837,7 +839,7 @@ export default function TestBuilderWizardModal({
                       >
                         <span className="font-extrabold text-text-secondary w-4 text-center">{idx + 1}</span>
                         <div className="flex-1 min-w-0 space-y-1">
-                          <p className="font-extrabold text-text-primary truncate">{q.question_text_en}</p>
+                          <p className="font-extrabold text-text-primary truncate">{q.question_text_en || q.questionTextEn}</p>
                           <div className="flex items-center space-x-2 text-[9px] font-bold text-text-secondary uppercase">
                             <span>{q.type.replace('_', ' ')}</span>
                             <span>•</span>
@@ -1165,9 +1167,9 @@ export default function TestBuilderWizardModal({
                               <p className="text-xs font-extrabold text-text-primary leading-relaxed whitespace-pre-wrap">
                                 {q.question_text_en || q.questionTextEn}
                               </p>
-                              {q.question_text_ta && (
+                              {(q.question_text_ta || q.questionTextTa) && (
                                 <p className="text-xs font-semibold text-text-secondary leading-relaxed border-t border-border/20 pt-2 italic">
-                                  {q.question_text_ta}
+                                  {q.question_text_ta || q.questionTextTa}
                                 </p>
                               )}
                             </div>

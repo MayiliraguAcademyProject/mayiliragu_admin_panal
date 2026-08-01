@@ -35,6 +35,7 @@ export interface Course {
   title: string;
   description: string;
   thumbnail: string;
+  lockMode?: 'free' | 'sequential';
   totalLessons?: number;
   modules?: Module[];
   createdAt: string;
@@ -234,6 +235,19 @@ export interface Question {
   tableData?: any;
   question_image_url?: string;
   questionTextEn?: string;
+  questionTextTa?: string;
+  explanationEn?: string;
+  explanationTa?: string;
+  isPublished?: boolean;
+  examCategory?: string;
+  subjectId?: string;
+  topicId?: string;
+  correctAnswer?: boolean;
+  acceptedAnswers?: any;
+  modelAnswer?: string;
+  wordLimit?: number;
+  explanation_image_url?: string | null;
+  explanationImageUrl?: string | null;
 }
 
 export interface QuestionStats {
