@@ -14,7 +14,8 @@ import {
   useAddStudentExamApplication,
   useAddStudentDocument,
   useAddStudentCommunication,
-  useCoursesList
+  useCoursesList,
+  useExamCategories
 } from '../../../core/api/endpoints';
 import type { Student } from '../../../core/types';
 import { 
@@ -84,6 +85,7 @@ export default function StudentManagementPage() {
   const { data: students = [], isLoading: isStudentsLoading, isError: isStudentsError, refetch: refetchStudents } = useStudentsList();
   const { data: enrollments = [], isLoading: isEnrollmentsLoading } = useStudentEnrollments(selectedStudent?.id ?? '');
   const { data: coursesData } = useCoursesList(1, 50);
+  const { data: examCategories = [], isLoading: isCategoriesLoading } = useExamCategories();
 
   // Profile Query
   const { data: profile, isLoading: isProfileLoading, refetch: refetchProfile } = useStudentProfile(selectedStudent?.id ?? '');
@@ -146,11 +148,11 @@ export default function StudentManagementPage() {
         batchTiming: profile.batchTiming || '',
         courseDuration: profile.courseDuration || '',
         facultyAssigned: profile.facultyAssigned || '',
-        courseFee: profile.courseFee || '',
-        discount: profile.discount || '',
+        courseFee: profile.courseFee ?? '',
+        discount: profile.discount ?? '',
         scholarshipDetails: profile.scholarshipDetails || '',
         enrollmentStatus: profile.enrollmentStatus || 'Active',
-        studyHoursPerDay: profile.studyHoursPerDay || '',
+        studyHoursPerDay: profile.studyHoursPerDay ?? '',
         placementSelected: profile.placementSelected || false,
         placementDetails: profile.placementDetails || {
           department: '',
@@ -164,7 +166,7 @@ export default function StudentManagementPage() {
       setProfileSuccessMsg(null);
       setProfileErrorMsg(null);
     }
-  }, [profile, activeTab]);
+  }, [profile]);
 
   // Filter students based on search query
   const filteredStudents = useMemo(() => {
@@ -343,7 +345,7 @@ export default function StudentManagementPage() {
       }
 
       // 8. Validation: courseFee and discount
-      if (payload.courseFee) {
+      if (payload.courseFee !== undefined && payload.courseFee !== null && payload.courseFee !== '') {
         const fee = Number(payload.courseFee);
         if (isNaN(fee) || fee < 0) {
           setProfileErrorMsg('Total Course Fee must be a valid positive number.');
@@ -352,7 +354,7 @@ export default function StudentManagementPage() {
         }
       }
 
-      if (payload.discount) {
+      if (payload.discount !== undefined && payload.discount !== null && payload.discount !== '') {
         const discount = Number(payload.discount);
         if (isNaN(discount) || discount < 0) {
           setProfileErrorMsg('Discount Allowed must be a valid positive number.');
@@ -368,11 +370,19 @@ export default function StudentManagementPage() {
       }
       
       // Sanitizations
-      if (payload.yearOfPassing) payload.yearOfPassing = Number(payload.yearOfPassing);
-      if (payload.percentage) payload.percentage = Number(payload.percentage);
-      if (payload.courseFee) payload.courseFee = Number(payload.courseFee);
-      if (payload.discount) payload.discount = Number(payload.discount);
-      if (payload.studyHoursPerDay) payload.studyHoursPerDay = Number(payload.studyHoursPerDay);
+      if (payload.yearOfPassing !== undefined && payload.yearOfPassing !== null && payload.yearOfPassing !== '') payload.yearOfPassing = Number(payload.yearOfPassing);
+      if (payload.percentage !== undefined && payload.percentage !== null && payload.percentage !== '') payload.percentage = Number(payload.percentage);
+      if (payload.courseFee !== undefined && payload.courseFee !== null && payload.courseFee !== '') {
+        payload.courseFee = Number(payload.courseFee);
+      } else {
+        payload.courseFee = null;
+      }
+      if (payload.discount !== undefined && payload.discount !== null && payload.discount !== '') {
+        payload.discount = Number(payload.discount);
+      } else {
+        payload.discount = null;
+      }
+      if (payload.studyHoursPerDay !== undefined && payload.studyHoursPerDay !== null && payload.studyHoursPerDay !== '') payload.studyHoursPerDay = Number(payload.studyHoursPerDay);
       
       await updateProfileMutation.mutateAsync({
         userId: selectedStudent.id,
@@ -407,11 +417,10 @@ export default function StudentManagementPage() {
   }, [profile?.payments]);
 
   const balanceFee = useMemo(() => {
-    if (!profile) return 0;
-    const fee = profile.courseFee || 0;
-    const disc = profile.discount || 0;
+    const fee = Number(editForm.courseFee ?? profile?.courseFee ?? 0);
+    const disc = Number(editForm.discount ?? profile?.discount ?? 0);
     return Math.max(0, fee - disc - totalPaid);
-  }, [profile, totalPaid]);
+  }, [editForm.courseFee, editForm.discount, profile, totalPaid]);
 
   if (isStudentsError) {
     return (
@@ -953,25 +962,38 @@ export default function StudentManagementPage() {
                         {/* Checklist Target Exams */}
                         <div className="space-y-2">
                           <label className="text-xs font-bold text-text-secondary uppercase">Target Exams</label>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                            {['UPSC', 'TNPSC Group 1', 'TNPSC Group 2', 'TNPSC Group 4', 'SSC CGL', 'SSC CHSL', 'Banking', 'Railways', 'Others'].map((exam) => {
-                              const isChecked = (editForm.targetExams || []).includes(exam);
-                              return (
-                                <button
-                                  key={exam}
-                                  type="button"
-                                  onClick={() => handleToggleExam(exam)}
-                                  className={`p-3 rounded-xl border text-xs font-extrabold transition-all duration-200 text-center ${
-                                    isChecked
-                                      ? 'bg-accent/15 border-accent text-accent'
-                                      : 'border-border/60 bg-slate-50 text-text-secondary hover:bg-slate-100'
-                                  }`}
-                                >
-                                  {exam}
-                                </button>
-                              );
-                            })}
-                          </div>
+                          {isCategoriesLoading ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                              {[1, 2, 3, 4, 5].map((i) => (
+                                <div key={i} className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+                              ))}
+                            </div>
+                          ) : examCategories.length === 0 ? (
+                            <p className="text-xs text-text-secondary font-medium py-2">
+                              No exam categories configured in test settings.
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                              {examCategories.map((cat: any) => {
+                                const exam = cat.name;
+                                const isChecked = (editForm.targetExams || []).includes(exam);
+                                return (
+                                  <button
+                                    key={cat.id || exam}
+                                    type="button"
+                                    onClick={() => handleToggleExam(exam)}
+                                    className={`p-3 rounded-xl border text-xs font-extrabold transition-all duration-200 text-center ${
+                                      isChecked
+                                        ? 'bg-accent/15 border-accent text-accent'
+                                        : 'border-border/60 bg-slate-50 text-text-secondary hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    {exam}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
