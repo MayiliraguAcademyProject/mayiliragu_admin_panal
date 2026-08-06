@@ -273,6 +273,8 @@ export interface Test {
   subject_id?: string;
   topic_id?: string;
   is_published: boolean;
+  is_paid?: boolean;
+  target_category?: string | null;
   scheduled_at?: string | null;
   created_at: string;
   updated_at: string;

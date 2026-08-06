@@ -52,6 +52,8 @@ export default function TestBuilderWizardModal({
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
   const [isPublished, setIsPublished] = useState(false);
+  const [isPaid, setIsPaid] = useState(false);
+  const [targetCategory, setTargetCategory] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
   const [isSectioned, setIsSectioned] = useState(false);
   const [sections, setSections] = useState<Array<{ id?: string; tempId?: string; name: string; order: number; duration: number; cutoff_marks: number; total_marks: number }>>([]);
@@ -89,6 +91,15 @@ export default function TestBuilderWizardModal({
     });
   }, [repositoryQuestions, repoSearch]);
 
+  // Helper to format ISO string to input[type="datetime-local"] format (local time)
+  const formatToDatetimeLocal = (isoString?: string | null) => {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
   // Load test if editing
   useEffect(() => {
     if (test) {
@@ -100,7 +111,9 @@ export default function TestBuilderWizardModal({
       setSubjectId(test.subject_id || '');
       setTopicId(test.topic_id || '');
       setIsPublished(test.is_published);
-      setScheduledAt(test.scheduled_at ? test.scheduled_at.substring(0, 16) : '');
+      setIsPaid(test.is_paid || false);
+      setTargetCategory(test.target_category || '');
+      setScheduledAt(formatToDatetimeLocal(test.scheduled_at));
       setIsSectioned(test.is_sectioned || false);
       if (test.sections) {
         setSections(test.sections.map((s: any) => ({
@@ -129,6 +142,8 @@ export default function TestBuilderWizardModal({
       setSubjectId('');
       setTopicId('');
       setIsPublished(false);
+      setIsPaid(false);
+      setTargetCategory('');
       setScheduledAt('');
       setIsSectioned(false);
       setSections([]);
@@ -279,6 +294,8 @@ export default function TestBuilderWizardModal({
       subject_id: subjectId || null,
       topic_id: topicId || null,
       is_published: isPublished,
+      is_paid: isPaid,
+      target_category: targetCategory || null,
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
       is_sectioned: isSectioned,
       sections: isSectioned ? sections.map((s, idx) => ({
@@ -437,26 +454,30 @@ export default function TestBuilderWizardModal({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Category */}
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Exam Category</label>
+                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Exam Category & Targeting</label>
                       <select
                         value={categoryId}
                         onChange={(e) => {
                           setCategoryId(e.target.value);
+                          setTargetCategory(e.target.value);
                           setSubjectId('');
                           setTopicId('');
                         }}
-                        className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-secondary bg-slate-50/20"
+                        className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
                       >
-                        <option value="">None / General</option>
+                        <option value="">None (General — Common for All Students)</option>
                         {categories.map((c) => (
                           <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                       </select>
+                      <p className="text-[10px] text-text-secondary font-medium">
+                        Targeted to students selecting this exam. General tests are common for all.
+                      </p>
                     </div>
 
                     {/* Subject */}
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Subject</label>
+                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Subject (Optional)</label>
                       <select
                         value={subjectId}
                         onChange={(e) => {
@@ -477,7 +498,7 @@ export default function TestBuilderWizardModal({
 
                     {/* Topic */}
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Topic</label>
+                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Topic (Optional)</label>
                       <select
                         value={topicId}
                         onChange={(e) => setTopicId(e.target.value)}
@@ -491,6 +512,44 @@ export default function TestBuilderWizardModal({
                             <option key={t.id} value={t.id}>{t.name}</option>
                           ))}
                       </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Test Access Control */}
+                <div className="border-t border-border/40 pt-4 space-y-4">
+                  <h4 className="text-xs font-extrabold text-text-primary uppercase tracking-wider flex items-center">
+                    <Sparkles className="w-3.5 h-3.5 mr-1 text-accent" />
+                    <span>Access Control & Monetization</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Paid Test Access Toggle */}
+                    <div className="space-y-1.5 col-span-2">
+                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">
+                        Test Pricing Tier
+                      </label>
+                      <div className="flex items-center space-x-3 p-3 bg-slate-50/40 rounded-xl border border-border/40">
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isPaid}
+                            onChange={(e) => setIsPaid(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                        </label>
+                        <div>
+                          <p className="text-xs font-extrabold text-text-primary">
+                            {isPaid ? 'Paid Students Only' : 'Free Test (All Students)'}
+                          </p>
+                          <p className="text-[10px] text-text-secondary font-medium">
+                            {isPaid
+                              ? 'Only enrolled students with completed fee payments can attempt this test.'
+                              : 'All registered students can attempt this test.'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -776,6 +776,11 @@ export default function TestsPage() {
                                   Sectioned
                                 </span>
                               )}
+                              {t.is_paid && (
+                                <span className="px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/20 text-[9px] font-black text-amber-700 uppercase rounded-md tracking-wider">
+                                  PRO
+                                </span>
+                              )}
                             </div>
                             {t.description && (
                               <p className="text-[10px] text-text-secondary font-medium truncate max-w-sm">{t.description}</p>
@@ -792,11 +797,18 @@ export default function TestsPage() {
                             {t.cutoff_marks}%
                           </td>
                           <td className="py-4 px-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold ${
-                              t.is_published ? 'bg-emerald-500/10 text-emerald-700' : 'bg-slate-100 text-text-secondary'
-                            }`}>
-                              {t.is_published ? 'Published' : 'Draft'}
-                            </span>
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold ${
+                                t.is_published ? 'bg-emerald-500/10 text-emerald-700' : 'bg-slate-100 text-text-secondary'
+                              }`}>
+                                {t.is_published ? 'Published' : 'Draft'}
+                              </span>
+                              {t.scheduled_at && (
+                                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-teal-500/10 text-teal-700 border border-teal-500/20 whitespace-nowrap">
+                                  📅 {new Date(t.scheduled_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-4 px-4 text-center space-x-1.5 whitespace-nowrap">
                             <button
