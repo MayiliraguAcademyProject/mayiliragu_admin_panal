@@ -21,11 +21,13 @@ export const ApiConstants = {
   modules: {
     base: '/modules',
     detail: (moduleId: string) => `/modules/${moduleId}`,
+    reorder: '/modules/reorder',
     swap: '/modules/sort/swap',
   },
   lessons: {
     base: '/lessons',
     detail: (lessonId: string) => `/lessons/${lessonId}`,
+    reorder: '/lessons/reorder',
     swap: '/lessons/sort/swap',
     downloads: '/lessons/admin/downloads',
   },

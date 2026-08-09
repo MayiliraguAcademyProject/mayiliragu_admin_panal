@@ -11,7 +11,8 @@ export interface Lesson {
   id: string;
   moduleId: string;
   title: string;
-  description: string;
+  description?: string | null;
+  image?: string | null;
   driveFileId: string;
   duration: number; // in seconds
   order: number;
@@ -516,6 +517,28 @@ export interface BookOrder {
     email: string;
   };
 }
+
+export interface EnrollmentRequest {
+  id: string;
+  studentId: string;
+  courseId: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  message?: string | null;
+  adminNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  student?: {
+    id?: string;
+    name: string;
+    email: string;
+  };
+  course?: {
+    id?: string;
+    title: string;
+    thumbnail?: string;
+  };
+}
+
 
 
 
