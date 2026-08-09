@@ -15,7 +15,8 @@ import {
   useAddStudentDocument,
   useAddStudentCommunication,
   useCoursesList,
-  useExamCategories
+  useExamCategories,
+  apiClient
 } from '../../../core/api/endpoints';
 import type { Student } from '../../../core/types';
 import { 
@@ -42,7 +43,8 @@ import {
   MapPin,
   DollarSign,
   Activity,
-  Briefcase
+  Briefcase,
+  Smartphone
 } from 'lucide-react';
 
 import { getAvailableCourses } from '../../../core/utils';
@@ -54,6 +56,7 @@ import CounselingModal from '../components/CounselingModal';
 import ExamAppModal from '../components/ExamAppModal';
 import DocModal from '../components/DocModal';
 import CommModal from '../components/CommModal';
+import ResetDeviceModal from '../components/ResetDeviceModal';
 
 type TabType = 'overview' | 'address_education' | 'exam_prep' | 'fees_payments' | 'performance' | 'mentoring' | 'exam_apps' | 'docs_history';
 
@@ -80,6 +83,8 @@ export default function StudentManagementPage() {
   const [isExamAppModalOpen, setIsExamAppModalOpen] = useState(false);
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
   const [isCommModalOpen, setIsCommModalOpen] = useState(false);
+  const [isResetDeviceModalOpen, setIsResetDeviceModalOpen] = useState(false);
+  const [isResettingDevice, setIsResettingDevice] = useState(false);
 
   // Queries
   const { data: students = [], isLoading: isStudentsLoading, isError: isStudentsError, refetch: refetchStudents } = useStudentsList();
@@ -568,6 +573,14 @@ export default function StudentManagementPage() {
                 >
                   <Pencil className="w-3.5 h-3.5" />
                   <span>Edit credentials</span>
+                </button>
+                <button
+                  onClick={() => setIsResetDeviceModalOpen(true)}
+                  className="flex items-center space-x-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold py-2.5 px-3.5 rounded-xl text-xs transition-colors active:scale-[0.98]"
+                  title="Reset Device Binding"
+                >
+                  <Smartphone className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Reset Device</span>
                 </button>
                 <button
                   onClick={() => handleDeleteStudent(selectedStudent)}
@@ -1892,6 +1905,27 @@ export default function StudentManagementPage() {
         message={`Are you sure you want to revoke the enrollment for course "${enrollmentToRevoke?.title}"?`}
         confirmText="Revoke"
         type="danger"
+      />
+
+      <ResetDeviceModal
+        isOpen={isResetDeviceModalOpen}
+        onClose={() => setIsResetDeviceModalOpen(false)}
+        onConfirm={async () => {
+          if (!selectedStudent) return;
+          setIsResettingDevice(true);
+          try {
+            await apiClient.delete(`/profile/admin/students/${selectedStudent.id}/device`);
+            setIsResetDeviceModalOpen(false);
+            refetchProfile();
+            alert(`Device binding reset successfully for ${selectedStudent.name}.`);
+          } catch (err: any) {
+            alert(err.response?.data?.message || 'Failed to reset device binding');
+          } finally {
+            setIsResettingDevice(false);
+          }
+        }}
+        studentName={selectedStudent?.name || 'Student'}
+        isLoading={isResettingDevice}
       />
 
     </div>

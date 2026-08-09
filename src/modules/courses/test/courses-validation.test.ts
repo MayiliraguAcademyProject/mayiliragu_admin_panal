@@ -36,15 +36,12 @@ describe('Courses Module Validation Schemas', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should reject description with less than 10 characters', () => {
+    it('should accept omitted or empty description', () => {
       const result = lessonSchema.safeParse({
         ...validLesson,
-        description: 'Short',
+        description: '',
       });
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Description must be at least 10 characters');
-      }
+      expect(result.success).toBe(true);
     });
 
     it('should reject Google Drive URL instead of File ID', () => {

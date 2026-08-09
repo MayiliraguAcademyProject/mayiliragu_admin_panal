@@ -20,7 +20,8 @@ import {
   Bell,
   Sun,
   Moon,
-  Smartphone
+  Smartphone,
+  UserCheck
 } from 'lucide-react';
 import { useThemeStore } from '../../store/theme-store';
 
@@ -41,6 +42,7 @@ export default function MainLayoutShell() {
   const navItems: NavItem[] = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Courses', path: '/courses', icon: BookOpen },
+    { name: 'Course Requests', path: '/course-requests', icon: UserCheck },
     { name: 'Students', path: '/student-management', icon: Users },
     { name: 'Tests & Question Bank', path: '/tests', icon: GraduationCap },
     { name: 'Banners', path: '/banners', icon: Image },

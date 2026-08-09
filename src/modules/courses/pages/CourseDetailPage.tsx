@@ -1,6 +1,23 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
   useCourseDetail,
   useUpdateCourse,
   useCreateModule,
@@ -9,7 +26,9 @@ import {
   useCreateLesson,
   useUpdateLesson,
   useDeleteLesson,
-  useLessonStats
+  useLessonStats,
+  useReorderModules,
+  useReorderLessons,
 } from '../../../core/api/endpoints';
 import type { Module, Lesson } from '../../../core/types';
 import {
@@ -28,7 +47,8 @@ import {
   Download,
   Users,
   Lock,
-  Unlock
+  Unlock,
+  GripVertical,
 } from 'lucide-react';
 
 import type { ModuleFormValues, LessonFormValues } from '../../../core/validation';
@@ -83,6 +103,9 @@ export default function CourseDetailPage() {
   const updateLessonMutation = useUpdateLesson(courseId);
   const deleteLessonMutation = useDeleteLesson(courseId);
 
+  const reorderModulesMutation = useReorderModules(courseId);
+  const reorderLessonsMutation = useReorderLessons(courseId);
+
   // Module submit handler
   const onModuleSubmit = async (values: ModuleFormValues) => {
     try {
@@ -106,7 +129,7 @@ export default function CourseDetailPage() {
   };
 
   // Lesson submit handler
-  const onLessonSubmit = async (values: LessonFormValues) => {
+  const onLessonSubmit = async (values: LessonFormValues, file?: File | null) => {
     try {
       const durationSeconds = values.durationMinutes * 60;
       if (editingLesson) {
@@ -115,21 +138,27 @@ export default function CourseDetailPage() {
           data: {
             title: values.title,
             description: values.description,
+            image: values.image,
             driveFileId: values.driveFileId,
             duration: durationSeconds,
             downloadEnabled: values.downloadEnabled,
           },
+          file,
         });
       } else {
         const module = course?.modules?.find((m) => m.id === targetModuleId);
         const order = module?.lessons?.length ?? 0;
         await createLessonMutation.mutateAsync({
-          title: values.title,
-          description: values.description,
-          driveFileId: values.driveFileId,
-          duration: durationSeconds,
-          order,
-          downloadEnabled: values.downloadEnabled,
+          data: {
+            title: values.title,
+            description: values.description,
+            image: values.image,
+            driveFileId: values.driveFileId,
+            duration: durationSeconds,
+            order,
+            downloadEnabled: values.downloadEnabled,
+          },
+          file,
         });
       }
       setIsLessonDialogOpen(false);
@@ -139,21 +168,66 @@ export default function CourseDetailPage() {
     }
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEndModules = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !course) return;
+
+    const modules = [...(course.modules ?? [])].sort((a, b) => a.order - b.order);
+    const oldIndex = modules.findIndex((m) => m.id === active.id);
+    const newIndex = modules.findIndex((m) => m.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(modules, oldIndex, newIndex);
+    const items = reordered.map((m, idx) => ({ id: m.id, order: idx + 1 }));
+
+    try {
+      await reorderModulesMutation.mutateAsync(items);
+    } catch (err) {
+      console.error('Failed to reorder modules:', err);
+    }
+  };
+
+  const handleDragEndLessons = async (module: Module, event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const lessons = [...(module.lessons ?? [])].sort((a, b) => a.order - b.order);
+    const oldIndex = lessons.findIndex((l) => l.id === active.id);
+    const newIndex = lessons.findIndex((l) => l.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(lessons, oldIndex, newIndex);
+    const items = reordered.map((l, idx) => ({ id: l.id, order: idx + 1 }));
+
+    try {
+      await reorderLessonsMutation.mutateAsync(items);
+    } catch (err) {
+      console.error('Failed to reorder lessons:', err);
+    }
+  };
+
   // Reorder Modules (Up/Down programmatic shift)
   const handleReorderModules = async (index: number, direction: 'up' | 'down') => {
     const modules = [...(course?.modules ?? [])].sort((a, b) => a.order - b.order);
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= modules.length) return;
 
-    // Swap order values
-    const item1 = modules[index];
-    const item2 = modules[targetIndex];
+    const reordered = arrayMove(modules, index, targetIndex);
+    const items = reordered.map((m, idx) => ({ id: m.id, order: idx + 1 }));
 
     try {
-      await Promise.all([
-        updateModuleMutation.mutateAsync({ id: item1.id, data: { order: item2.order } }),
-        updateModuleMutation.mutateAsync({ id: item2.id, data: { order: item1.order } }),
-      ]);
+      await reorderModulesMutation.mutateAsync(items);
     } catch (err) {
       console.error('Failed to swap module order:', err);
     }
@@ -165,15 +239,11 @@ export default function CourseDetailPage() {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= lessons.length) return;
 
-    // Swap order values
-    const item1 = lessons[index];
-    const item2 = lessons[targetIndex];
+    const reordered = arrayMove(lessons, index, targetIndex);
+    const items = reordered.map((l, idx) => ({ id: l.id, order: idx + 1 }));
 
     try {
-      await Promise.all([
-        updateLessonMutation.mutateAsync({ id: item1.id, data: { order: item2.order } }),
-        updateLessonMutation.mutateAsync({ id: item2.id, data: { order: item1.order } }),
-      ]);
+      await reorderLessonsMutation.mutateAsync(items);
     } catch (err) {
       console.error('Failed to swap lesson order:', err);
     }
@@ -352,191 +422,89 @@ export default function CourseDetailPage() {
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {sortedModules.map((module, mIdx) => {
-              const isExpanded = expandedModuleId === module.id;
-              const moduleLessons = [...(module.lessons ?? [])].sort((a, b) => a.order - b.order);
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEndModules}
+          >
+            <SortableContext
+              items={sortedModules.map((m) => m.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-3">
+                {sortedModules.map((module, mIdx) => {
+                  const isExpanded = expandedModuleId === module.id;
+                  const moduleLessons = [...(module.lessons ?? [])].sort((a, b) => a.order - b.order);
 
-              return (
-                <div
-                  key={module.id}
-                  className="bg-cardBg border border-border/60 rounded-3xl overflow-hidden shadow-sm"
-                >
-                  {/* Module Header Bar */}
-                  <div
-                    onClick={() => setExpandedModuleId(isExpanded ? null : module.id)}
-                    className="p-4 sm:p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/40 select-none transition-colors"
-                  >
-                    <div className="flex items-center space-x-3 min-w-0">
-
-                      {/* Sorting controls for Module */}
-                      <div className="flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => handleReorderModules(mIdx, 'up')}
-                          disabled={mIdx === 0}
-                          className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 text-text-secondary hover:text-accent"
-                          title="Move Up"
-                        >
-                          <ChevronUp className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleReorderModules(mIdx, 'down')}
-                          disabled={mIdx === sortedModules.length - 1}
-                          className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 text-text-secondary hover:text-accent"
-                          title="Move Down"
-                        >
-                          <ChevronDown className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-[10px] text-text-secondary font-black bg-slate-100 px-2 py-0.5 rounded-md">
-                            M{mIdx + 1}
-                          </span>
-                          <h4 className="font-extrabold text-sm sm:text-base text-text-primary tracking-tight truncate">
-                            {module.title}
-                          </h4>
-                        </div>
-                        <p className="text-[11px] text-text-secondary font-medium mt-0.5">
-                          {moduleLessons.length} lessons in this block
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleOpenEditModule(module)}
-                        className="p-2 rounded-xl hover:bg-slate-100 text-text-secondary hover:text-accent transition-colors"
-                        title="Rename Module"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteModule(module.id, module.title)}
-                        className="p-2 rounded-xl hover:bg-red-50 text-text-secondary hover:text-red-600 transition-colors"
-                        title="Delete Module"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                      <ChevronRight className={`w-5 h-5 text-gray-400 transform transition-transform duration-200 ${isExpanded ? 'rotate-95' : ''}`} />
-                    </div>
-                  </div>
-
-                  {/* Lessons detail list */}
-                  {isExpanded && (
-                    <div className="border-t border-border/40 bg-slate-50/10 p-4 sm:p-5 space-y-3">
-                      <div className="flex items-center justify-between pb-1">
-                        <span className="text-xs font-extrabold text-text-secondary uppercase tracking-wider">
-                          Module Lectures
-                        </span>
-                        <button
-                          onClick={() => handleOpenCreateLesson(module.id)}
-                          className="flex items-center space-x-1 text-accent hover:text-accent-onContainer font-bold text-xs"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Add Lesson</span>
-                        </button>
-                      </div>
-
-                      {moduleLessons.length === 0 ? (
-                        <p className="text-text-secondary text-xs font-semibold py-4 text-center">
-                          No lessons added under this module yet.
-                        </p>
-                      ) : (
-                        <div className="space-y-2.5">
-                          {moduleLessons.map((lesson, lIdx) => (
-                            <div
-                              key={lesson.id}
-                              className="bg-cardBg border border-border/50 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs hover:border-slate-300 transition-all duration-200"
+                  return (
+                    <SortableModuleItem
+                      key={module.id}
+                      module={module}
+                      mIdx={mIdx}
+                      totalModules={sortedModules.length}
+                      isExpanded={isExpanded}
+                      onToggleExpand={() => setExpandedModuleId(isExpanded ? null : module.id)}
+                      onEdit={() => handleOpenEditModule(module)}
+                      onDelete={() => handleDeleteModule(module.id, module.title)}
+                      onReorderUp={() => handleReorderModules(mIdx, 'up')}
+                      onReorderDown={() => handleReorderModules(mIdx, 'down')}
+                    >
+                      {/* Lessons detail list */}
+                      {isExpanded && (
+                        <div className="border-t border-border/40 bg-slate-50/10 p-4 sm:p-5 space-y-3">
+                          <div className="flex items-center justify-between pb-1">
+                            <span className="text-xs font-extrabold text-text-secondary uppercase tracking-wider">
+                              Module Lectures
+                            </span>
+                            <button
+                              onClick={() => handleOpenCreateLesson(module.id)}
+                              className="flex items-center space-x-1 text-accent hover:text-accent-onContainer font-bold text-xs"
                             >
-                              <div className="flex items-start space-x-3 min-w-0">
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Add Lesson</span>
+                            </button>
+                          </div>
 
-                                {/* Lesson Sorting controls */}
-                                <div className="flex flex-col items-center justify-center pt-0.5">
-                                  <button
-                                    onClick={() => handleReorderLessons(module, lIdx, 'up')}
-                                    disabled={lIdx === 0}
-                                    className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 text-text-secondary hover:text-accent"
-                                    title="Move Up"
-                                  >
-                                    <ChevronUp className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleReorderLessons(module, lIdx, 'down')}
-                                    disabled={lIdx === moduleLessons.length - 1}
-                                    className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 text-text-secondary hover:text-accent"
-                                    title="Move Down"
-                                  >
-                                    <ChevronDown className="w-3.5 h-3.5" />
-                                  </button>
+                          {moduleLessons.length === 0 ? (
+                            <p className="text-text-secondary text-xs font-semibold py-4 text-center">
+                              No lessons added under this module yet.
+                            </p>
+                          ) : (
+                            <DndContext
+                              sensors={sensors}
+                              collisionDetection={closestCenter}
+                              onDragEnd={(e) => handleDragEndLessons(module, e)}
+                            >
+                              <SortableContext
+                                items={moduleLessons.map((l) => l.id)}
+                                strategy={verticalListSortingStrategy}
+                              >
+                                <div className="space-y-2.5">
+                                  {moduleLessons.map((lesson, lIdx) => (
+                                    <SortableLessonItem
+                                      key={lesson.id}
+                                      lesson={lesson}
+                                      lIdx={lIdx}
+                                      totalLessons={moduleLessons.length}
+                                      onEdit={() => handleOpenEditLesson(module.id, lesson)}
+                                      onDelete={() => handleDeleteLesson(lesson.id, lesson.title)}
+                                      onReorderUp={() => handleReorderLessons(module, lIdx, 'up')}
+                                      onReorderDown={() => handleReorderLessons(module, lIdx, 'down')}
+                                      onSelectStats={() => setSelectedLessonForStats(lesson)}
+                                    />
+                                  ))}
                                 </div>
-
-                                <div className="min-w-0 space-y-1">
-                                  <div className="flex items-center space-x-2 flex-wrap">
-                                    <span className="text-[9px] text-[#008A7C] font-black bg-[#008A7C]/5 px-2 py-0.5 rounded">
-                                      Lesson {lIdx + 1}
-                                    </span>
-                                    <h5 className="font-extrabold text-sm text-text-primary tracking-tight">
-                                      {lesson.title}
-                                    </h5>
-                                  </div>
-                                  <p className="text-xs text-text-secondary leading-normal line-clamp-2">
-                                    {lesson.description}
-                                  </p>
-
-                                  {/* Lesson meta counts */}
-                                  <div className="flex items-center space-x-4 pt-1 text-[10px] text-text-secondary font-semibold">
-                                    <span className="flex items-center space-x-1">
-                                      <Clock className="w-3.5 h-3.5 text-accent" />
-                                      <span>{Math.round(lesson.duration / 60)} minutes</span>
-                                    </span>
-                                    <span className="flex items-center space-x-1">
-                                      <Video className="w-3.5 h-3.5 text-indigo-500" />
-                                      <span className="font-mono">ID: {lesson.driveFileId}</span>
-                                    </span>
-                                    <span className={`flex items-center space-x-1 ${lesson.downloadEnabled ? 'text-green-600' : 'text-slate-400'}`}>
-                                      <Download className="w-3.5 h-3.5" />
-                                      <span>{lesson.downloadEnabled ? 'Download Enabled' : 'Download Disabled'}</span>
-                                    </span>
-                                    <button
-                                      onClick={() => setSelectedLessonForStats(lesson)}
-                                      className="flex items-center space-x-1 text-accent hover:underline cursor-pointer transition-all hover:scale-105 font-bold"
-                                      title="View Watching Progress"
-                                    >
-                                      <Users className="w-3.5 h-3.5 text-accent" />
-                                      <span>Watch Stats</span>
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-end space-x-1 self-end sm:self-center">
-                                <button
-                                  onClick={() => handleOpenEditLesson(module.id, lesson)}
-                                  className="p-1.5 rounded-lg hover:bg-slate-100 text-text-secondary hover:text-accent transition-colors"
-                                  title="Edit Lesson"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteLesson(lesson.id, lesson.title)}
-                                  className="p-1.5 rounded-lg hover:bg-red-50 text-text-secondary hover:text-red-600 transition-colors"
-                                  title="Delete Lesson"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                              </SortableContext>
+                            </DndContext>
+                          )}
                         </div>
                       )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    </SortableModuleItem>
+                  );
+                })}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
@@ -709,6 +677,263 @@ function StudentWatchStatsModal({ lesson, onClose }: StudentWatchStatsModalProps
             Close
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface SortableModuleItemProps {
+  module: Module;
+  mIdx: number;
+  totalModules: number;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onReorderUp: () => void;
+  onReorderDown: () => void;
+  children?: React.ReactNode;
+}
+
+function SortableModuleItem({
+  module,
+  mIdx,
+  totalModules,
+  isExpanded,
+  onToggleExpand,
+  onEdit,
+  onDelete,
+  onReorderUp,
+  onReorderDown,
+  children,
+}: SortableModuleItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: module.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="bg-cardBg border border-border/60 rounded-3xl overflow-hidden shadow-sm"
+    >
+      <div
+        onClick={onToggleExpand}
+        className="p-4 sm:p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/40 select-none transition-colors"
+      >
+        <div className="flex items-center space-x-3 min-w-0">
+          <div
+            {...attributes}
+            {...listeners}
+            onClick={(e) => e.stopPropagation()}
+            className="p-1 rounded cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+            title="Drag to reorder module"
+          >
+            <GripVertical className="w-5 h-5" />
+          </div>
+
+          <div className="flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={onReorderUp}
+              disabled={mIdx === 0}
+              className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 text-text-secondary hover:text-accent"
+              title="Move Up"
+            >
+              <ChevronUp className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onReorderDown}
+              disabled={mIdx === totalModules - 1}
+              className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 text-text-secondary hover:text-accent"
+              title="Move Down"
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex items-center space-x-2">
+              <span className="text-[10px] text-text-secondary font-black bg-slate-100 px-2 py-0.5 rounded-md">
+                M{mIdx + 1}
+              </span>
+              <h4 className="font-extrabold text-sm sm:text-base text-text-primary tracking-tight truncate">
+                {module.title}
+              </h4>
+            </div>
+            <p className="text-[11px] text-text-secondary font-medium mt-0.5">
+              {(module.lessons ?? []).length} lessons in this block
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={onEdit}
+            className="p-2 rounded-xl hover:bg-slate-100 text-text-secondary hover:text-accent transition-colors"
+            title="Rename Module"
+          >
+            <Edit className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-2 rounded-xl hover:bg-red-50 text-text-secondary hover:text-red-600 transition-colors"
+            title="Delete Module"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <ChevronRight className={`w-5 h-5 text-gray-400 transform transition-transform duration-200 ${isExpanded ? 'rotate-95' : ''}`} />
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+interface SortableLessonItemProps {
+  lesson: Lesson;
+  lIdx: number;
+  totalLessons: number;
+  onEdit: () => void;
+  onDelete: () => void;
+  onReorderUp: () => void;
+  onReorderDown: () => void;
+  onSelectStats: () => void;
+}
+
+function SortableLessonItem({
+  lesson,
+  lIdx,
+  totalLessons,
+  onEdit,
+  onDelete,
+  onReorderUp,
+  onReorderDown,
+  onSelectStats,
+}: SortableLessonItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: lesson.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="bg-cardBg border border-border/50 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs hover:border-slate-300 transition-all duration-200"
+    >
+      <div className="flex items-start space-x-3 min-w-0">
+        <div
+          {...attributes}
+          {...listeners}
+          className="p-1 rounded cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 hover:bg-slate-100 self-center"
+          title="Drag to reorder lesson"
+        >
+          <GripVertical className="w-4 h-4" />
+        </div>
+
+        <div className="flex flex-col items-center justify-center pt-0.5">
+          <button
+            onClick={onReorderUp}
+            disabled={lIdx === 0}
+            className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 text-text-secondary hover:text-accent"
+            title="Move Up"
+          >
+            <ChevronUp className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onReorderDown}
+            disabled={lIdx === totalLessons - 1}
+            className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 text-text-secondary hover:text-accent"
+            title="Move Down"
+          >
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {lesson.image && (
+          <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 border border-border/40">
+            <img
+              src={lesson.image}
+              alt={lesson.title}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center space-x-2 flex-wrap">
+            <span className="text-[9px] text-[#008A7C] font-black bg-[#008A7C]/5 px-2 py-0.5 rounded">
+              Lesson {lIdx + 1}
+            </span>
+            <h5 className="font-extrabold text-sm text-text-primary tracking-tight">
+              {lesson.title}
+            </h5>
+          </div>
+          <p className="text-xs text-text-secondary leading-normal line-clamp-2">
+            {lesson.description}
+          </p>
+
+          <div className="flex items-center space-x-4 pt-1 text-[10px] text-text-secondary font-semibold">
+            <span className="flex items-center space-x-1">
+              <Clock className="w-3.5 h-3.5 text-accent" />
+              <span>{Math.round(lesson.duration / 60)} minutes</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <Video className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="font-mono">ID: {lesson.driveFileId}</span>
+            </span>
+            <span className={`flex items-center space-x-1 ${lesson.downloadEnabled ? 'text-green-600' : 'text-slate-400'}`}>
+              <Download className="w-3.5 h-3.5" />
+              <span>{lesson.downloadEnabled ? 'Download Enabled' : 'Download Disabled'}</span>
+            </span>
+            <button
+              onClick={onSelectStats}
+              className="flex items-center space-x-1 text-accent hover:underline cursor-pointer transition-all hover:scale-105 font-bold"
+              title="View Watching Progress"
+            >
+              <Users className="w-3.5 h-3.5 text-accent" />
+              <span>Watch Stats</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end space-x-1 self-end sm:self-center">
+        <button
+          onClick={onEdit}
+          className="p-1.5 rounded-lg hover:bg-slate-100 text-text-secondary hover:text-accent transition-colors"
+          title="Edit Lesson"
+        >
+          <Edit className="w-4 h-4" />
+        </button>
+        <button
+          onClick={onDelete}
+          className="p-1.5 rounded-lg hover:bg-red-50 text-text-secondary hover:text-red-600 transition-colors"
+          title="Delete Lesson"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );

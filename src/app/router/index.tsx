@@ -22,6 +22,7 @@ const BookStorePage = React.lazy(() => import('../../modules/book-store/pages/Bo
 const VideoDownloadsPage = React.lazy(() => import('../../modules/downloads/pages/VideoDownloadsPage'));
 const NotificationsPage = React.lazy(() => import('../../modules/notifications/pages/NotificationsPage'));
 const AppConfigPage = React.lazy(() => import('../../modules/app-config/pages/AppConfigPage'));
+const CourseRequestsPage = React.lazy(() => import('../../modules/enrollments/pages/CourseRequestsPage'));
 
 // Loading fallback component
 const SuspenseFallback = () => (
@@ -82,6 +83,14 @@ export const router = createBrowserRouter([
         element: (
           <React.Suspense fallback={<SuspenseFallback />}>
             <StudentManagementPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'course-requests',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <CourseRequestsPage />
           </React.Suspense>
         ),
       },

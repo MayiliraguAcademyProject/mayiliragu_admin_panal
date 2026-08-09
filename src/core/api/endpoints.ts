@@ -38,7 +38,8 @@ import type {
   Book,
   Coupon,
   BookOrder,
-  BookOrderItem
+  BookOrderItem,
+  EnrollmentRequest
 } from '../types';
 
 export type { 
@@ -74,7 +75,8 @@ export type {
   Book,
   Coupon,
   BookOrder,
-  BookOrderItem
+  BookOrderItem,
+  EnrollmentRequest
 };
 
 // ==========================================
@@ -234,8 +236,23 @@ export function useDeleteModule(courseId: string) {
 export function useCreateLesson(courseId: string, moduleId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { title: string; description: string; driveFileId: string; duration: number; order: number; downloadEnabled?: boolean }) => {
-      const response = await apiClient.post(ApiConstants.lessons.base, { ...data, moduleId });
+    mutationFn: async ({ data, file }: { data: { title: string; description?: string; image?: string; driveFileId: string; duration: number; order: number; downloadEnabled?: boolean }; file?: File | null }) => {
+      const formData = new FormData();
+      formData.append('moduleId', moduleId);
+      formData.append('title', data.title);
+      if (data.description !== undefined) formData.append('description', data.description || '');
+      if (data.image !== undefined) formData.append('image', data.image || '');
+      formData.append('driveFileId', data.driveFileId);
+      formData.append('duration', String(data.duration));
+      formData.append('order', String(data.order));
+      if (data.downloadEnabled !== undefined) formData.append('downloadEnabled', String(data.downloadEnabled));
+      if (file) {
+        formData.append('file', file);
+      }
+
+      const response = await apiClient.post(ApiConstants.lessons.base, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -247,8 +264,22 @@ export function useCreateLesson(courseId: string, moduleId: string) {
 export function useUpdateLesson(courseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { title?: string; description?: string; driveFileId?: string; duration?: number; order?: number; downloadEnabled?: boolean } }) => {
-      const response = await apiClient.put(ApiConstants.lessons.detail(id), data);
+    mutationFn: async ({ id, data, file }: { id: string; data: { title?: string; description?: string; image?: string; driveFileId?: string; duration?: number; order?: number; downloadEnabled?: boolean }; file?: File | null }) => {
+      const formData = new FormData();
+      if (data.title !== undefined) formData.append('title', data.title);
+      if (data.description !== undefined) formData.append('description', data.description || '');
+      if (data.image !== undefined) formData.append('image', data.image || '');
+      if (data.driveFileId !== undefined) formData.append('driveFileId', data.driveFileId);
+      if (data.duration !== undefined) formData.append('duration', String(data.duration));
+      if (data.order !== undefined) formData.append('order', String(data.order));
+      if (data.downloadEnabled !== undefined) formData.append('downloadEnabled', String(data.downloadEnabled));
+      if (file) {
+        formData.append('file', file);
+      }
+
+      const response = await apiClient.put(ApiConstants.lessons.detail(id), formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -261,6 +292,32 @@ export function useDeleteLesson(courseId: string) {
   return useMutation({
     mutationFn: async (id: string) => {
       const response = await apiClient.delete(ApiConstants.lessons.detail(id));
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useReorderModules(courseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: { id: string; order: number }[]) => {
+      const response = await apiClient.patch(ApiConstants.modules.reorder, { items });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useReorderLessons(courseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: { id: string; order: number }[]) => {
+      const response = await apiClient.patch(ApiConstants.lessons.reorder, { items });
       return response.data;
     },
     onSuccess: () => {
@@ -1462,6 +1519,33 @@ export function useUpdatePaymentQr() {
     },
   });
 }
+
+export function useEnrollmentRequests(status?: string) {
+  return useQuery({
+    queryKey: ['enrollmentRequests', status],
+    queryFn: async () => {
+      const response = await apiClient.get('/enrollment-requests', {
+        params: status ? { status } : undefined,
+      });
+      return response.data.data as EnrollmentRequest[];
+    },
+  });
+}
+
+export function useProcessEnrollmentRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, action, adminNote }: { id: string; action: 'approve' | 'reject'; adminNote?: string }) => {
+      const response = await apiClient.patch(`/enrollment-requests/${id}`, { action, adminNote });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['enrollmentRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+  });
+}
+
 
 
 
