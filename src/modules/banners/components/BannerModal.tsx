@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,6 +34,34 @@ export default function BannerModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadZoneClick = () => {
+    console.log('[Upload] Zone tapped/clicked');
+    const input = fileInputRef.current;
+    if (!input) {
+      console.error('[Upload] fileInputRef.current is NULL — ref not attached');
+      return;
+    }
+    console.log('[Upload] Input element found:', input.tagName);
+    console.log('[Upload] Input disabled:', input.disabled);
+    console.log('[Upload] Input type:', input.type);
+    console.log('[Upload] Input accept:', input.accept);
+    console.log('[Upload] Input visibility:', input.style.display, '| opacity:', input.style.opacity);
+    console.log('[Upload] Input computed offsetWidth:', input.offsetWidth, 'offsetHeight:', input.offsetHeight);
+    console.log('[Upload] isSubmitting state:', isSubmitting);
+    if (input.disabled) {
+      console.error('[Upload] BLOCKED — input is disabled! isSubmitting was true.');
+      return;
+    }
+    try {
+      console.log('[Upload] Calling input.click()...');
+      input.click();
+      console.log('[Upload] input.click() returned (file picker may now be open)');
+    } catch (err) {
+      console.error('[Upload] input.click() threw an error:', err);
+    }
+  };
 
   const {
     register,
@@ -56,8 +84,10 @@ export default function BannerModal({
   const activePreviewUrl = previewUrl || watchImageUrl;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('handleFileChange triggered. Files length:', e.target.files?.length);
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
+      console.log('Selected file name:', file.name, 'size:', file.size, 'type:', file.type);
       setSelectedFile(file);
       setFileError(null);
       
@@ -152,6 +182,18 @@ export default function BannerModal({
               )}
             </div>
 
+            {/* TEST INPUT FOR MOBILE CHROME */}
+            {/* <div className="p-3 bg-yellow-500/20 border border-yellow-500 rounded-xl space-y-1">
+              <p className="text-[10px] font-bold text-yellow-600 uppercase">TEST INPUT (PLAIN & VISIBLE)</p>
+              <input
+                type="file"
+                onChange={(e) => {
+                  console.log('[TEST INPUT] onChange fired!', e.target.files);
+                  handleFileChange(e);
+                }}
+              />
+            </div> */}
+
             {/* Image Source Selection */}
             <div className="space-y-1.5">
               <label className="block text-[10px] font-black text-text-primary uppercase tracking-wider">
@@ -159,23 +201,37 @@ export default function BannerModal({
               </label>
               <div className="border border-border/80 rounded-2xl p-4 space-y-3 bg-slate-50/10">
                 {/* File Upload zone */}
-                <div className="border border-dashed border-border rounded-xl p-4 text-center hover:bg-slate-50/20 transition-all cursor-pointer relative">
+                <div 
+                  onClick={handleUploadZoneClick}
+                  className="relative border border-dashed border-border rounded-xl p-4 text-center hover:bg-slate-50/20 transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 select-none"
+                >
                   <input
+                    ref={fileInputRef}
                     type="file"
-                    onChange={handleFileChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept="image/*"
+                    onChange={(e) => {
+                      console.log('[Upload] onChange fired! files:', e.target.files?.length);
+                      handleFileChange(e);
+                    }}
+                    onClick={() => {
+                      console.log('[Upload] Input native onClick fired — file picker should open now');
+                    }}
+                    style={{
+                      position: 'fixed',
+                      top: '-9999px',
+                      left: '-9999px',
+                      width: '1px',
+                      height: '1px',
+                      opacity: 0,
+                    }}
                     disabled={isSubmitting}
                   />
-                  <div className="flex flex-col items-center space-y-1">
-                    <Upload className="w-5 h-5 text-accent" />
-                    <p className="text-xs font-semibold text-text-primary">
-                      {selectedFile ? 'Change chosen file' : 'Click to select image from local device'}
-                    </p>
-                    <p className="text-[9px] text-text-secondary">
-                      {selectedFile ? `${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)` : 'Supported: JPEG, PNG, WEBP, SVG (Max 10MB)'}
-                    </p>
-                  </div>
+                  <Upload className="w-5 h-5 text-accent" />
+                  <p className="text-xs font-semibold text-text-primary">
+                    {selectedFile ? 'Change chosen file' : 'Tap to select image from gallery'}
+                  </p>
+                  <p className="text-[9px] text-text-secondary">
+                    {selectedFile ? `${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)` : 'Supported: JPEG, PNG, WEBP, SVG (Max 10MB)'}
+                  </p>
                 </div>
 
                 {selectedFile && (
