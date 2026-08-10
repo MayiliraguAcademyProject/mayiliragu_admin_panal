@@ -639,7 +639,7 @@ export default function TestsPage() {
                       <div className="flex flex-col items-end justify-between self-stretch">
                         <button
                           onClick={(e) => handleDeleteCategory(e, cat.id, cat.name)}
-                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                           title="Delete Category"
                         >
                           <Trash2 className="w-4 h-4" />

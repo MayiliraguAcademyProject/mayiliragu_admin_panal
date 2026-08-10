@@ -178,7 +178,7 @@ export default function BannerListPage() {
                 />
 
                 {/* Actions Overlay */}
-                <div className="absolute top-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-slate-900/60 p-1.5 rounded-xl backdrop-blur-sm">
+                <div className="absolute top-3 right-3 flex items-center space-x-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 bg-slate-900/60 p-1.5 rounded-xl backdrop-blur-sm">
                   <button
                     onClick={() => handleOpenEditDialog(banner)}
                     className="p-1.5 rounded-lg bg-white/20 hover:bg-white text-white hover:text-text-primary transition-all duration-200"
