@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isValidDriveFileId } from '../utils';
+// import { isValidDriveFileId } from '../utils';
 
 // Login Validation Schema
 export const loginSchema = z.object({
@@ -29,7 +29,8 @@ export type ModuleFormValues = z.infer<typeof moduleSchema>;
 // Lesson Validation Schema
 export const lessonSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100),
-  description: z.string().min(10, 'Description must be at least 10 characters'),
+  description: z.string().optional().or(z.literal('')),
+  image: z.string().optional().or(z.literal('')),
   driveFileId: z.string().min(1, 'Video ID or URL is required').refine(
     (val) => {
       if (!val || val.trim() === '') return false;

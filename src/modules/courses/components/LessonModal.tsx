@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, X, Copy, Check, Upload, Image as ImageIcon } from 'lucide-react';
+import { Loader2, X, Upload, Image as ImageIcon } from 'lucide-react';
 import { lessonSchema, type LessonFormValues } from '../../../core/validation';
 import type { Lesson } from '../../../core/types';
 
@@ -10,8 +10,8 @@ interface LessonModalProps {
   onClose: () => void;
   onSubmit: (values: LessonFormValues, file?: File | null) => Promise<void>;
   editingLesson: Lesson | null;
-  copiedEmail: boolean;
-  onCopyEmail: () => void;
+  // copiedEmail: boolean;
+  // onCopyEmail: () => void;
 }
 
 export default function LessonModal({
@@ -19,8 +19,8 @@ export default function LessonModal({
   onClose,
   onSubmit,
   editingLesson,
-  copiedEmail,
-  onCopyEmail,
+  // copiedEmail,
+  // onCopyEmail,
 }: LessonModalProps) {
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

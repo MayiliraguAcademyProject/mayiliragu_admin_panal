@@ -68,16 +68,17 @@ export default function CourseDetailPage() {
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false);
   const [targetModuleId, setTargetModuleId] = useState<string>('');
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
-  const [copiedEmail, setCopiedEmail] = useState(false);
+ 
   const [selectedLessonForStats, setSelectedLessonForStats] = useState<Lesson | null>(null);
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
   const [deletingLessonTitle, setDeletingLessonTitle] = useState<string>('');
 
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText('mayiliraguacadamy@mayiliragu-501911.iam.gserviceaccount.com');
-    setCopiedEmail(true);
-    setTimeout(() => setCopiedEmail(false), 2000);
-  };
+  // const [copiedEmail, setCopiedEmail] = useState(false);
+  // const handleCopyEmail = () => {
+  //   navigator.clipboard.writeText('mayiliraguacadamy@mayiliragu-501911.iam.gserviceaccount.com');
+  //   setCopiedEmail(true);
+  //   setTimeout(() => setCopiedEmail(false), 2000);
+  // };
 
   // Queries & Mutations
   const { data: course, isLoading, isError, refetch } = useCourseDetail(courseId);
@@ -522,8 +523,8 @@ export default function CourseDetailPage() {
         onClose={() => setIsLessonDialogOpen(false)}
         onSubmit={onLessonSubmit}
         editingLesson={editingLesson}
-        copiedEmail={copiedEmail}
-        onCopyEmail={handleCopyEmail}
+        // copiedEmail={copiedEmail}
+        // onCopyEmail={handleCopyEmail}
       />
 
       {/* Student watch stats dialog */}
