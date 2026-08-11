@@ -179,9 +179,16 @@ export default function CourseListPage() {
               <div className="w-2/3 p-5 flex flex-col justify-between">
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black tracking-widest text-accent uppercase bg-accent/5 px-2.5 py-1 rounded-full">
-                      Course
-                    </span>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-[10px] font-black tracking-widest text-accent uppercase bg-accent/5 px-2.5 py-1 rounded-full">
+                        Course
+                      </span>
+                      {course.isDemo && (
+                        <span className="text-[10px] font-black tracking-widest text-orange-600 uppercase bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
+                          Demo
+                        </span>
+                      )}
+                    </div>
                     
                     {/* Hover controls container */}
                     <div 

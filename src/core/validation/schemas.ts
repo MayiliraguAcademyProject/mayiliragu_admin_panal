@@ -15,6 +15,7 @@ export const courseSchema = z.object({
   description: z.string().min(10, 'Description must be at least 10 characters'),
   thumbnail: z.string().optional(),
   lockMode: z.enum(['free', 'sequential']).optional(),
+  isDemo: z.boolean().optional(),
 });
 
 export type CourseFormValues = z.infer<typeof courseSchema>;
