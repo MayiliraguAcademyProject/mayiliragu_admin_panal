@@ -45,9 +45,15 @@ export default function CourseModal({
         setValue('title', editingCourse.title);
         setValue('description', editingCourse.description);
         setValue('thumbnail', editingCourse.thumbnail);
+        setValue('lockMode', editingCourse.lockMode || 'free');
         setUploadMode(editingCourse.thumbnail ? 'url' : 'file');
       } else {
-        reset();
+        reset({
+          title: '',
+          description: '',
+          thumbnail: '',
+          lockMode: 'free',
+        });
         setUploadMode('file');
       }
     }
@@ -113,6 +119,24 @@ export default function CourseModal({
               {errors.description && (
                 <p className="text-[11px] text-error font-semibold pl-1">{errors.description.message}</p>
               )}
+            </div>
+
+            {/* Lock Mode / Access Control */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
+                Lesson Unlock Mode
+              </label>
+              <select
+                {...register('lockMode')}
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 rounded-xl border border-border text-sm font-medium outline-none focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+              >
+                <option value="free">Free Access (All videos unlocked)</option>
+                <option value="sequential">Sequential Unlock (Line by line as videos completed)</option>
+              </select>
+              <p className="text-[11px] text-text-secondary font-medium pl-1">
+                Sequential mode forces students to complete each video (90%+ watched) before the next video unlocks.
+              </p>
             </div>
 
             {/* Thumbnail Image */}

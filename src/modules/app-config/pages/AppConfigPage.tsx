@@ -41,8 +41,11 @@ export default function AppConfigPage() {
     return match ? match[1] : null;
   };
 
+  const [quickActions, setQuickActions] = useState<any[]>([]);
+
   useEffect(() => {
     fetchConfig();
+    fetchQuickActions();
   }, []);
 
   const fetchConfig = async () => {
@@ -59,6 +62,17 @@ export default function AppConfigPage() {
       setMessage({ type: 'error', text: 'Failed to fetch current app configuration.' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchQuickActions = async () => {
+    try {
+      const response = await apiClient.get('/quick-actions');
+      if (response.data?.status === 'success') {
+        setQuickActions(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch quick actions:', error);
     }
   };
 
@@ -213,6 +227,73 @@ export default function AppConfigPage() {
               </button>
             </div>
           </form>
+        )}
+      </div>
+
+      {/* Quick Actions Card */}
+      <div className="bg-white dark:bg-cardBg rounded-2xl border border-slate-100 dark:border-border/60 shadow-sm overflow-hidden mt-8 p-6">
+        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">Student App Quick Actions</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Enable, disable, or change the order of quick actions shown on the student home screen.</p>
+        
+        {loading ? (
+          <div className="flex items-center justify-center p-6">
+            <div className="w-6 h-6 border-4 border-brandPurple border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {quickActions.map((action) => (
+              <div key={action.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-border/40">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Order:</span>
+                    <input
+                      type="number"
+                      value={action.order}
+                      onChange={async (e) => {
+                        const newOrder = parseInt(e.target.value) || 0;
+                        setQuickActions(prev => prev.map(a => a.id === action.id ? { ...a, order: newOrder } : a));
+                        try {
+                          await apiClient.put(`/quick-actions/${action.id}`, { order: newOrder });
+                        } catch (err) {
+                          console.error('Failed to update action order', err);
+                        }
+                      }}
+                      className="w-16 px-2 py-1 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-border/60 rounded text-center font-mono"
+                    />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">{action.title}</span>
+                    <span className="block text-xs text-slate-400 font-mono">{action.route}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  {/* Toggle Switch */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const newStatus = !action.isEnabled;
+                      setQuickActions(prev => prev.map(a => a.id === action.id ? { ...a, isEnabled: newStatus } : a));
+                      try {
+                        await apiClient.put(`/quick-actions/${action.id}`, { isEnabled: newStatus });
+                      } catch (err) {
+                        console.error('Failed to update action status', err);
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                      action.isEnabled ? 'bg-primary' : 'bg-slate-200 dark:bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        action.isEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

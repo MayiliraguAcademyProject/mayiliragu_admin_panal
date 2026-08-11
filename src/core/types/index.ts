@@ -11,7 +11,8 @@ export interface Lesson {
   id: string;
   moduleId: string;
   title: string;
-  description: string;
+  description?: string | null;
+  image?: string | null;
   driveFileId: string;
   duration: number; // in seconds
   order: number;
@@ -35,6 +36,7 @@ export interface Course {
   title: string;
   description: string;
   thumbnail: string;
+  lockMode?: 'free' | 'sequential';
   totalLessons?: number;
   modules?: Module[];
   createdAt: string;
@@ -234,6 +236,19 @@ export interface Question {
   tableData?: any;
   question_image_url?: string;
   questionTextEn?: string;
+  questionTextTa?: string;
+  explanationEn?: string;
+  explanationTa?: string;
+  isPublished?: boolean;
+  examCategory?: string;
+  subjectId?: string;
+  topicId?: string;
+  correctAnswer?: boolean;
+  acceptedAnswers?: any;
+  modelAnswer?: string;
+  wordLimit?: number;
+  explanation_image_url?: string | null;
+  explanationImageUrl?: string | null;
 }
 
 export interface QuestionStats {
@@ -259,6 +274,8 @@ export interface Test {
   subject_id?: string;
   topic_id?: string;
   is_published: boolean;
+  is_paid?: boolean;
+  target_category?: string | null;
   scheduled_at?: string | null;
   created_at: string;
   updated_at: string;
@@ -500,6 +517,28 @@ export interface BookOrder {
     email: string;
   };
 }
+
+export interface EnrollmentRequest {
+  id: string;
+  studentId: string;
+  courseId: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  message?: string | null;
+  adminNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  student?: {
+    id?: string;
+    name: string;
+    email: string;
+  };
+  course?: {
+    id?: string;
+    title: string;
+    thumbnail?: string;
+  };
+}
+
 
 
 
