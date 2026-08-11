@@ -12,6 +12,7 @@ import {
   Ticket,
   ClipboardList,
   User,
+  Mail,
   Phone,
   MapPin,
   X
@@ -490,23 +491,61 @@ export default function BookStorePage() {
                       </table>
                     </div>
 
-                    {/* Address details */}
-                    {(order.shippingAddress || order.shippingName) && (
-                      <div className="bg-slate-50 rounded-xl p-4 max-w-xl text-xs space-y-2 text-text-secondary border border-border/30">
+                    {/* Student & Shipping details grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl">
+                      {/* Registered Student Account Card */}
+                      <div className="bg-slate-50 rounded-xl p-4 text-xs space-y-2 text-text-secondary border border-border/30">
                         <h4 className="font-extrabold text-text-primary flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-accent" /> Shipping Address
+                          <User className="w-3.5 h-3.5 text-accent" /> Student Details
                         </h4>
                         <div className="space-y-1">
-                          <p className="flex items-center gap-1 font-semibold text-text-primary">
-                            <User className="w-3 h-3" /> {order.shippingName}
+                          <p className="font-bold text-text-primary">
+                            {order.student?.name || order.shippingName || 'Unknown Student'}
                           </p>
-                          <p className="flex items-center gap-1">
-                            <Phone className="w-3 h-3" /> {order.shippingPhone}
+                          {order.student?.email && (
+                            <p className="flex items-center gap-1.5 text-slate-500 font-medium">
+                              <Mail className="w-3 h-3 text-slate-400" />
+                              <a href={`mailto:${order.student.email}`} className="hover:text-accent hover:underline">
+                                {order.student.email}
+                              </a>
+                            </p>
+                          )}
+                          <p className="text-[10px] text-slate-400 font-mono pt-0.5">
+                            Student ID: {order.studentId ? order.studentId.slice(0, 8) : 'N/A'}
                           </p>
-                          <p className="pl-4 whitespace-pre-wrap">{order.shippingAddress}</p>
                         </div>
                       </div>
-                    )}
+
+                      {/* Shipping Address Card */}
+                      {(order.shippingAddress || order.shippingName || order.shippingPhone) && (
+                        <div className="bg-slate-50 rounded-xl p-4 text-xs space-y-2 text-text-secondary border border-border/30">
+                          <h4 className="font-extrabold text-text-primary flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-accent" /> Shipping Address
+                          </h4>
+                          <div className="space-y-1">
+                            {order.shippingName && (
+                              <p className="font-semibold text-text-primary flex items-center gap-1">
+                                <User className="w-3 h-3 text-slate-400" /> {order.shippingName}
+                              </p>
+                            )}
+                            {order.shippingPhone && (
+                              <p className="flex items-center gap-1 text-slate-600">
+                                <Phone className="w-3 h-3 text-slate-400" />
+                                <a href={`tel:${order.shippingPhone}`} className="hover:text-accent hover:underline">
+                                  {order.shippingPhone}
+                                </a>
+                              </p>
+                            )}
+                            {order.shippingAddress && (
+                              <p className="pt-1 text-slate-600 whitespace-pre-wrap leading-relaxed">
+                                {order.shippingAddress}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {order.paymentScreenshotUrl && (
                       <div className="bg-slate-50 rounded-xl p-4 max-w-xl text-xs space-y-2 text-text-secondary border border-border/30 mt-3">
                         <h4 className="font-extrabold text-text-primary flex items-center gap-1.5">
