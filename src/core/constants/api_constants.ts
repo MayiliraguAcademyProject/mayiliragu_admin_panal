@@ -1,8 +1,8 @@
 export const ApiConstants = {
-  baseUrl: (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://192.168.31.86:5000/api',
+  baseUrl: (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'https://api-mayiliragu.sathishdev.in/api',
   getAssetUrl: (path: string) => {
     if (!path) return '';
-    const base = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://192.168.31.86:5000/api';
+    const base = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'https://api-mayiliragu.sathishdev.in/api';
     const serverRoot = base.endsWith('/api') ? base.slice(0, -4) : base;
     return `${serverRoot}${path}`;
   },

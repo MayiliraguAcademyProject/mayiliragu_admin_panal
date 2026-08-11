@@ -37,6 +37,7 @@ export interface Course {
   description: string;
   thumbnail: string;
   lockMode?: 'free' | 'sequential';
+  isDemo?: boolean;
   totalLessons?: number;
   modules?: Module[];
   createdAt: string;
