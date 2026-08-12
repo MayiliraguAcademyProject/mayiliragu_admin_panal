@@ -1,10 +1,11 @@
 export const ApiConstants = {
-  baseUrl: (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'https://api-mayiliragu.sathishdev.in/api',
+  baseUrl: (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://127.0.0.1:5000/api',
   getAssetUrl: (path: string) => {
     if (!path) return '';
-    const base = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'https://api-mayiliragu.sathishdev.in/api';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    const base = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://127.0.0.1:5000/api';
     const serverRoot = base.endsWith('/api') ? base.slice(0, -4) : base;
-    return `${serverRoot}${path}`;
+    return `${serverRoot}${path.startsWith('/') ? path : '/' + path}`;
   },
   auth: {
     login: '/auth/login',
