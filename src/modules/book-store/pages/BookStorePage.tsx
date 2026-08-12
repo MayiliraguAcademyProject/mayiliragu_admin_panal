@@ -41,7 +41,7 @@ const bookSchema = z.object({
   author: z.string().min(1, 'Author is required'),
   publisher: z.string().optional(),
   priceHardCopy: z.coerce.number().min(0).optional(),
-  priceSoftCopy: z.coerce.number().min(0).optional(),
+  // priceSoftCopy: z.coerce.number().min(0).optional(),
   stockHardCopy: z.coerce.number().min(0).default(0),
   categoryId: z.string().min(1, 'Category is required'),
   isActive: z.boolean().default(true),
@@ -114,7 +114,7 @@ export default function BookStorePage() {
       author: '',
       publisher: '',
       priceHardCopy: undefined,
-      priceSoftCopy: undefined,
+      // priceSoftCopy: undefined,
       stockHardCopy: 0,
       categoryId: '',
       isActive: true,
@@ -132,7 +132,7 @@ export default function BookStorePage() {
       author: book.author || '',
       publisher: book.publisher || '',
       priceHardCopy: book.priceHardCopy ?? undefined,
-      priceSoftCopy: book.priceSoftCopy ?? undefined,
+      // priceSoftCopy: book.priceSoftCopy ?? undefined,
       stockHardCopy: book.stockHardCopy,
       categoryId: book.categoryId,
       isActive: book.isActive,
@@ -326,12 +326,14 @@ export default function BookStorePage() {
                             {book.priceHardCopy ? `₹${book.priceHardCopy}` : 'N/A'} (Stock: {book.stockHardCopy})
                           </span>
                         </div>
+                        {/*
                         <div className="flex justify-between">
                           <span className="text-text-secondary">Soft Copy:</span>
                           <span className="font-extrabold text-slate-800">
                             {book.priceSoftCopy ? `₹${book.priceSoftCopy}` : 'N/A'} {book.pdfUrl ? '✓ PDF' : '✖ File'}
                           </span>
                         </div>
+                        */}
                       </div>
                     </div>
                   </div>
@@ -788,6 +790,7 @@ export default function BookStorePage() {
                   />
                 </div>
 
+                {/*
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-text-secondary">Soft Copy Price (₹)</label>
                   <input
@@ -798,6 +801,7 @@ export default function BookStorePage() {
                     placeholder="Digital book price"
                   />
                 </div>
+                */}
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-text-secondary">Cover Thumbnail</label>
@@ -809,6 +813,7 @@ export default function BookStorePage() {
                   />
                 </div>
 
+                {/*
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-text-secondary">Digital PDF Document</label>
                   <input
@@ -818,6 +823,7 @@ export default function BookStorePage() {
                     className="w-full text-xs border border-border/80 rounded-xl p-2 bg-slate-50 outline-none"
                   />
                 </div>
+                */}
 
                 <div className="flex items-center space-x-2 pt-6">
                   <input
