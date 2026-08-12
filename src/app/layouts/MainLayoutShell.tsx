@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth-store';
+import { ErrorBoundary } from '../../shared/components/ErrorBoundary';
 import {
   LayoutDashboard,
   BookOpen,
@@ -256,7 +257,9 @@ export default function MainLayoutShell() {
         {/* Content Outlet scroll Container */}
         <main className="flex-1 overflow-y-auto relative">
           <div className="max-w-[1600px] mx-auto min-h-full">
-            <Outlet />
+            <ErrorBoundary key={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </main>
       </div>

@@ -1,4 +1,4 @@
-import { X, Upload, FileText } from 'lucide-react';
+import { X, Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
 
 interface UploadMaterialModalProps {
   isOpen: boolean;
@@ -22,6 +22,9 @@ export default function UploadMaterialModal({
   isEditMode = false,
 }: UploadMaterialModalProps) {
   if (!isOpen) return null;
+
+  const MAX_FILE_SIZE_MB = 100;
+  const isFileTooLarge = selectedFile ? selectedFile.size > MAX_FILE_SIZE_MB * 1024 * 1024 : false;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -148,12 +151,17 @@ export default function UploadMaterialModal({
                 </div>
               </div>
               {selectedFile && (
-                <div className="flex items-center space-x-2 p-3 bg-accent/5 border border-accent/20 rounded-xl mt-2">
-                  <FileText className="w-4 h-4 text-accent" />
+                <div
+                  className={`flex items-center space-x-2 p-3 border rounded-xl mt-2 ${
+                    isFileTooLarge ? 'bg-red-50 border-red-200' : 'bg-accent/5 border-accent/20'
+                  }`}
+                >
+                  <FileText className={`w-4 h-4 ${isFileTooLarge ? 'text-red-650' : 'text-accent'}`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-text-primary truncate">{selectedFile.name}</p>
-                    <p className="text-[9px] text-text-secondary">
-                      {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                    <p className={`text-[9px] ${isFileTooLarge ? 'text-red-600 font-extrabold' : 'text-text-secondary'}`}>
+                      {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB{' '}
+                      {isFileTooLarge && `(Exceeds ${MAX_FILE_SIZE_MB}MB Limit!)`}
                     </p>
                   </div>
                   <button
@@ -165,22 +173,36 @@ export default function UploadMaterialModal({
                   </button>
                 </div>
               )}
+              {isFileTooLarge && (
+                <div className="flex items-center space-x-1.5 mt-1.5 text-red-600 text-[10px] font-bold">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>File size exceeds {MAX_FILE_SIZE_MB}MB limit. Please select a smaller file.</span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end space-x-3 pt-4 border-t border-border/40">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors"
+                disabled={form.formState.isSubmitting}
+                className="px-4 py-2.5 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={form.formState.isSubmitting}
-                className="px-6 py-2.5 bg-accent hover:bg-accent-onContainer text-white rounded-xl text-xs font-black shadow-md disabled:opacity-55"
+                disabled={form.formState.isSubmitting || isFileTooLarge}
+                className="px-6 py-2.5 bg-accent hover:bg-accent-onContainer text-white rounded-xl text-xs font-black shadow-md disabled:opacity-55 flex items-center justify-center space-x-2 transition-all min-w-[140px]"
               >
-                {isEditMode ? 'Update Material' : 'Upload and Publish'}
+                {form.formState.isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>{isEditMode ? 'Updating...' : 'Uploading...'}</span>
+                  </>
+                ) : (
+                  <span>{isEditMode ? 'Update Material' : 'Upload and Publish'}</span>
+                )}
               </button>
             </div>
           </form>
@@ -189,3 +211,4 @@ export default function UploadMaterialModal({
     </div>
   );
 }
+

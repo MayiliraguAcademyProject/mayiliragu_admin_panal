@@ -31,17 +31,27 @@ import { ApiConstants } from '../../../core/constants/api_constants';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
 import CategoryModal from '../components/CategoryModal';
 import UploadMaterialModal from '../components/UploadMaterialModal';
+import Toast, { type ToastState } from '../../../shared/components/Toast';
 import { categorySchema, materialSchema } from '../components/schemas';
 
 export default function StudyMaterialsPage() {
   const [activeTab, setActiveTab] = useState<'materials' | 'approvals' | 'categories'>('materials');
 
-  // Modals status
+  // Modals & Toast status
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<StudyMaterial | null>(null);
   const [materialToDelete, setMaterialToDelete] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [toast, setToast] = useState<ToastState>({
+    show: false,
+    type: 'success',
+    message: '',
+  });
+
+  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
+    setToast({ show: true, type, message });
+  };
 
   // API Hooks
   const { data: categoriesData, isLoading: isCategoriesLoading } = useStudyCategoriesList();
@@ -68,10 +78,12 @@ export default function StudyMaterialsPage() {
   const onCategorySubmit = async (values: z.infer<typeof categorySchema>) => {
     try {
       await createCategoryMutation.mutateAsync(values);
+      showToast('success', 'Category created successfully!');
       setIsCategoryModalOpen(false);
       categoryForm.reset();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      showToast('error', err?.response?.data?.message || 'Failed to create category.');
     }
   };
 
@@ -79,8 +91,10 @@ export default function StudyMaterialsPage() {
     if (window.confirm('Are you sure you want to delete this category?')) {
       try {
         await deleteCategoryMutation.mutateAsync(id);
-      } catch (err) {
+        showToast('success', 'Category deleted successfully!');
+      } catch (err: any) {
         console.error(err);
+        showToast('error', err?.response?.data?.message || 'Failed to delete category.');
       }
     }
   };
@@ -120,21 +134,41 @@ export default function StudyMaterialsPage() {
           ...values,
           file: selectedFile || undefined,
         });
+        showToast('success', 'Study material updated successfully!');
       } else {
         if (!selectedFile) {
-          alert('Please select a file to upload');
+          showToast('error', 'Please select a file to upload.');
           return;
         }
         await createMaterialMutation.mutateAsync({
           ...values,
           file: selectedFile,
         });
+        showToast('success', 'Study material uploaded and published successfully!');
       }
       setIsUploadModalOpen(false);
       setSelectedFile(null);
       materialForm.reset();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      const is413 =
+        err?.response?.status === 413 ||
+        err?.status === 413 ||
+        err?.message?.includes('413') ||
+        err?.response?.data?.message?.includes('413');
+
+      if (is413) {
+        showToast(
+          'error',
+          'Upload Failed: File content is too large (HTTP 413). Please select a file smaller than 100MB or configure server Nginx client_max_body_size.'
+        );
+      } else {
+        const errorMsg =
+          err?.response?.data?.message ||
+          err?.message ||
+          'Failed to upload study material. Please try again.';
+        showToast('error', errorMsg);
+      }
     }
   };
 
@@ -142,8 +176,10 @@ export default function StudyMaterialsPage() {
     if (materialToDelete) {
       try {
         await deleteMaterialMutation.mutateAsync(materialToDelete);
-      } catch (err) {
+        showToast('success', 'Study material deleted successfully!');
+      } catch (err: any) {
         console.error(err);
+        showToast('error', err?.response?.data?.message || 'Failed to delete study material.');
       } finally {
         setMaterialToDelete(null);
       }
@@ -156,8 +192,10 @@ export default function StudyMaterialsPage() {
         id: mat.id,
         status: 'APPROVED',
       });
-    } catch (err) {
+      showToast('success', `"${mat.title}" has been approved.`);
+    } catch (err: any) {
       console.error(err);
+      showToast('error', 'Failed to approve material.');
     }
   };
 
@@ -167,8 +205,10 @@ export default function StudyMaterialsPage() {
         id: mat.id,
         status: 'REJECTED',
       });
-    } catch (err) {
+      showToast('info', `"${mat.title}" was marked as rejected.`);
+    } catch (err: any) {
       console.error(err);
+      showToast('error', 'Failed to reject material.');
     }
   };
 
@@ -463,6 +503,8 @@ export default function StudyMaterialsPage() {
         message="This will hide the document and all associated version histories from the student application view."
         confirmText="Delete Document"
       />
+
+      <Toast toast={toast} onClose={() => setToast((prev) => ({ ...prev, show: false }))} />
     </div>
   );
 }

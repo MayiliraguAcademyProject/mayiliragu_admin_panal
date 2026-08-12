@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from '../../shared/components/ProtectedRoute';
 import { PublicRoute } from '../../shared/components/PublicRoute';
 import MainLayoutShell from '../layouts/MainLayoutShell';
+import RouterErrorPage from '../../shared/components/RouterErrorPage';
 
 // Lazy load pages for performance as requested in performance rules
 const LoginPage = React.lazy(() => import('../../modules/auth/pages/LoginPage'));
@@ -34,6 +35,7 @@ const SuspenseFallback = () => (
 export const router = createBrowserRouter([
   {
     path: '/login',
+    errorElement: <RouterErrorPage />,
     element: (
       <PublicRoute>
         <React.Suspense fallback={<SuspenseFallback />}>
@@ -44,6 +46,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/',
+    errorElement: <RouterErrorPage />,
     element: (
       <ProtectedRoute>
         <MainLayoutShell />
