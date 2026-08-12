@@ -980,6 +980,52 @@ export function useCurrentAffairsAdminList() {
   });
 }
 
+export interface CurrentAffairQuizAttemptAdmin {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  quizId: string;
+  articleId: string | null;
+  articleTitle: string;
+  questionPrompt: string;
+  selectedAnswer: string;
+  correctAnswer: string;
+  explanationEn: string | null;
+  isCorrect: boolean;
+  attemptedAt: string;
+}
+
+export interface CurrentAffairsQuizAttemptsAdminResponse {
+  attempts: CurrentAffairQuizAttemptAdmin[];
+  summary: {
+    totalSubmissions: number;
+    totalUniqueStudents: number;
+    overallAccuracy: number;
+  };
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export function useCurrentAffairsQuizAttemptsAdmin(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  isCorrect?: string;
+}) {
+  return useQuery<{ data: CurrentAffairsQuizAttemptsAdminResponse }>({
+    queryKey: ['currentAffairsQuizAttemptsAdmin', params],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.currentAffairs.quizAttemptsAdmin, { params });
+      return response.data;
+    },
+  });
+}
+
 export function useCreateCurrentAffair() {
   const queryClient = useQueryClient();
   return useMutation({

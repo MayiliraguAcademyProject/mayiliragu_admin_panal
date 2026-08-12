@@ -65,6 +65,7 @@ export const ApiConstants = {
   currentAffairs: {
     base: '/current-affairs',
     admin: '/current-affairs/admin',
+    quizAttemptsAdmin: '/current-affairs/admin/quiz-attempts',
     detail: (id: string) => `/current-affairs/${id}`,
     quizzes: (articleId: string) => `/current-affairs/${articleId}/quizzes`,
     magazinesAll: '/current-affairs/magazines/all',
