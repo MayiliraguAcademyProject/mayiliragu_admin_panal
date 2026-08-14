@@ -79,7 +79,7 @@ export default function LoginPage() {
           </p>
 
           {/* Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="w-full mt-8 space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="w-full mt-8 space-y-5">
 
             {/* Error banner */}
             {errorMsg && (
