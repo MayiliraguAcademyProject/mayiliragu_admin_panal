@@ -289,6 +289,14 @@ export interface Banner {
   title: string;
   imageUrl: string;
   linkUrl?: string | null;
+  linkType?: 'COURSE' | 'TEST' | 'NONE';
+  linkId?: string | null;
+  price?: number | null;
+  offerPrice?: number | null;
+  offerValidUntil?: string | null;
+  planDescription?: string | null;
+  validityDays?: number | null;
+  curriculumJson?: string | null;
   isActive: boolean;
   order: number;
   createdAt: string;
@@ -537,6 +545,31 @@ export interface EnrollmentRequest {
     id?: string;
     title: string;
     thumbnail?: string;
+  };
+}
+
+export interface PaymentSettings {
+  id: string;
+  qrImageUrl: string;
+  instructions: string;
+  updatedAt: string;
+}
+
+export interface PaymentRequest {
+  id: string;
+  studentId: string;
+  linkType: 'COURSE' | 'TEST';
+  linkId: string;
+  amount: number;
+  screenshotUrl: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  adminNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  student: {
+    id: string;
+    name: string;
+    email: string;
   };
 }
 

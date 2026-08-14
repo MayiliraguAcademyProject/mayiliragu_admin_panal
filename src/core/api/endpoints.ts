@@ -39,7 +39,9 @@ import type {
   Coupon,
   BookOrder,
   BookOrderItem,
-  EnrollmentRequest
+  EnrollmentRequest,
+  PaymentSettings,
+  PaymentRequest
 } from '../types';
 
 export type { 
@@ -76,7 +78,9 @@ export type {
   Coupon,
   BookOrder,
   BookOrderItem,
-  EnrollmentRequest
+  EnrollmentRequest,
+  PaymentSettings,
+  PaymentRequest
 };
 
 // ==========================================
@@ -705,10 +709,33 @@ export function useBannersAdminList() {
 export function useCreateBanner() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ title, imageUrl, linkUrl, order, isActive, file }: {
+    mutationFn: async ({
+      title,
+      imageUrl,
+      linkUrl,
+      linkType,
+      linkId,
+      price,
+      offerPrice,
+      offerValidUntil,
+      planDescription,
+      validityDays,
+      curriculumJson,
+      order,
+      isActive,
+      file,
+    }: {
       title: string;
       imageUrl?: string;
       linkUrl?: string | null;
+      linkType?: 'COURSE' | 'TEST' | 'NONE';
+      linkId?: string | null;
+      price?: number | null;
+      offerPrice?: number | null;
+      offerValidUntil?: string | null;
+      planDescription?: string | null;
+      validityDays?: number | null;
+      curriculumJson?: string | null;
       order: number;
       isActive: boolean;
       file?: File;
@@ -717,6 +744,14 @@ export function useCreateBanner() {
       formData.append('title', title);
       if (imageUrl) formData.append('imageUrl', imageUrl);
       if (linkUrl) formData.append('linkUrl', linkUrl);
+      if (linkType) formData.append('linkType', linkType);
+      if (linkId) formData.append('linkId', linkId);
+      if (price !== undefined && price !== null) formData.append('price', String(price));
+      if (offerPrice !== undefined && offerPrice !== null) formData.append('offerPrice', String(offerPrice));
+      if (offerValidUntil) formData.append('offerValidUntil', offerValidUntil);
+      if (planDescription) formData.append('planDescription', planDescription);
+      if (validityDays !== undefined && validityDays !== null) formData.append('validityDays', String(validityDays));
+      if (curriculumJson) formData.append('curriculumJson', curriculumJson);
       formData.append('order', String(order));
       formData.append('isActive', String(isActive));
       if (file) {
@@ -742,6 +777,14 @@ export function useUpdateBanner() {
       if (data.title !== undefined) formData.append('title', data.title);
       if (data.imageUrl !== undefined) formData.append('imageUrl', data.imageUrl);
       if (data.linkUrl !== undefined) formData.append('linkUrl', data.linkUrl || '');
+      if (data.linkType !== undefined) formData.append('linkType', data.linkType || 'NONE');
+      if (data.linkId !== undefined) formData.append('linkId', data.linkId || '');
+      if (data.price !== undefined) formData.append('price', data.price !== null ? String(data.price) : '');
+      if (data.offerPrice !== undefined) formData.append('offerPrice', data.offerPrice !== null ? String(data.offerPrice) : '');
+      if (data.offerValidUntil !== undefined) formData.append('offerValidUntil', data.offerValidUntil || '');
+      if (data.planDescription !== undefined) formData.append('planDescription', data.planDescription || '');
+      if (data.validityDays !== undefined) formData.append('validityDays', data.validityDays !== null ? String(data.validityDays) : '');
+      if (data.curriculumJson !== undefined) formData.append('curriculumJson', data.curriculumJson || '');
       if (data.order !== undefined) formData.append('order', String(data.order));
       if (data.isActive !== undefined) formData.append('isActive', String(data.isActive));
       if (file) {
@@ -1591,6 +1634,62 @@ export function useProcessEnrollmentRequest() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['enrollmentRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+  });
+}
+
+export function useGetPaymentSettings() {
+  return useQuery<PaymentSettings>({
+    queryKey: ['paymentSettings'],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.paymentSettings.public);
+      return response.data.data;
+    },
+  });
+}
+
+export function useUpsertPaymentSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ instructions, file }: { instructions: string; file?: File }) => {
+      const formData = new FormData();
+      formData.append('instructions', instructions);
+      if (file) {
+        formData.append('file', file);
+      }
+      const response = await apiClient.put(ApiConstants.paymentSettings.base, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentSettings'] });
+    },
+  });
+}
+
+export function useListPaymentRequests(status?: string) {
+  return useQuery<PaymentRequest[]>({
+    queryKey: ['paymentRequests', status],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.paymentRequests.base, {
+        params: status ? { status } : undefined,
+      });
+      return response.data.data;
+    },
+  });
+}
+
+export function useProcessPaymentRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, action, adminNote }: { id: string; action: 'approve' | 'reject'; adminNote?: string }) => {
+      const response = await apiClient.patch(ApiConstants.paymentRequests.detail(id), { action, adminNote });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentRequests'] });
       queryClient.invalidateQueries({ queryKey: ['students'] });
     },
   });

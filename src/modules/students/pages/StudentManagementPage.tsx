@@ -498,7 +498,7 @@ export default function StudentManagementPage() {
                   className={`p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer flex items-center justify-between group ${
                     isSelected
                       ? 'bg-accent/5 border-accent text-accent shadow-sm'
-                      : 'border-border/40 hover:border-slate-350 hover:bg-slate-50 text-text-primary'
+                      : 'border-border/40 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 text-text-primary'
                   }`}
                 >
                   <div className="flex items-center space-x-3 min-w-0">
@@ -1180,7 +1180,7 @@ export default function StudentManagementPage() {
                             {enrollments.map((enrollment: any) => (
                               <div
                                 key={enrollment.id}
-                                className="bg-cardBg border border-border/60 rounded-2xl p-4 flex items-center justify-between shadow-xs hover:border-slate-350 transition-colors"
+                                className="bg-cardBg border border-border/60 rounded-2xl p-4 flex items-center justify-between shadow-xs hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
                               >
                                 <div className="flex items-center space-x-3 min-w-0">
                                   <div className="w-12 h-12 bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 relative border border-border/45">

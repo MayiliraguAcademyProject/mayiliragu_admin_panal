@@ -2,14 +2,23 @@ import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Image as ImageIcon, Loader2, Upload } from 'lucide-react';
+import { Image as ImageIcon, Loader2, Upload, Plus, Minus } from 'lucide-react';
 import type { Banner } from '../../../core/types';
+import { useCoursesList, useTestsList } from '../../../core/api/endpoints';
 
 // Form Validation Schema
 export const bannerSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100),
   imageUrl: z.string().optional(),
   linkUrl: z.string().nullable().optional(),
+  linkType: z.enum(['COURSE', 'TEST', 'NONE']).default('NONE'),
+  linkId: z.string().nullable().optional(),
+  price: z.preprocess((val) => (val === '' || val === null || val === undefined ? null : Number(val)), z.number().min(0).nullable().optional()),
+  offerPrice: z.preprocess((val) => (val === '' || val === null || val === undefined ? null : Number(val)), z.number().min(0).nullable().optional()),
+  offerValidUntil: z.string().nullable().optional(),
+  planDescription: z.string().nullable().optional(),
+  validityDays: z.preprocess((val) => (val === '' || val === null || val === undefined ? null : Number(val)), z.number().int().min(0).nullable().optional()),
+  curriculumJson: z.string().nullable().optional(),
   order: z.number().int().min(0, 'Order must be 0 or greater'),
   isActive: z.boolean(),
 });
@@ -34,33 +43,18 @@ export default function BannerModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [curriculumItems, setCurriculumItems] = useState<string[]>(['']);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Queries for linkId populating
+  const { data: coursesData } = useCoursesList(1, 50);
+  const { data: testsData } = useTestsList();
+
   const handleUploadZoneClick = () => {
-    console.log('[Upload] Zone tapped/clicked');
     const input = fileInputRef.current;
-    if (!input) {
-      console.error('[Upload] fileInputRef.current is NULL — ref not attached');
-      return;
-    }
-    console.log('[Upload] Input element found:', input.tagName);
-    console.log('[Upload] Input disabled:', input.disabled);
-    console.log('[Upload] Input type:', input.type);
-    console.log('[Upload] Input accept:', input.accept);
-    console.log('[Upload] Input visibility:', input.style.display, '| opacity:', input.style.opacity);
-    console.log('[Upload] Input computed offsetWidth:', input.offsetWidth, 'offsetHeight:', input.offsetHeight);
-    console.log('[Upload] isSubmitting state:', isSubmitting);
-    if (input.disabled) {
-      console.error('[Upload] BLOCKED — input is disabled! isSubmitting was true.');
-      return;
-    }
-    try {
-      console.log('[Upload] Calling input.click()...');
-      input.click();
-      console.log('[Upload] input.click() returned (file picker may now be open)');
-    } catch (err) {
-      console.error('[Upload] input.click() threw an error:', err);
-    }
+    if (!input) return;
+    if (input.disabled) return;
+    input.click();
   };
 
   const {
@@ -70,28 +64,36 @@ export default function BannerModal({
     reset,
     formState: { errors, isSubmitting }
   } = useForm<BannerFormValues>({
-    resolver: zodResolver(bannerSchema),
+    resolver: zodResolver(bannerSchema) as any,
     defaultValues: {
       title: '',
       imageUrl: '',
       linkUrl: '',
+      linkType: 'NONE',
+      linkId: '',
+      price: null,
+      offerPrice: null,
+      offerValidUntil: '',
+      planDescription: '',
+      validityDays: null,
+      curriculumJson: '',
       order: defaultOrder,
       isActive: true,
     }
   });
 
   const watchImageUrl = watch('imageUrl');
+  const watchLinkType = watch('linkType');
+  const watchOfferPrice = watch('offerPrice');
+  const watchOfferValidUntil = watch('offerValidUntil');
   const activePreviewUrl = previewUrl || watchImageUrl;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('handleFileChange triggered. Files length:', e.target.files?.length);
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      console.log('Selected file name:', file.name, 'size:', file.size, 'type:', file.type);
       setSelectedFile(file);
       setFileError(null);
       
-      // Clean up previous preview url if it exists
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
       }
@@ -107,6 +109,22 @@ export default function BannerModal({
     }
   };
 
+  // Curriculum dynamic list actions
+  const handleAddCurriculumItem = () => {
+    setCurriculumItems([...curriculumItems, '']);
+  };
+
+  const handleRemoveCurriculumItem = (index: number) => {
+    const newItems = curriculumItems.filter((_, i) => i !== index);
+    setCurriculumItems(newItems.length > 0 ? newItems : ['']);
+  };
+
+  const handleCurriculumItemChange = (index: number, val: string) => {
+    const newItems = [...curriculumItems];
+    newItems[index] = val;
+    setCurriculumItems(newItems);
+  };
+
   useEffect(() => {
     if (isOpen) {
       setSelectedFile(null);
@@ -114,18 +132,48 @@ export default function BannerModal({
       setFileError(null);
 
       if (editingBanner) {
+        let curriculumList: string[] = [''];
+        if (editingBanner.curriculumJson) {
+          try {
+            const parsed = JSON.parse(editingBanner.curriculumJson);
+            if (Array.isArray(parsed)) {
+              curriculumList = parsed.map((c: any) => typeof c === 'string' ? c : (c.title || ''));
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        setCurriculumItems(curriculumList.length > 0 ? curriculumList : ['']);
+
         reset({
           title: editingBanner.title,
           imageUrl: editingBanner.imageUrl,
           linkUrl: editingBanner.linkUrl || '',
+          linkType: editingBanner.linkType || 'NONE',
+          linkId: editingBanner.linkId || '',
+          price: editingBanner.price !== null && editingBanner.price !== undefined ? Number(editingBanner.price) : null,
+          offerPrice: editingBanner.offerPrice !== null && editingBanner.offerPrice !== undefined ? Number(editingBanner.offerPrice) : null,
+          offerValidUntil: editingBanner.offerValidUntil ? new Date(editingBanner.offerValidUntil).toISOString().slice(0, 16) : '',
+          planDescription: editingBanner.planDescription || '',
+          validityDays: editingBanner.validityDays !== null && editingBanner.validityDays !== undefined ? Number(editingBanner.validityDays) : null,
+          curriculumJson: editingBanner.curriculumJson || '',
           order: editingBanner.order,
           isActive: editingBanner.isActive,
         });
       } else {
+        setCurriculumItems(['']);
         reset({
           title: '',
           imageUrl: '',
           linkUrl: '',
+          linkType: 'NONE',
+          linkId: '',
+          price: null,
+          offerPrice: null,
+          offerValidUntil: '',
+          planDescription: '',
+          validityDays: null,
+          curriculumJson: '',
           order: defaultOrder,
           isActive: true,
         });
@@ -144,7 +192,12 @@ export default function BannerModal({
       setFileError('Please upload an image from local device');
       return;
     }
-    await onSubmit(values, selectedFile);
+    const filteredCurriculum = curriculumItems.filter(item => item.trim() !== '');
+    const curriculumJson = JSON.stringify(filteredCurriculum.map(title => ({ title })));
+    await onSubmit({
+      ...values,
+      curriculumJson,
+    }, selectedFile);
   };
 
   if (!isOpen) return null;
@@ -276,18 +329,198 @@ export default function BannerModal({
               </div>
             </div>
 
+            {/* Link Configuration */}
             <div className="grid grid-cols-2 gap-4">
-              {/* Link URL (String Input) */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-black text-text-primary uppercase tracking-wider">
-                  Target Course Link
+                  Link Type
+                </label>
+                <select
+                  {...register('linkType')}
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+                >
+                  <option value="NONE">None (No Action)</option>
+                  <option value="COURSE">Course Detail</option>
+                  <option value="TEST">Test Batch Detail</option>
+                </select>
+              </div>
+
+              {watchLinkType !== 'NONE' && (
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-text-primary uppercase tracking-wider">
+                    Linked Item
+                  </label>
+                  <select
+                    {...register('linkId')}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+                  >
+                    <option value="">Select an item...</option>
+                    {watchLinkType === 'COURSE' &&
+                      coursesData?.data?.map((course: any) => (
+                        <option key={course.id} value={course.id}>
+                          {course.title}
+                        </option>
+                      ))}
+                    {watchLinkType === 'TEST' &&
+                      testsData?.map((test: any) => (
+                        <option key={test.id} value={test.id}>
+                          {test.title}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Price and Validity */}
+            {watchLinkType !== 'NONE' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-text-primary uppercase tracking-wider">
+                    Price (INR)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 1500"
+                    {...register('price', { valueAsNumber: true })}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+                  />
+                  {errors.price && (
+                    <p className="text-[10px] text-error font-semibold pl-1">{errors.price.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-text-primary uppercase tracking-wider">
+                    Validity (Days)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 90"
+                    {...register('validityDays')}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+                  />
+                  {errors.validityDays && (
+                    <p className="text-[10px] text-error font-semibold pl-1">{errors.validityDays.message}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Offer Price and Offer Validity */}
+            {watchLinkType !== 'NONE' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-text-primary uppercase tracking-wider">
+                    Offer Price (INR) - Optional
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 999"
+                    {...register('offerPrice', { valueAsNumber: true })}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+                  />
+                  {errors.offerPrice && (
+                    <p className="text-[10px] text-error font-semibold pl-1">{errors.offerPrice.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-text-primary uppercase tracking-wider">
+                    Offer Valid Until
+                  </label>
+                  <input
+                    type="datetime-local"
+                    {...register('offerValidUntil')}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+                  />
+                  {errors.offerValidUntil && (
+                    <p className="text-[10px] text-error font-semibold pl-1">{errors.offerValidUntil.message}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {watchLinkType !== 'NONE' && watchOfferPrice && watchOfferValidUntil && (
+              <p className="text-[10px] text-green-600 font-semibold pl-1 -mt-2">
+                Discount active: Offer ends on {new Date(watchOfferValidUntil).toLocaleString()}
+              </p>
+            )}
+
+            {/* Plan Description */}
+            {watchLinkType !== 'NONE' && (
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-text-primary uppercase tracking-wider">
+                  Plan Summary / Description
+                </label>
+                <textarea
+                  placeholder="e.g. PLAN PRICE - 1271&#10;GST (18%) - 229&#10;TOTAL - 1500"
+                  {...register('planDescription')}
+                  disabled={isSubmitting}
+                  rows={3}
+                  className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+                />
+              </div>
+            )}
+
+            {/* Curriculum Dynamic List */}
+            {watchLinkType !== 'NONE' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[10px] font-black text-text-primary uppercase tracking-wider">
+                    Course Curriculum / Sections
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddCurriculumItem}
+                    className="flex items-center space-x-1 text-[10px] font-bold text-accent hover:underline"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Item</span>
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
+                  {curriculumItems.map((item, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        placeholder={`Curriculum Item #${index + 1}`}
+                        value={item}
+                        onChange={(e) => handleCurriculumItemChange(index, e.target.value)}
+                        disabled={isSubmitting}
+                        className="flex-1 px-4 py-2 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCurriculumItem(index)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Legacy Link URL / External URL */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-text-primary uppercase tracking-wider">
+                  Or External Link URL
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. course UUID or path"
+                  placeholder="e.g. https://example.com"
                   {...register('linkUrl')}
                   disabled={isSubmitting}
-                  className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none transition-all border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20`}
+                  className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none transition-all border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
                 />
               </div>
 

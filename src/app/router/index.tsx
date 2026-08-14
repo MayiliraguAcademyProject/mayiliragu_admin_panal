@@ -22,8 +22,11 @@ const PerformanceAnalyticsPage = React.lazy(() => import('../../modules/performa
 const BookStorePage = React.lazy(() => import('../../modules/book-store/pages/BookStorePage'));
 const VideoDownloadsPage = React.lazy(() => import('../../modules/downloads/pages/VideoDownloadsPage'));
 const NotificationsPage = React.lazy(() => import('../../modules/notifications/pages/NotificationsPage'));
-const AppConfigPage = React.lazy(() => import('../../modules/app-config/pages/AppConfigPage'));
 const CourseRequestsPage = React.lazy(() => import('../../modules/enrollments/pages/CourseRequestsPage'));
+const PaymentSettingsPage = React.lazy(() => import('../../modules/payment-settings/pages/PaymentSettingsPage'));
+const PaymentRequestsPage = React.lazy(() => import('../../modules/payment-requests/pages/PaymentRequestsPage'));
+const AppConfigPage = React.lazy(() => import('../../modules/app-config/pages/AppConfigPage'));
+
 
 // Loading fallback component
 const SuspenseFallback = () => (
@@ -94,6 +97,22 @@ export const router = createBrowserRouter([
         element: (
           <React.Suspense fallback={<SuspenseFallback />}>
             <CourseRequestsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'payment-settings',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <PaymentSettingsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'payment-requests',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <PaymentRequestsPage />
           </React.Suspense>
         ),
       },

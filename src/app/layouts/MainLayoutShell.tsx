@@ -22,7 +22,9 @@ import {
   Sun,
   Moon,
   Smartphone,
-  UserCheck
+  UserCheck,
+  CreditCard,
+  DollarSign
 } from 'lucide-react';
 import { useThemeStore } from '../../store/theme-store';
 
@@ -44,6 +46,7 @@ export default function MainLayoutShell() {
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Courses', path: '/courses', icon: BookOpen },
     { name: 'Course Requests', path: '/course-requests', icon: UserCheck },
+    { name: 'Payment Requests', path: '/payment-requests', icon: DollarSign },
     { name: 'Students', path: '/student-management', icon: Users },
     { name: 'Tests & Question Bank', path: '/tests', icon: GraduationCap },
     { name: 'Banners', path: '/banners', icon: Image },
@@ -54,6 +57,7 @@ export default function MainLayoutShell() {
     { name: 'Push Notifications', path: '/notifications', icon: Bell },
     { name: 'Performance Analytics', path: '/performance-analytics', icon: TrendingUp },
     { name: 'App Config', path: '/app-config', icon: Smartphone },
+    { name: 'Payment Settings', path: '/payment-settings', icon: CreditCard },
   ];
 
   const handleLogout = () => {

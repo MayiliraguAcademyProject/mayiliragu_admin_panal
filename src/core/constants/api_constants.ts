@@ -109,4 +109,12 @@ export const ApiConstants = {
   appConfig: {
     base: '/app-config',
   },
+  paymentSettings: {
+    base: '/payment-settings',
+    public: '/payment-settings/public',
+  },
+  paymentRequests: {
+    base: '/payment-requests',
+    detail: (id: string) => `/payment-requests/${id}`,
+  },
 } as const;

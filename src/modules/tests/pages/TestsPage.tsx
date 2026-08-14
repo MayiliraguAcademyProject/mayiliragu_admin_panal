@@ -350,7 +350,7 @@ export default function TestsPage() {
 
         <button
           onClick={handleRefreshAll}
-          className="p-2 bg-slate-50 border border-border/40 hover:border-slate-350 hover:bg-slate-100 rounded-xl text-text-secondary transition-colors"
+          className="p-2 bg-slate-50 dark:bg-slate-800 border border-border/40 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-text-secondary transition-colors"
           title="Refresh Data"
         >
           <RotateCw className="w-4 h-4" />
