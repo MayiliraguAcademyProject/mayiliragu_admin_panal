@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth-store';
+import { ErrorBoundary } from '../../shared/components/ErrorBoundary';
 import {
   LayoutDashboard,
   BookOpen,
@@ -20,7 +21,10 @@ import {
   Bell,
   Sun,
   Moon,
-  Smartphone
+  Smartphone,
+  UserCheck,
+  CreditCard,
+  DollarSign
 } from 'lucide-react';
 import { useThemeStore } from '../../store/theme-store';
 
@@ -41,6 +45,8 @@ export default function MainLayoutShell() {
   const navItems: NavItem[] = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Courses', path: '/courses', icon: BookOpen },
+    { name: 'Course Requests', path: '/course-requests', icon: UserCheck },
+    { name: 'Payment Requests', path: '/payment-requests', icon: DollarSign },
     { name: 'Students', path: '/student-management', icon: Users },
     { name: 'Tests & Question Bank', path: '/tests', icon: GraduationCap },
     { name: 'Banners', path: '/banners', icon: Image },
@@ -51,6 +57,7 @@ export default function MainLayoutShell() {
     { name: 'Push Notifications', path: '/notifications', icon: Bell },
     { name: 'Performance Analytics', path: '/performance-analytics', icon: TrendingUp },
     { name: 'App Config', path: '/app-config', icon: Smartphone },
+    { name: 'Payment Settings', path: '/payment-settings', icon: CreditCard },
   ];
 
   const handleLogout = () => {
@@ -254,7 +261,9 @@ export default function MainLayoutShell() {
         {/* Content Outlet scroll Container */}
         <main className="flex-1 overflow-y-auto relative">
           <div className="max-w-[1600px] mx-auto min-h-full">
-            <Outlet />
+            <ErrorBoundary key={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </main>
       </div>

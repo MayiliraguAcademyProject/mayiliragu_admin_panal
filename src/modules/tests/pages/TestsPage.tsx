@@ -25,6 +25,7 @@ import { type Question, type Test } from '../../../core/types';
 import QuestionFormModal from '../components/QuestionFormModal';
 import BulkImportModal from '../components/BulkImportModal';
 import TestBuilderWizardModal from '../components/TestBuilderWizardModal';
+import TestReviewsModal from '../components/TestReviewsModal';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
 import ConnectionModal from '../components/ConnectionModal';
 import CategoryModal from '../components/CategoryModal';
@@ -43,6 +44,7 @@ import {
   Award,
   AlertCircle,
   TrendingUp,
+  Star,
   Users,
   CheckCircle,
   HelpCircle as QuestionIcon
@@ -230,6 +232,14 @@ export default function TestsPage() {
   const [editingTestId, setEditingTestId] = useState<string | undefined>(undefined);
   const { data: editingTestDetail } = useTestDetail(editingTestId);
 
+  const [selectedTestForReviews, setSelectedTestForReviews] = useState<Test | null>(null);
+  const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
+
+  const handleViewReviewsClick = (test: Test) => {
+    setSelectedTestForReviews(test);
+    setIsReviewsModalOpen(true);
+  };
+
   const handleCreateTestClick = () => {
     setEditingTestId(undefined);
     setIsTestModalOpen(true);
@@ -340,7 +350,7 @@ export default function TestsPage() {
 
         <button
           onClick={handleRefreshAll}
-          className="p-2 bg-slate-50 border border-border/40 hover:border-slate-350 hover:bg-slate-100 rounded-xl text-text-secondary transition-colors"
+          className="p-2 bg-slate-50 dark:bg-slate-800 border border-border/40 dark:border-slate-700/40 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-text-secondary transition-colors"
           title="Refresh Data"
         >
           <RotateCw className="w-4 h-4" />
@@ -629,7 +639,7 @@ export default function TestsPage() {
                       <div className="flex flex-col items-end justify-between self-stretch">
                         <button
                           onClick={(e) => handleDeleteCategory(e, cat.id, cat.name)}
-                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                           title="Delete Category"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -766,6 +776,11 @@ export default function TestsPage() {
                                   Sectioned
                                 </span>
                               )}
+                              {t.is_paid && (
+                                <span className="px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/20 text-[9px] font-black text-amber-700 uppercase rounded-md tracking-wider">
+                                  PRO
+                                </span>
+                              )}
                             </div>
                             {t.description && (
                               <p className="text-[10px] text-text-secondary font-medium truncate max-w-sm">{t.description}</p>
@@ -782,13 +797,28 @@ export default function TestsPage() {
                             {t.cutoff_marks}%
                           </td>
                           <td className="py-4 px-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold ${
-                              t.is_published ? 'bg-emerald-500/10 text-emerald-700' : 'bg-slate-100 text-text-secondary'
-                            }`}>
-                              {t.is_published ? 'Published' : 'Draft'}
-                            </span>
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold ${
+                                t.is_published ? 'bg-emerald-500/10 text-emerald-700' : 'bg-slate-100 text-text-secondary'
+                              }`}>
+                                {t.is_published ? 'Published' : 'Draft'}
+                              </span>
+                              {t.scheduled_at && (
+                                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-teal-500/10 text-teal-700 border border-teal-500/20 whitespace-nowrap">
+                                  📅 {new Date(t.scheduled_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-4 px-4 text-center space-x-1.5 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleViewReviewsClick(t)}
+                              className="px-2 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg hover:border-amber-400 font-bold text-[10px] transition-colors inline-flex items-center space-x-1"
+                            >
+                              <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                              <span>Reviews</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleEditTestClick(t)}
@@ -1106,6 +1136,13 @@ export default function TestsPage() {
         onConfirm={handleConfirmDeleteCategory}
         title="Delete Category"
         message={`Are you sure you want to delete the category "${categoryToDelete?.name}"? This will delete all associated subjects and topics.`}
+      />
+
+      <TestReviewsModal
+        isOpen={isReviewsModalOpen}
+        onClose={() => setIsReviewsModalOpen(false)}
+        testId={selectedTestForReviews?.id || ''}
+        testTitle={selectedTestForReviews?.title || ''}
       />
 
     </div>

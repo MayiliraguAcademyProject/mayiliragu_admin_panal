@@ -38,7 +38,10 @@ import type {
   Book,
   Coupon,
   BookOrder,
-  BookOrderItem
+  BookOrderItem,
+  EnrollmentRequest,
+  PaymentSettings,
+  PaymentRequest
 } from '../types';
 
 export type { 
@@ -74,7 +77,10 @@ export type {
   Book,
   Coupon,
   BookOrder,
-  BookOrderItem
+  BookOrderItem,
+  EnrollmentRequest,
+  PaymentSettings,
+  PaymentRequest
 };
 
 // ==========================================
@@ -121,10 +127,16 @@ export function useCourseDetail(courseId: string) {
 export function useCreateCourse() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { title: string; description: string; thumbnail?: string; file?: File }) => {
+    mutationFn: async (data: { title: string; description: string; thumbnail?: string; lockMode?: string; isDemo?: boolean; file?: File }) => {
       const formData = new FormData();
       formData.append('title', data.title);
       formData.append('description', data.description);
+      if (data.lockMode) {
+        formData.append('lockMode', data.lockMode);
+      }
+      if (data.isDemo !== undefined) {
+        formData.append('isDemo', String(data.isDemo));
+      }
       if (data.thumbnail) {
         formData.append('thumbnail', data.thumbnail);
       }
@@ -151,6 +163,8 @@ export function useUpdateCourse() {
       if (data.title !== undefined) formData.append('title', data.title);
       if (data.description !== undefined) formData.append('description', data.description);
       if (data.thumbnail !== undefined) formData.append('thumbnail', data.thumbnail || '');
+      if (data.lockMode !== undefined) formData.append('lockMode', data.lockMode);
+      if (data.isDemo !== undefined) formData.append('isDemo', String(data.isDemo));
       if (file) {
         formData.append('file', file);
       }
@@ -230,8 +244,23 @@ export function useDeleteModule(courseId: string) {
 export function useCreateLesson(courseId: string, moduleId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { title: string; description: string; driveFileId: string; duration: number; order: number; downloadEnabled?: boolean }) => {
-      const response = await apiClient.post(ApiConstants.lessons.base, { ...data, moduleId });
+    mutationFn: async ({ data, file }: { data: { title: string; description?: string; image?: string; driveFileId: string; duration: number; order: number; downloadEnabled?: boolean }; file?: File | null }) => {
+      const formData = new FormData();
+      formData.append('moduleId', moduleId);
+      formData.append('title', data.title);
+      if (data.description !== undefined) formData.append('description', data.description || '');
+      if (data.image !== undefined) formData.append('image', data.image || '');
+      formData.append('driveFileId', data.driveFileId);
+      formData.append('duration', String(data.duration));
+      formData.append('order', String(data.order));
+      if (data.downloadEnabled !== undefined) formData.append('downloadEnabled', String(data.downloadEnabled));
+      if (file) {
+        formData.append('file', file);
+      }
+
+      const response = await apiClient.post(ApiConstants.lessons.base, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -243,8 +272,22 @@ export function useCreateLesson(courseId: string, moduleId: string) {
 export function useUpdateLesson(courseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { title?: string; description?: string; driveFileId?: string; duration?: number; order?: number; downloadEnabled?: boolean } }) => {
-      const response = await apiClient.put(ApiConstants.lessons.detail(id), data);
+    mutationFn: async ({ id, data, file }: { id: string; data: { title?: string; description?: string; image?: string; driveFileId?: string; duration?: number; order?: number; downloadEnabled?: boolean }; file?: File | null }) => {
+      const formData = new FormData();
+      if (data.title !== undefined) formData.append('title', data.title);
+      if (data.description !== undefined) formData.append('description', data.description || '');
+      if (data.image !== undefined) formData.append('image', data.image || '');
+      if (data.driveFileId !== undefined) formData.append('driveFileId', data.driveFileId);
+      if (data.duration !== undefined) formData.append('duration', String(data.duration));
+      if (data.order !== undefined) formData.append('order', String(data.order));
+      if (data.downloadEnabled !== undefined) formData.append('downloadEnabled', String(data.downloadEnabled));
+      if (file) {
+        formData.append('file', file);
+      }
+
+      const response = await apiClient.put(ApiConstants.lessons.detail(id), formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -257,6 +300,32 @@ export function useDeleteLesson(courseId: string) {
   return useMutation({
     mutationFn: async (id: string) => {
       const response = await apiClient.delete(ApiConstants.lessons.detail(id));
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useReorderModules(courseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: { id: string; order: number }[]) => {
+      const response = await apiClient.patch(ApiConstants.modules.reorder, { items });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useReorderLessons(courseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: { id: string; order: number }[]) => {
+      const response = await apiClient.patch(ApiConstants.lessons.reorder, { items });
       return response.data;
     },
     onSuccess: () => {
@@ -640,10 +709,33 @@ export function useBannersAdminList() {
 export function useCreateBanner() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ title, imageUrl, linkUrl, order, isActive, file }: {
+    mutationFn: async ({
+      title,
+      imageUrl,
+      linkUrl,
+      linkType,
+      linkId,
+      price,
+      offerPrice,
+      offerValidUntil,
+      planDescription,
+      validityDays,
+      curriculumJson,
+      order,
+      isActive,
+      file,
+    }: {
       title: string;
       imageUrl?: string;
       linkUrl?: string | null;
+      linkType?: 'COURSE' | 'TEST' | 'NONE';
+      linkId?: string | null;
+      price?: number | null;
+      offerPrice?: number | null;
+      offerValidUntil?: string | null;
+      planDescription?: string | null;
+      validityDays?: number | null;
+      curriculumJson?: string | null;
       order: number;
       isActive: boolean;
       file?: File;
@@ -652,6 +744,14 @@ export function useCreateBanner() {
       formData.append('title', title);
       if (imageUrl) formData.append('imageUrl', imageUrl);
       if (linkUrl) formData.append('linkUrl', linkUrl);
+      if (linkType) formData.append('linkType', linkType);
+      if (linkId) formData.append('linkId', linkId);
+      if (price !== undefined && price !== null) formData.append('price', String(price));
+      if (offerPrice !== undefined && offerPrice !== null) formData.append('offerPrice', String(offerPrice));
+      if (offerValidUntil) formData.append('offerValidUntil', offerValidUntil);
+      if (planDescription) formData.append('planDescription', planDescription);
+      if (validityDays !== undefined && validityDays !== null) formData.append('validityDays', String(validityDays));
+      if (curriculumJson) formData.append('curriculumJson', curriculumJson);
       formData.append('order', String(order));
       formData.append('isActive', String(isActive));
       if (file) {
@@ -677,6 +777,14 @@ export function useUpdateBanner() {
       if (data.title !== undefined) formData.append('title', data.title);
       if (data.imageUrl !== undefined) formData.append('imageUrl', data.imageUrl);
       if (data.linkUrl !== undefined) formData.append('linkUrl', data.linkUrl || '');
+      if (data.linkType !== undefined) formData.append('linkType', data.linkType || 'NONE');
+      if (data.linkId !== undefined) formData.append('linkId', data.linkId || '');
+      if (data.price !== undefined) formData.append('price', data.price !== null ? String(data.price) : '');
+      if (data.offerPrice !== undefined) formData.append('offerPrice', data.offerPrice !== null ? String(data.offerPrice) : '');
+      if (data.offerValidUntil !== undefined) formData.append('offerValidUntil', data.offerValidUntil || '');
+      if (data.planDescription !== undefined) formData.append('planDescription', data.planDescription || '');
+      if (data.validityDays !== undefined) formData.append('validityDays', data.validityDays !== null ? String(data.validityDays) : '');
+      if (data.curriculumJson !== undefined) formData.append('curriculumJson', data.curriculumJson || '');
       if (data.order !== undefined) formData.append('order', String(data.order));
       if (data.isActive !== undefined) formData.append('isActive', String(data.isActive));
       if (file) {
@@ -910,6 +1018,52 @@ export function useCurrentAffairsAdminList() {
     queryKey: ['currentAffairsAdmin'],
     queryFn: async () => {
       const response = await apiClient.get(ApiConstants.currentAffairs.admin);
+      return response.data;
+    },
+  });
+}
+
+export interface CurrentAffairQuizAttemptAdmin {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  quizId: string;
+  articleId: string | null;
+  articleTitle: string;
+  questionPrompt: string;
+  selectedAnswer: string;
+  correctAnswer: string;
+  explanationEn: string | null;
+  isCorrect: boolean;
+  attemptedAt: string;
+}
+
+export interface CurrentAffairsQuizAttemptsAdminResponse {
+  attempts: CurrentAffairQuizAttemptAdmin[];
+  summary: {
+    totalSubmissions: number;
+    totalUniqueStudents: number;
+    overallAccuracy: number;
+  };
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export function useCurrentAffairsQuizAttemptsAdmin(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  isCorrect?: string;
+}) {
+  return useQuery<{ data: CurrentAffairsQuizAttemptsAdminResponse }>({
+    queryKey: ['currentAffairsQuizAttemptsAdmin', params],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.currentAffairs.quizAttemptsAdmin, { params });
       return response.data;
     },
   });
@@ -1458,6 +1612,89 @@ export function useUpdatePaymentQr() {
     },
   });
 }
+
+export function useEnrollmentRequests(status?: string) {
+  return useQuery({
+    queryKey: ['enrollmentRequests', status],
+    queryFn: async () => {
+      const response = await apiClient.get('/enrollment-requests', {
+        params: status ? { status } : undefined,
+      });
+      return response.data.data as EnrollmentRequest[];
+    },
+  });
+}
+
+export function useProcessEnrollmentRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, action, adminNote }: { id: string; action: 'approve' | 'reject'; adminNote?: string }) => {
+      const response = await apiClient.patch(`/enrollment-requests/${id}`, { action, adminNote });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['enrollmentRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+  });
+}
+
+export function useGetPaymentSettings() {
+  return useQuery<PaymentSettings>({
+    queryKey: ['paymentSettings'],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.paymentSettings.public);
+      return response.data.data;
+    },
+  });
+}
+
+export function useUpsertPaymentSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ instructions, file }: { instructions: string; file?: File }) => {
+      const formData = new FormData();
+      formData.append('instructions', instructions);
+      if (file) {
+        formData.append('file', file);
+      }
+      const response = await apiClient.put(ApiConstants.paymentSettings.base, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentSettings'] });
+    },
+  });
+}
+
+export function useListPaymentRequests(status?: string) {
+  return useQuery<PaymentRequest[]>({
+    queryKey: ['paymentRequests', status],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.paymentRequests.base, {
+        params: status ? { status } : undefined,
+      });
+      return response.data.data;
+    },
+  });
+}
+
+export function useProcessPaymentRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, action, adminNote }: { id: string; action: 'approve' | 'reject'; adminNote?: string }) => {
+      const response = await apiClient.patch(ApiConstants.paymentRequests.detail(id), { action, adminNote });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+  });
+}
+
 
 
 

@@ -62,6 +62,14 @@ export default function BannerListPage() {
             title: values.title,
             imageUrl: values.imageUrl,
             linkUrl: values.linkUrl || null,
+            linkType: values.linkType,
+            linkId: values.linkId,
+            price: values.price,
+            offerPrice: values.offerPrice,
+            offerValidUntil: values.offerValidUntil,
+            planDescription: values.planDescription,
+            validityDays: values.validityDays,
+            curriculumJson: values.curriculumJson,
             order: values.order,
             isActive: values.isActive,
           },
@@ -72,6 +80,14 @@ export default function BannerListPage() {
           title: values.title,
           imageUrl: values.imageUrl,
           linkUrl: values.linkUrl || null,
+          linkType: values.linkType,
+          linkId: values.linkId,
+          price: values.price,
+          offerPrice: values.offerPrice,
+          offerValidUntil: values.offerValidUntil,
+          planDescription: values.planDescription,
+          validityDays: values.validityDays,
+          curriculumJson: values.curriculumJson,
           order: values.order,
           isActive: values.isActive,
           file: file || undefined,
@@ -178,7 +194,7 @@ export default function BannerListPage() {
                 />
 
                 {/* Actions Overlay */}
-                <div className="absolute top-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-slate-900/60 p-1.5 rounded-xl backdrop-blur-sm">
+                <div className="absolute top-3 right-3 flex items-center space-x-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 bg-slate-900/60 p-1.5 rounded-xl backdrop-blur-sm">
                   <button
                     onClick={() => handleOpenEditDialog(banner)}
                     className="p-1.5 rounded-lg bg-white/20 hover:bg-white text-white hover:text-text-primary transition-all duration-200"
@@ -231,7 +247,7 @@ export default function BannerListPage() {
                   <button
                     type="button"
                     onClick={() => handleToggleActive(banner.id)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${banner.isActive ? 'bg-accent' : 'bg-slate-350'
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${banner.isActive ? 'bg-emerald-500' : 'bg-accent'
                       }`}
                   >
                     <span

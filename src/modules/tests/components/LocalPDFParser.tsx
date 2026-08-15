@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Upload, FileText, AlertCircle, RefreshCw, Download, CheckCircle } from 'lucide-react';
+import { Upload, FileText, AlertCircle, RefreshCw, Download, CheckCircle, Trash2 } from 'lucide-react';
 import { apiClient, useExamCategories } from '../../../core/api/endpoints';
 
 // Dynamic PDF.js ES module loader
@@ -48,7 +48,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
   const [isParsing, setIsParsing] = useState(false);
   const [logs, setLogs] = useState<string[]>(['[System Ready] Drop a PDF above to begin.']);
   const [parsedQuestions, setParsedQuestions] = useState<any[]>([]);
-  const [detectedFormat, setDetectedFormat] = useState<'Detecting...' | 'IBPS PO / Banking' | 'TNPSC / State Exam'>('Detecting...');
+  const [detectedFormat, setDetectedFormat] = useState<'Detecting...' | 'IBPS PO / Banking' | 'TNPSC / State Exam' | 'SSC / Competitive'>('Detecting...');
   
   // OCR suggestion states
   const [showOcrBanner, setShowOcrBanner] = useState(false);
@@ -61,11 +61,13 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
 
   // Search & Filter preview
   const [filterIssuesOnly, setFilterIssuesOnly] = useState(false);
+  const [filterNoAnswerOnly, setFilterNoAnswerOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredQuestions = useMemo(() => {
     return parsedQuestions.filter(q => {
       if (filterIssuesOnly && !q.hasIssue) return false;
+      if (filterNoAnswerOnly && !q.missingAnswer) return false;
       if (searchQuery.trim().length > 0) {
         const query = searchQuery.toLowerCase();
         return (
@@ -81,7 +83,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       }
       return true;
     });
-  }, [parsedQuestions, filterIssuesOnly, searchQuery]);
+  }, [parsedQuestions, filterIssuesOnly, filterNoAnswerOnly, searchQuery]);
 
   const hasComprehension = useMemo(() => {
     return parsedQuestions.some(q => q.sharedContext && q.sharedContext.trim().length > 0);
@@ -388,7 +390,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       return {
         ...q,
         correctOption: correct,
-        hasIssue: !q.optionA || !q.optionB || !correct
+        hasIssue: !q.optionA || !q.optionB,
+        missingAnswer: !correct
       };
     });
 
@@ -407,9 +410,18 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     addLog("Detecting question paper format standard...");
     const hasQPrefix = rawText.match(/\bQ\d+\./) !== null;
     const isBanking = hasQPrefix;
+    const isSSC = !isBanking && rawText.match(/\([a-e]\)\s/i) !== null;
 
-    setDetectedFormat(isBanking ? 'IBPS PO / Banking' : 'TNPSC / State Exam');
-    addLog(`Detected Format: ${isBanking ? 'Banking (Q1. prefix)' : 'TNPSC (1. prefix)'}`);
+    if (isBanking) {
+      setDetectedFormat('IBPS PO / Banking');
+      addLog(`Detected Format: Banking (Q1. prefix)`);
+    } else if (isSSC) {
+      setDetectedFormat('SSC / Competitive');
+      addLog(`Detected Format: SSC / Competitive ((a) prefix/inline)`);
+    } else {
+      setDetectedFormat('TNPSC / State Exam');
+      addLog(`Detected Format: TNPSC (1. prefix)`);
+    }
 
     let text = rawText.replace(/[✓✔☑]/g, ' ');
 
@@ -429,13 +441,13 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
 
     const questionRegex = isBanking
       ? /^Q(\d+)\.\s*(.*)$/
-      : /^(\d+)\.\s+(.+)$/;
+      : /^(\d{1,3})\.\s+(\S.*)$/;
 
     const sectionMarkerRegex = /^Q\.\d+\s*\(/i;
 
     const optionStartRegex = isBanking
       ? /^\(([a-eA-E])\)\s*(.*)$/
-      : /^([A-E])\)\s*(.*)$/;
+      : /^(?:([A-E])\)|\(([a-eA-E])\))\s*(.*)$/;
 
     const directionsRegex = /^\s*Direc\s*tion\s*s?\s*\(\s*(\d+)\s*-\s*(\d+)\s*\):?\s*(.*)$/i;
     const solutionsBoundary = /^(S1\.\s*Ans\.|Answers\s*&\s*Explanations|Detailed\s*Solutions|Solutions\s*\(|^Solutions$|Answer\s*Key|விடை\s+வட்டங்கள்|விடைகள்|Ans\.?\s*$)/i;
@@ -505,7 +517,14 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       if (qMatch) {
         const qNum = parseInt(qMatch[1]);
         if (qNum >= 1 && qNum <= 200) {
-          if (currentQuestion) questions.push(currentQuestion);
+          if (currentQuestion) {
+            const lastText = currentQuestion.text.trim();
+            if (lastText.endsWith(' ' + qNum) || lastText.endsWith(' ' + qNum + '.')) {
+              currentQuestion.text = (currentQuestion.text + ' ' + qMatch[2]).trim();
+              continue;
+            }
+            questions.push(currentQuestion);
+          }
 
           const existingIdx = questions.findIndex(q => q.number === qNum);
           if (existingIdx !== -1) {
@@ -531,18 +550,22 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       if (currentQuestion) {
         const singleOpt = line.match(optionStartRegex);
         if (singleOpt) {
-          const label = singleOpt[1].toUpperCase();
-          let optText = singleOpt[2].trim();
+          const label = isBanking ? singleOpt[1].toUpperCase() : (singleOpt[1] || singleOpt[2]).toUpperCase();
+          let optText = isBanking ? singleOpt[2].trim() : singleOpt[3].trim();
 
-          const moreOptMatch = optText.match(/\s+([B-E])\)\s/);
+          const moreOptMatch = isBanking
+            ? optText.match(/\s+([B-E])\)\s/)
+            : optText.match(/\s+(?:([B-E])\)|\(([b-eA-E])\))\s/);
           if (moreOptMatch) {
             const fullOptLine = line; 
-            const optParts = fullOptLine.split(/\s+(?=[A-E]\))/);
+            const optParts = isBanking
+              ? fullOptLine.split(/\s+(?=[A-E]\))/)
+              : fullOptLine.split(/\s+(?=(?:[A-E]\)|\([a-eA-E]\)))/);
             for (const part of optParts) {
               const m = part.trim().match(optionStartRegex);
               if (m) {
-                const lbl = m[1].toUpperCase();
-                const val = m[2].trim();
+                const lbl = isBanking ? m[1].toUpperCase() : (m[1] || m[2]).toUpperCase();
+                const val = isBanking ? m[2].trim() : m[3].trim();
                 if (val.length > 0) {
                   currentQuestion.options[lbl] = val;
                   currentQuestion.lastActiveOption = lbl;
@@ -574,10 +597,45 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
 
     if (currentQuestion) questions.push(currentQuestion);
 
+    const extractInlineOptions = (text: string): { questionBody: string, options: Record<string, string> } | null => {
+      const matchA = text.match(/\([aA]\)/);
+      if (!matchA || matchA.index === undefined) return null;
+
+      const firstOptIndex = matchA.index;
+      const questionBody = text.substring(0, firstOptIndex).trim();
+      const optionsText = text.substring(firstOptIndex);
+
+      const optionRegex = /\(([a-eA-E])\)\s*((?:(?!\([a-eA-E]\)).)+)/g;
+      const options: Record<string, string> = {};
+      let match;
+      let count = 0;
+
+      while ((match = optionRegex.exec(optionsText)) !== null) {
+        const label = match[1].toUpperCase();
+        const val = match[2].trim();
+        options[label] = val;
+        count++;
+      }
+
+      if (count < 2) return null;
+      return { questionBody, options };
+    };
+
+    // Post-processing pass for inline options (fallback)
+    for (const q of questions) {
+      if (Object.keys(q.options).length === 0) {
+        const result = extractInlineOptions(q.text);
+        if (result) {
+          q.options = result.options;
+          q.text = result.questionBody;
+        }
+      }
+    }
+
     addLog(`Base parse complete: ${questions.length} questions constructed. Processing keys...`);
 
     const answersMap: Record<number, string> = {};
-    const answerRegex = /S(\d+)\.\s+Ans\.\(([a-eA-E])\)/g;
+    const answerRegex = /(?:S)?(\d+)\.\s*Ans\.\s*\(([a-eA-E])\)/gi;
     let ansMatch;
     while ((ansMatch = answerRegex.exec(rawText)) !== null) {
       answersMap[parseInt(ansMatch[1])] = ansMatch[2].toUpperCase();
@@ -606,7 +664,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       const optE = q.options['E'] || '';
 
       const correct = answerKeyMapRef.current.get(q.number) || answersMap[q.number] || '';
-      const hasIssue = !optA || !optB || !correct;
+      const hasIssue = !optA || !optB;
+      const missingAnswer = !correct;
 
       let cleanOptE = optE;
       const inlineCleanupIndex = cleanOptE.search(/Direc\s*tions?\s*\(\s*\d+\s*-\s*\d+\s*\)/i);
@@ -640,6 +699,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
         correctOption: correct,
         sharedContext: splitCtx.en || splitCtx.ta,
         hasIssue,
+        missingAnswer,
         examCategory: isBanking ? 'IBPS_PO' : 'TNPSC_GROUP_2_4',
         negativeMarks: isBanking ? 0.25 : 0.0,
         negativeEnabled: isBanking ? 'TRUE' : 'FALSE',
@@ -826,17 +886,33 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     }
   };
 
-  // Inline table cell editor handler
   const handleCellBlur = (idx: number, field: string, value: string) => {
     setParsedQuestions((prev) => {
       const copy = [...prev];
+      const optA = field === 'optionA' ? value : copy[idx].optionA;
+      const optB = field === 'optionB' ? value : copy[idx].optionB;
+      const correct = field === 'correctOption' ? value : copy[idx].correctOption;
+
       copy[idx] = {
         ...copy[idx],
-        [field]: value,
-        hasIssue: !copy[idx].optionA || !copy[idx].optionB || (field === 'correctOption' ? !value : !copy[idx].correctOption)
+        [field]: field === 'number' ? (parseInt(value) || 0) : value,
+        hasIssue: !optA || !optB,
+        missingAnswer: !correct
       };
       return copy;
     });
+  };
+  const handleDeleteRow = (idx: number) => {
+    if (confirm('Are you sure you want to delete this question?')) {
+      setParsedQuestions((prev) => {
+        const copy = prev.filter((_, i) => i !== idx);
+        if (selectedQuestionIndex >= copy.length) {
+          setSelectedQuestionIndex(Math.max(0, copy.length - 1));
+        }
+        return copy;
+      });
+      addLog(`Deleted question at row index ${idx + 1}.`, 'warn');
+    }
   };
 
   const activeCategory = categories.find((c) => c.id === selectedCategory);
@@ -1001,7 +1077,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
         <div className="flex justify-between items-center border-b border-slate-800 pb-1.5">
           <span className="text-[10px] uppercase font-bold text-slate-400">System Log Trace</span>
-          <button onClick={() => setLogs([])} className="text-[9px] text-slate-500 hover:text-slate-350">Clear</button>
+          <button onClick={() => setLogs([])} className="text-[9px] text-slate-500 hover:text-slate-300">Clear</button>
         </div>
         <div ref={logContainerRef} className="font-mono text-[10px] text-slate-400 h-20 overflow-y-auto space-y-1 font-semibold">
           {logs.map((log, i) => <div key={i}>{log}</div>)}
@@ -1035,12 +1111,27 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
                 className="w-48 px-3 py-1.5 text-xs bg-slate-50 border border-border/50 rounded-xl outline-none focus:border-accent font-semibold text-text-primary placeholder:text-text-secondary"
               />
               <button
-                onClick={() => setFilterIssuesOnly(!filterIssuesOnly)}
+                onClick={() => {
+                  setFilterIssuesOnly(!filterIssuesOnly);
+                  setFilterNoAnswerOnly(false);
+                }}
                 className={`px-3 py-1.5 text-xs font-bold border rounded-xl transition-all ${
                   filterIssuesOnly ? 'bg-amber-500/10 border-amber-500/30 text-amber-600' : 'bg-slate-50 border-border/50 text-text-secondary'
                 }`}
               >
                 Issues Only ({parsedQuestions.filter(q => q.hasIssue).length})
+              </button>
+
+              <button
+                onClick={() => {
+                  setFilterNoAnswerOnly(!filterNoAnswerOnly);
+                  setFilterIssuesOnly(false);
+                }}
+                className={`px-3 py-1.5 text-xs font-bold border rounded-xl transition-all ${
+                  filterNoAnswerOnly ? 'bg-amber-500/10 border-amber-500/30 text-amber-600' : 'bg-slate-50 border-border/50 text-text-secondary'
+                }`}
+              >
+                No Answer ({parsedQuestions.filter(q => q.missingAnswer).length})
               </button>
               
               <button
@@ -1096,6 +1187,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
                     {hasOptionD && <th className="py-2.5 px-3 w-60 min-w-[220px] bg-slate-50 dark:bg-slate-900">Option D</th>}
                     {hasOptionE && <th className="py-2.5 px-3 w-60 min-w-[220px] bg-slate-50 dark:bg-slate-900">Option E</th>}
                     <th className="py-2.5 px-3 w-20 text-center bg-slate-50 dark:bg-slate-900">Answer</th>
+                    <th className="py-2.5 px-3 w-20 text-center bg-slate-50 dark:bg-slate-900">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/20 text-xs font-semibold text-text-primary">
@@ -1113,7 +1205,15 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
                           q.hasIssue ? 'bg-amber-500/5' : ''
                         } ${isSelected ? 'bg-accent/5 border-l-4 border-l-accent' : ''}`}
                       >
-                        <td className="py-5 px-3 w-12 text-center text-text-secondary font-bold">{q.number}</td>
+                        <td className="py-5 px-3 w-12 text-center text-text-secondary font-bold">
+                          <input
+                            type="number"
+                            value={q.number}
+                            title={`Question number: ${q.number}`}
+                            onChange={(e) => handleCellBlur(originalIdx, 'number', e.target.value)}
+                            className="bg-transparent border-none outline-none w-full text-xs text-center font-bold text-text-secondary py-1"
+                          />
+                        </td>
                         <td className="py-5 px-3 w-40">
                           <input
                             type="text"
@@ -1206,7 +1306,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
                             />
                           </td>
                         )}
-                        <td className="py-5 px-3 w-20 text-center text-teal-600 font-black uppercase">
+                        <td className="py-5 px-3 w-20 text-center text-teal-600 font-black uppercase relative">
                           <input
                             type="text"
                             value={q.correctOption}
@@ -1214,6 +1314,20 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
                             onChange={(e) => handleCellBlur(originalIdx, 'correctOption', e.target.value)}
                             className="bg-transparent border-none outline-none w-full text-xs text-center font-bold text-teal-600 py-1"
                           />
+                          {q.missingAnswer && !q.hasIssue && (
+                            <span className="block text-[9px] text-amber-500 font-bold mt-0.5 whitespace-nowrap">
+                              ⚠ No Answer
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-5 px-3 w-20 text-center" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleDeleteRow(originalIdx)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-all"
+                            title="Delete this question"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     );

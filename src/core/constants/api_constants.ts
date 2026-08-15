@@ -1,10 +1,11 @@
 export const ApiConstants = {
-  baseUrl: (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://192.168.31.86:5000/api',
+  baseUrl: (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://127.0.0.1:5000/api',
   getAssetUrl: (path: string) => {
     if (!path) return '';
-    const base = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://192.168.31.86:5000/api';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    const base = (import.meta.env.VITE_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || 'http://127.0.0.1:5000/api';
     const serverRoot = base.endsWith('/api') ? base.slice(0, -4) : base;
-    return `${serverRoot}${path}`;
+    return `${serverRoot}${path.startsWith('/') ? path : '/' + path}`;
   },
   auth: {
     login: '/auth/login',
@@ -21,11 +22,13 @@ export const ApiConstants = {
   modules: {
     base: '/modules',
     detail: (moduleId: string) => `/modules/${moduleId}`,
+    reorder: '/modules/reorder',
     swap: '/modules/sort/swap',
   },
   lessons: {
     base: '/lessons',
     detail: (lessonId: string) => `/lessons/${lessonId}`,
+    reorder: '/lessons/reorder',
     swap: '/lessons/sort/swap',
     downloads: '/lessons/admin/downloads',
   },
@@ -63,6 +66,7 @@ export const ApiConstants = {
   currentAffairs: {
     base: '/current-affairs',
     admin: '/current-affairs/admin',
+    quizAttemptsAdmin: '/current-affairs/admin/quiz-attempts',
     detail: (id: string) => `/current-affairs/${id}`,
     quizzes: (articleId: string) => `/current-affairs/${articleId}/quizzes`,
     magazinesAll: '/current-affairs/magazines/all',
@@ -104,5 +108,13 @@ export const ApiConstants = {
   },
   appConfig: {
     base: '/app-config',
+  },
+  paymentSettings: {
+    base: '/payment-settings',
+    public: '/payment-settings/public',
+  },
+  paymentRequests: {
+    base: '/payment-requests',
+    detail: (id: string) => `/payment-requests/${id}`,
   },
 } as const;

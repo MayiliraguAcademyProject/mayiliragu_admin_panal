@@ -34,6 +34,8 @@ export default function CourseModal({
       title: '',
       description: '',
       thumbnail: '',
+      lockMode: 'free',
+      isDemo: false,
     },
   });
 
@@ -45,9 +47,17 @@ export default function CourseModal({
         setValue('title', editingCourse.title);
         setValue('description', editingCourse.description);
         setValue('thumbnail', editingCourse.thumbnail);
+        setValue('lockMode', editingCourse.lockMode || 'free');
+        setValue('isDemo', editingCourse.isDemo ?? false);
         setUploadMode(editingCourse.thumbnail ? 'url' : 'file');
       } else {
-        reset();
+        reset({
+          title: '',
+          description: '',
+          thumbnail: '',
+          lockMode: 'free',
+          isDemo: false,
+        });
         setUploadMode('file');
       }
     }
@@ -113,6 +123,45 @@ export default function CourseModal({
               {errors.description && (
                 <p className="text-[11px] text-error font-semibold pl-1">{errors.description.message}</p>
               )}
+            </div>
+
+            {/* Lock Mode / Access Control */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
+                Lesson Unlock Mode
+              </label>
+              <select
+                {...register('lockMode')}
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 rounded-xl border border-border text-sm font-medium outline-none focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+              >
+                <option value="free">Free Access (All videos unlocked)</option>
+                <option value="sequential">Sequential Unlock (Line by line as videos completed)</option>
+              </select>
+              <p className="text-[11px] text-text-secondary font-medium pl-1">
+                Sequential mode forces students to complete each video (90%+ watched) before the next video unlocks.
+              </p>
+            </div>
+
+            {/* Demo Course Access Toggle */}
+            <div className="p-3.5 rounded-2xl border border-border/80 bg-slate-50/30 flex items-center justify-between">
+              <div className="space-y-0.5 pr-4">
+                <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider cursor-pointer">
+                  Demo Course Access
+                </label>
+                <p className="text-[11px] text-text-secondary font-medium">
+                  Enable free preview video playback for non-enrolled students in the mobile app.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  {...register('isDemo')}
+                  disabled={isSubmitting}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+              </label>
             </div>
 
             {/* Thumbnail Image */}
