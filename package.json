@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:stage": "vite build --mode staging",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run"
@@ -27,6 +28,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1111.0",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/postcss": "^4.3.0",
     "@testing-library/jest-dom": "^6.9.1",

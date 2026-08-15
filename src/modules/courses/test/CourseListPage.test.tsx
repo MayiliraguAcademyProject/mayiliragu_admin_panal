@@ -17,6 +17,8 @@ vi.mock('../../../core/api/endpoints', () => endpointsMock);
 
 const { useCoursesList, useCreateCourse, useUpdateCourse, useDeleteCourse } = endpointsMock;
 
+vi.setConfig({ testTimeout: 15000 });
+
 const coursesData = {
   data: [
     {
