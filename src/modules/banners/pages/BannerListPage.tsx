@@ -54,9 +54,11 @@ export default function BannerListPage() {
   };
 
   const onSubmit = async (values: BannerFormValues, file: File | null) => {
+    console.log('[BannerListPage] 📥 onSubmit called!', { isEditing: !!editingBanner, values, file: file?.name });
     try {
       if (editingBanner) {
-        await updateBannerMutation.mutateAsync({
+        console.log('[BannerListPage] Updating banner:', editingBanner.id);
+        const res = await updateBannerMutation.mutateAsync({
           id: editingBanner.id,
           data: {
             title: values.title,
@@ -75,8 +77,10 @@ export default function BannerListPage() {
           },
           file: file || undefined,
         });
+        console.log('[BannerListPage] ✅ Banner update SUCCESS:', res);
       } else {
-        await createBannerMutation.mutateAsync({
+        console.log('[BannerListPage] Creating new banner...');
+        const res = await createBannerMutation.mutateAsync({
           title: values.title,
           imageUrl: values.imageUrl,
           linkUrl: values.linkUrl || null,
@@ -92,10 +96,11 @@ export default function BannerListPage() {
           isActive: values.isActive,
           file: file || undefined,
         });
+        console.log('[BannerListPage] ✅ Banner creation SUCCESS:', res);
       }
       handleCloseDialog();
     } catch (err) {
-      console.error('Failed to save banner:', err);
+      console.error('[BannerListPage] ❌ Failed to save banner:', err);
     }
   };
 
