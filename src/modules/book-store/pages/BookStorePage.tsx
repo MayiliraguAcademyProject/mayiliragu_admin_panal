@@ -33,6 +33,10 @@ import {
 } from '../../../core/api/endpoints';
 import type { Book } from '../../../core/types';
 import { ApiConstants } from '../../../core/constants/api_constants';
+import RefreshButton from '../../../shared/components/RefreshButton';
+import ConfirmModal from '../../../shared/components/ConfirmModal';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 // Validation Schemas
 const bookSchema = z.object({
@@ -60,6 +64,7 @@ const couponSchema = z.object({
 });
 
 export default function BookStorePage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'books' | 'coupons' | 'orders' | 'settings'>('books');
 
   // Modals state
@@ -70,27 +75,38 @@ export default function BookStorePage() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [selectedQrFile, setSelectedQrFile] = useState<File | null>(null);
   const [activeScreenshotUrl, setActiveScreenshotUrl] = useState<string | null>(null);
+  const [bookToDelete, setBookToDelete] = useState<string | null>(null);
 
   // API hooks
-  const { data: categoriesData } = useStudyCategoriesList();
+  const { data: categoriesData, refetch: refetchCategories, isRefetching: isRefetchingCategories } = useStudyCategoriesList();
   const categories = categoriesData?.data || [];
 
-  const { data: booksData, isLoading: isBooksLoading } = useAdminBooksList();
+  const { data: booksData, isLoading: isBooksLoading, refetch: refetchBooks, isRefetching: isRefetchingBooks } = useAdminBooksList();
   const books = booksData?.data || [];
 
   const createBookMutation = useCreateBook();
   const updateBookMutation = useUpdateBook();
   const deleteBookMutation = useDeleteBook();
 
-  const { data: couponsData, isLoading: isCouponsLoading } = useCouponsList();
+  const { data: couponsData, isLoading: isCouponsLoading, refetch: refetchCoupons, isRefetching: isRefetchingCoupons } = useCouponsList();
   const coupons = couponsData?.data || [];
   const createCouponMutation = useCreateCoupon();
 
-  const { data: ordersData, isLoading: isOrdersLoading } = useAdminOrdersList();
+  const { data: ordersData, isLoading: isOrdersLoading, refetch: refetchOrders, isRefetching: isRefetchingOrders } = useAdminOrdersList();
   const orders = ordersData?.data || [];
 
-  const { data: qrData, isLoading: isQrLoading } = usePaymentQr();
+  const { data: qrData, isLoading: isQrLoading, refetch: refetchQr, isRefetching: isRefetchingQr } = usePaymentQr();
   const updateQrMutation = useUpdatePaymentQr();
+
+  const isRefetching = isRefetchingCategories || isRefetchingBooks || isRefetchingCoupons || isRefetchingOrders || isRefetchingQr;
+
+  const handleRefreshAll = () => {
+    refetchCategories();
+    refetchBooks();
+    refetchCoupons();
+    refetchOrders();
+    refetchQr();
+  };
 
   const updateOrderStatusMutation = useUpdateOrderStatus();
   const updateOrderPaymentMutation = useUpdateOrderPaymentStatus();
@@ -146,32 +162,37 @@ export default function BookStorePage() {
   const onBookSubmit = async (values: z.infer<typeof bookSchema>) => {
     try {
       if (editingBook) {
-        await updateBookMutation.mutateAsync({
+        const res = await updateBookMutation.mutateAsync({
           id: editingBook.id,
           ...values,
           thumbnail: thumbnailFile || undefined,
           pdf: pdfFile || undefined,
         });
+        toast.success(res?.message || 'Book updated successfully!');
       } else {
-        await createBookMutation.mutateAsync({
+        const res = await createBookMutation.mutateAsync({
           ...values,
           thumbnail: thumbnailFile || undefined,
           pdf: pdfFile || undefined,
         });
+        toast.success(res?.message || 'Book created successfully!');
       }
       setIsBookModalOpen(false);
       bookForm.reset();
     } catch (err) {
-      console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
-  const handleDeleteBook = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this book?')) {
+  const handleDeleteBookConfirm = async () => {
+    if (bookToDelete) {
       try {
-        await deleteBookMutation.mutateAsync(id);
+        const res = await deleteBookMutation.mutateAsync(bookToDelete);
+        toast.success(res?.message || 'Book deleted successfully!');
       } catch (err) {
-        console.error(err);
+        toast.error(extractErrorMessage(err));
+      } finally {
+        setBookToDelete(null);
       }
     }
   };
@@ -179,32 +200,35 @@ export default function BookStorePage() {
   // Coupon Handlers
   const onCouponSubmit = async (values: z.infer<typeof couponSchema>) => {
     try {
-      await createCouponMutation.mutateAsync({
+      const res = await createCouponMutation.mutateAsync({
         ...values,
         startDate: new Date(values.startDate).toISOString(),
         endDate: new Date(values.endDate).toISOString(),
       });
+      toast.success(res?.message || 'Coupon created successfully!');
       setIsCouponModalOpen(false);
       couponForm.reset();
     } catch (err) {
-      console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
   // Order Handlers
   const handleUpdateOrderStatus = async (orderId: string, status: string) => {
     try {
-      await updateOrderStatusMutation.mutateAsync({ id: orderId, orderStatus: status });
+      const res = await updateOrderStatusMutation.mutateAsync({ id: orderId, orderStatus: status });
+      toast.success(res?.message || 'Order status updated!');
     } catch (err) {
-      console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
   const handleUpdatePaymentStatus = async (orderId: string, status: string) => {
     try {
-      await updateOrderPaymentMutation.mutateAsync({ id: orderId, paymentStatus: status });
+      const res = await updateOrderPaymentMutation.mutateAsync({ id: orderId, paymentStatus: status });
+      toast.success(res?.message || 'Payment status updated!');
     } catch (err) {
-      console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -212,25 +236,27 @@ export default function BookStorePage() {
     e.preventDefault();
     if (!selectedQrFile) return;
     try {
-      await updateQrMutation.mutateAsync(selectedQrFile);
+      const res = await updateQrMutation.mutateAsync(selectedQrFile);
       setSelectedQrFile(null);
-      alert('Payment QR Code updated successfully!');
+      toast.success(res?.data?.message || 'Payment QR Code updated successfully!');
     } catch (error) {
-      console.error(error);
-      alert('Failed to update QR Code');
+      toast.error(extractErrorMessage(error));
     }
   };
 
   return (
     <div className="p-6 sm:p-8 space-y-8 animate-fade-in text-text-primary">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-          <Sparkles className="w-6 h-6 text-accent" /> Book Store Control Center
-        </h1>
-        <p className="text-xs text-text-secondary mt-1 font-semibold">
-          Manage hard/soft copy study book listings, set price structures, customize checkout coupons, and process incoming COD orders.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-accent" /> Book Store Control Center
+          </h1>
+          <p className="text-xs text-text-secondary mt-1 font-semibold">
+            Manage hard/soft copy study book listings, set price structures, customize checkout coupons, and process incoming COD orders.
+          </p>
+        </div>
+        <RefreshButton onRefresh={handleRefreshAll} isRefetching={isRefetching} />
       </div>
 
       {/* Tabs */}
@@ -350,7 +376,7 @@ export default function BookStorePage() {
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDeleteBook(book.id)}
+                        onClick={() => setBookToDelete(book.id)}
                         className="p-2 bg-slate-100 hover:bg-red-50 text-red-650 rounded-xl transition-all"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1023,6 +1049,15 @@ export default function BookStorePage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={bookToDelete !== null}
+        onClose={() => setBookToDelete(null)}
+        onConfirm={handleDeleteBookConfirm}
+        title="Delete Study Book?"
+        message="Are you sure you want to delete this book listing? This action cannot be undone."
+        isLoading={deleteBookMutation.isPending}
+      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ interface LessonModalProps {
   editingLesson: Lesson | null;
   copiedEmail: boolean;
   onCopyEmail: () => void;
+  isLoading?: boolean;
 }
 
 export default function LessonModal({
@@ -21,6 +22,7 @@ export default function LessonModal({
   editingLesson,
   copiedEmail,
   onCopyEmail,
+  isLoading = false,
 }: LessonModalProps) {
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -30,7 +32,7 @@ export default function LessonModal({
     handleSubmit,
     setValue,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting: isFormSubmitting },
   } = useForm<LessonFormValues>({
     resolver: zodResolver(lessonSchema),
     defaultValues: {
@@ -42,6 +44,8 @@ export default function LessonModal({
       downloadEnabled: false,
     },
   });
+
+  const isSubmitting = isFormSubmitting || isLoading;
 
   useEffect(() => {
     if (isOpen) {

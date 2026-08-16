@@ -12,8 +12,13 @@ import {
   UserCheck,
   BookOpen
 } from 'lucide-react';
+import RefreshButton from '../../../shared/components/RefreshButton';
+
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function CourseRequestsPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequest, setSelectedRequest] = useState<EnrollmentRequest | null>(null);
@@ -21,7 +26,7 @@ export default function CourseRequestsPage() {
   const [adminNote, setAdminNote] = useState('');
 
   const statusFilter = activeTab === 'ALL' ? undefined : activeTab;
-  const { data: requests = [], isLoading, isError, error } = useEnrollmentRequests(statusFilter);
+  const { data: requests = [], isLoading, isError, error, refetch, isRefetching } = useEnrollmentRequests(statusFilter);
   const processMutation = useProcessEnrollmentRequest();
 
   const filteredRequests = requests.filter((req) => {
@@ -47,10 +52,14 @@ export default function CourseRequestsPage() {
         adminNote: adminNote.trim() ? adminNote.trim() : undefined,
       },
       {
-        onSuccess: () => {
+        onSuccess: (res: any) => {
+          toast.success(res?.message || `Request ${actionType === 'approve' ? 'approved' : 'rejected'} successfully!`);
           setSelectedRequest(null);
           setActionType(null);
           setAdminNote('');
+        },
+        onError: (err: any) => {
+          toast.error(extractErrorMessage(err));
         },
       }
     );
@@ -69,6 +78,7 @@ export default function CourseRequestsPage() {
             Review and approve student course purchase and enrollment requests
           </p>
         </div>
+        <RefreshButton onRefresh={refetch} isRefetching={isRefetching} />
       </div>
 
       {/* Filter Tabs & Search */}

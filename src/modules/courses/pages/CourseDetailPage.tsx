@@ -55,8 +55,12 @@ import type { ModuleFormValues, LessonFormValues } from '../../../core/validatio
 import ModuleModal from '../components/ModuleModal';
 import LessonModal from '../components/LessonModal';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
+import RefreshButton from '../../../shared/components/RefreshButton';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function CourseDetailPage() {
+  const toast = useToast();
   const { id: courseId = '' } = useParams<{ id: string }>();
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
 
@@ -80,18 +84,20 @@ export default function CourseDetailPage() {
   };
 
   // Queries & Mutations
-  const { data: course, isLoading, isError, refetch } = useCourseDetail(courseId);
+  const { data: course, isLoading, isError, refetch, isRefetching } = useCourseDetail(courseId);
   const updateCourseMutation = useUpdateCourse();
 
   const handleToggleLockMode = async (mode: 'free' | 'sequential') => {
     if (!course) return;
     try {
-      await updateCourseMutation.mutateAsync({
+      const res = await updateCourseMutation.mutateAsync({
         id: courseId,
         data: { lockMode: mode },
       });
+      toast.success(res?.message || 'Course lock mode updated!');
     } catch (err) {
       console.error('Failed to update course lock mode:', err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -110,21 +116,24 @@ export default function CourseDetailPage() {
   const onModuleSubmit = async (values: ModuleFormValues) => {
     try {
       if (editingModule) {
-        await updateModuleMutation.mutateAsync({
+        const res = await updateModuleMutation.mutateAsync({
           id: editingModule.id,
           data: { title: values.title },
         });
+        toast.success(res?.message || 'Module updated successfully!');
       } else {
         const order = course?.modules?.length ?? 0;
-        await createModuleMutation.mutateAsync({
+        const res = await createModuleMutation.mutateAsync({
           title: values.title,
           order,
         });
+        toast.success(res?.message || 'Module created successfully!');
       }
       setIsModuleDialogOpen(false);
       setEditingModule(null);
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -133,7 +142,7 @@ export default function CourseDetailPage() {
     try {
       const durationSeconds = values.durationMinutes * 60;
       if (editingLesson) {
-        await updateLessonMutation.mutateAsync({
+        const res = await updateLessonMutation.mutateAsync({
           id: editingLesson.id,
           data: {
             title: values.title,
@@ -145,10 +154,11 @@ export default function CourseDetailPage() {
           },
           file,
         });
+        toast.success(res?.message || 'Lesson updated successfully!');
       } else {
         const module = course?.modules?.find((m) => m.id === targetModuleId);
         const order = module?.lessons?.length ?? 0;
-        await createLessonMutation.mutateAsync({
+        const res = await createLessonMutation.mutateAsync({
           data: {
             title: values.title,
             description: values.description,
@@ -160,11 +170,13 @@ export default function CourseDetailPage() {
           },
           file,
         });
+        toast.success(res?.message || 'Lesson created successfully!');
       }
       setIsLessonDialogOpen(false);
       setEditingLesson(null);
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -262,10 +274,12 @@ export default function CourseDetailPage() {
   const handleDeleteModule = async (id: string, title: string) => {
     if (window.confirm(`Are you sure you want to delete module "${title}"? All nested lessons will be permanently deleted.`)) {
       try {
-        await deleteModuleMutation.mutateAsync(id);
+        const res = await deleteModuleMutation.mutateAsync(id);
+        toast.success(res?.message || 'Module deleted successfully!');
         if (expandedModuleId === id) setExpandedModuleId(null);
       } catch (err) {
         console.error(err);
+        toast.error(extractErrorMessage(err));
       }
     }
   };
@@ -290,9 +304,11 @@ export default function CourseDetailPage() {
   const handleConfirmDeleteLesson = async () => {
     if (!deletingLessonId) return;
     try {
-      await deleteLessonMutation.mutateAsync(deletingLessonId);
+      const res = await deleteLessonMutation.mutateAsync(deletingLessonId);
+      toast.success(res?.message || 'Lesson deleted successfully!');
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -326,13 +342,16 @@ export default function CourseDetailPage() {
     <div className="p-6 sm:p-8 space-y-6 animate-fade-in relative">
 
       {/* Back to courses */}
-      <Link
-        to="/courses"
-        className="inline-flex items-center space-x-2 text-text-secondary hover:text-accent font-bold text-xs transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>Back to Curriculum</span>
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link
+          to="/courses"
+          className="inline-flex items-center space-x-2 text-text-secondary hover:text-accent font-bold text-xs transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Curriculum</span>
+        </Link>
+        <RefreshButton onRefresh={refetch} isRefetching={isRefetching} />
+      </div>
 
       {/* Course Header Hero Card */}
       <div className="bg-cardBg border border-border/60 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col md:flex-row gap-6 items-start">
@@ -514,6 +533,7 @@ export default function CourseDetailPage() {
         onClose={() => setIsModuleDialogOpen(false)}
         onSubmit={onModuleSubmit}
         editingModule={editingModule}
+        isLoading={createModuleMutation.isPending || updateModuleMutation.isPending}
       />
 
       {/* Lesson dialog */}
@@ -524,6 +544,7 @@ export default function CourseDetailPage() {
         editingLesson={editingLesson}
         copiedEmail={copiedEmail}
         onCopyEmail={handleCopyEmail}
+        isLoading={createLessonMutation.isPending || updateLessonMutation.isPending}
       />
 
       {/* Student watch stats dialog */}
@@ -544,6 +565,7 @@ export default function CourseDetailPage() {
         onConfirm={handleConfirmDeleteLesson}
         title="Delete Lesson"
         message={`Are you sure you want to delete lesson "${deletingLessonTitle}"? This action cannot be undone.`}
+        isLoading={deleteLessonMutation.isPending}
       />
 
     </div>

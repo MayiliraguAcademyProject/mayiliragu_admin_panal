@@ -10,6 +10,7 @@ interface CourseModalProps {
   onClose: () => void;
   onSubmit: (values: CourseFormValues, file?: File | null) => Promise<void>;
   editingCourse: Course | null;
+  isLoading?: boolean;
 }
 
 export default function CourseModal({
@@ -17,6 +18,7 @@ export default function CourseModal({
   onClose,
   onSubmit,
   editingCourse,
+  isLoading = false,
 }: CourseModalProps) {
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -27,7 +29,7 @@ export default function CourseModal({
     handleSubmit,
     setValue,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting: isFormSubmitting },
   } = useForm<CourseFormValues>({
     resolver: zodResolver(courseSchema),
     defaultValues: {
@@ -38,6 +40,8 @@ export default function CourseModal({
       isDemo: false,
     },
   });
+
+  const isSubmitting = isFormSubmitting || isLoading;
 
   useEffect(() => {
     if (isOpen) {

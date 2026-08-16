@@ -10,6 +10,7 @@ interface ModuleModalProps {
   onClose: () => void;
   onSubmit: (values: ModuleFormValues) => Promise<void>;
   editingModule: Module | null;
+  isLoading?: boolean;
 }
 
 export default function ModuleModal({
@@ -17,17 +18,20 @@ export default function ModuleModal({
   onClose,
   onSubmit,
   editingModule,
+  isLoading = false,
 }: ModuleModalProps) {
   const {
     register,
     handleSubmit,
     setValue,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting: isFormSubmitting },
   } = useForm<ModuleFormValues>({
     resolver: zodResolver(moduleSchema),
     defaultValues: { title: '' },
   });
+
+  const isSubmitting = isFormSubmitting || isLoading;
 
   useEffect(() => {
     if (isOpen) {

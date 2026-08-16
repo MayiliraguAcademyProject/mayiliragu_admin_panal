@@ -16,8 +16,13 @@ import {
   Check,
   X
 } from 'lucide-react';
+import RefreshButton from '../../../shared/components/RefreshButton';
+
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function PaymentRequestsPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequest, setSelectedRequest] = useState<PaymentRequest | null>(null);
@@ -26,7 +31,7 @@ export default function PaymentRequestsPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   const statusFilter = activeTab === 'ALL' ? undefined : activeTab;
-  const { data: requests = [], isLoading, isError, error } = useListPaymentRequests(statusFilter);
+  const { data: requests = [], isLoading, isError, error, refetch, isRefetching } = useListPaymentRequests(statusFilter);
   const processMutation = useProcessPaymentRequest();
 
   const filteredRequests = requests.filter((req) => {
@@ -52,10 +57,14 @@ export default function PaymentRequestsPage() {
         adminNote: adminNote.trim() ? adminNote.trim() : undefined,
       },
       {
-        onSuccess: () => {
+        onSuccess: (res: any) => {
+          toast.success(res?.message || `Payment request ${actionType === 'approve' ? 'approved' : 'rejected'} successfully!`);
           setSelectedRequest(null);
           setActionType(null);
           setAdminNote('');
+        },
+        onError: (err: any) => {
+          toast.error(extractErrorMessage(err));
         },
       }
     );
@@ -74,6 +83,7 @@ export default function PaymentRequestsPage() {
             Verify screenshot proofs and approve course or test batch enrollment access
           </p>
         </div>
+        <RefreshButton onRefresh={refetch} isRefetching={isRefetching} />
       </div>
 
       {/* Filter Tabs & Search */}

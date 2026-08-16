@@ -24,7 +24,10 @@ import {
   Smartphone,
   UserCheck,
   CreditCard,
-  DollarSign
+  DollarSign,
+  Video,
+  MessageSquare,
+  FileText
 } from 'lucide-react';
 import { useThemeStore } from '../../store/theme-store';
 
@@ -56,6 +59,9 @@ export default function MainLayoutShell() {
     { name: 'Video Downloads', path: '/video-downloads', icon: Download },
     { name: 'Push Notifications', path: '/notifications', icon: Bell },
     { name: 'Performance Analytics', path: '/performance-analytics', icon: TrendingUp },
+    { name: 'Live Streams', path: '/live-streams', icon: Video },
+    { name: 'Testimonials', path: '/testimonials', icon: MessageSquare },
+    { name: 'Exam Updates', path: '/exam-updates', icon: FileText },
     { name: 'App Config', path: '/app-config', icon: Smartphone },
     { name: 'Payment Settings', path: '/payment-settings', icon: CreditCard },
   ];

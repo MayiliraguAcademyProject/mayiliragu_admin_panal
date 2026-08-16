@@ -8,11 +8,12 @@ import {
   Users, 
   User, 
   Clock, 
-  CheckCircle, 
-  AlertCircle,
   FileText,
   GraduationCap
 } from 'lucide-react';
+import RefreshButton from '../../../shared/components/RefreshButton';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 interface CampaignLog {
   id: string;
@@ -46,6 +47,7 @@ interface Student {
 }
 
 export default function NotificationsPage() {
+  const toast = useToast();
   // Form State
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -60,7 +62,17 @@ export default function NotificationsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isRefetching, setIsRefetching] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefetching(true);
+    await Promise.allSettled([
+      fetchCampaigns(),
+      fetchCourses(),
+      fetchStudents(),
+    ]);
+    setIsRefetching(false);
+  };
 
   // Fetch initial data
   useEffect(() => {
@@ -86,9 +98,8 @@ export default function NotificationsPage() {
   const fetchCourses = async () => {
     try {
       const response = await apiClient.get(ApiConstants.courses.base);
-      // Backend list course response might wrap inside data or data.courses
-      const courseList = response.data?.data || response.data || [];
-      setCourses(Array.isArray(courseList) ? courseList : []);
+      const list = response.data?.data || (Array.isArray(response.data) ? response.data : []);
+      setCourses(list);
     } catch (error) {
       console.error('Failed to fetch courses:', error);
     }
@@ -97,8 +108,8 @@ export default function NotificationsPage() {
   const fetchStudents = async () => {
     try {
       const response = await apiClient.get(ApiConstants.students.base);
-      const studentList = response.data?.data || response.data || [];
-      setStudents(Array.isArray(studentList) ? studentList : []);
+      const list = response.data?.data || (Array.isArray(response.data) ? response.data : []);
+      setStudents(list);
     } catch (error) {
       console.error('Failed to fetch students:', error);
     }
@@ -107,22 +118,24 @@ export default function NotificationsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !body.trim()) {
-      setMessage({ type: 'error', text: 'Title and Message Body are required.' });
+      const errText = 'Title and Message Body are required.';
+      toast.error(errText);
       return;
     }
 
     if (targetGroup !== 'ALL' && !targetValue) {
-      setMessage({ type: 'error', text: `Please select a target ${targetGroup.toLowerCase()}.` });
+      const errText = `Please select a target ${targetGroup.toLowerCase()}.`;
+      toast.error(errText);
       return;
     }
 
     if (isScheduled && !scheduledAt) {
-      setMessage({ type: 'error', text: 'Please select a scheduled date and time.' });
+      const errText = 'Please select a scheduled date and time.';
+      toast.error(errText);
       return;
     }
 
     setSubmitLoading(true);
-    setMessage(null);
 
     try {
       let response;
@@ -144,12 +157,10 @@ export default function NotificationsPage() {
       }
 
       if (response.data?.status === 'success') {
-        setMessage({
-          type: 'success',
-          text: isScheduled 
-            ? 'Campaign scheduled successfully!' 
-            : 'Push notifications dispatched successfully!'
-        });
+        const succMsg = isScheduled 
+          ? 'Campaign scheduled successfully!' 
+          : 'Push notifications dispatched successfully!';
+        toast.success(succMsg);
         // Reset form
         setTitle('');
         setBody('');
@@ -158,13 +169,11 @@ export default function NotificationsPage() {
         setScheduledAt('');
         fetchCampaigns();
       } else {
-        setMessage({ type: 'error', text: response.data?.message || 'Something went wrong.' });
+        const errMsg = response.data?.message || 'Something went wrong.';
+        toast.error(errMsg);
       }
     } catch (error: any) {
-      setMessage({ 
-        type: 'error', 
-        text: error.response?.data?.message || 'Failed to process push notification request.' 
-      });
+      toast.error(extractErrorMessage(error));
     } finally {
       setSubmitLoading(false);
     }
@@ -183,18 +192,10 @@ export default function NotificationsPage() {
             Compose and broadcast push notifications immediately or schedule them for Tennessee/SSC batches.
           </p>
         </div>
+        <RefreshButton onRefresh={handleRefresh} isRefetching={isRefetching} />
       </div>
 
-      {message && (
-        <div className={`p-4 rounded-xl border flex items-start space-x-3 ${
-          message.type === 'success' 
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-            : 'bg-rose-50 border-rose-200 text-rose-800'
-        }`}>
-          {message.type === 'success' ? <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" /> : <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />}
-          <span className="text-sm font-semibold">{message.text}</span>
-        </div>
-      )}
+
 
       {/* Main Grid split layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

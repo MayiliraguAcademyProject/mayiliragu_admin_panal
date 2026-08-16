@@ -10,6 +10,7 @@ interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   type?: 'danger' | 'warning' | 'info';
+  isLoading?: boolean;
 }
 
 export default function ConfirmModal({
@@ -21,20 +22,22 @@ export default function ConfirmModal({
   confirmText = 'Delete',
   cancelText = 'Cancel',
   type = 'danger',
+  isLoading = false,
 }: ConfirmModalProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [internalSubmitting, setInternalSubmitting] = useState(false);
+  const isSubmitting = internalSubmitting || isLoading;
 
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
-    setIsSubmitting(true);
+    setInternalSubmitting(true);
     try {
       await onConfirm();
       onClose();
     } catch (error) {
       console.error('Confirm action failed:', error);
     } finally {
-      setIsSubmitting(false);
+      setInternalSubmitting(false);
     }
   };
 
