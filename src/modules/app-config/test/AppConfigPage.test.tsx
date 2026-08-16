@@ -220,8 +220,8 @@ describe('AppConfigPage', () => {
     await screen.findByText('Mock Test Series');
 
     const buttons = screen.getAllByRole('button');
-    expect(buttons[0]).toHaveTextContent('Save Configuration');
-    await user.click(buttons[1]);
+    expect(buttons[1]).toHaveTextContent('Save Configuration');
+    await user.click(buttons[2]);
 
     await waitFor(() => {
       expect(state.apiClientMock.put).toHaveBeenCalledWith('/quick-actions/qa1', { isEnabled: false });

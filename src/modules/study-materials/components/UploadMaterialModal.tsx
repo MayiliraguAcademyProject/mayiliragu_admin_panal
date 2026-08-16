@@ -9,6 +9,7 @@ interface UploadMaterialModalProps {
   selectedFile: File | null;
   onFileChange: (file: File | null) => void;
   isEditMode?: boolean;
+  isLoading?: boolean;
 }
 
 export default function UploadMaterialModal({
@@ -20,8 +21,11 @@ export default function UploadMaterialModal({
   selectedFile,
   onFileChange,
   isEditMode = false,
+  isLoading = false,
 }: UploadMaterialModalProps) {
   if (!isOpen) return null;
+
+  const isSubmitting = form.formState.isSubmitting || isLoading;
 
   const MAX_FILE_SIZE_MB = 100;
   const isFileTooLarge = selectedFile ? selectedFile.size > MAX_FILE_SIZE_MB * 1024 * 1024 : false;
@@ -185,17 +189,17 @@ export default function UploadMaterialModal({
               <button
                 type="button"
                 onClick={onClose}
-                disabled={form.formState.isSubmitting}
+                disabled={isSubmitting}
                 className="px-4 py-2.5 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={form.formState.isSubmitting || isFileTooLarge}
+                disabled={isSubmitting || isFileTooLarge}
                 className="px-6 py-2.5 bg-accent hover:bg-accent-onContainer text-white rounded-xl text-xs font-black shadow-md disabled:opacity-55 flex items-center justify-center space-x-2 transition-all min-w-[140px]"
               >
-                {form.formState.isSubmitting ? (
+                {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin text-white" />
                     <span>{isEditMode ? 'Updating...' : 'Uploading...'}</span>

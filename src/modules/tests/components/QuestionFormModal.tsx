@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useExamCategories, apiClient } from '../../../core/api/endpoints';
 import { type Question } from '../../../core/types';
-import { X, Plus, Trash2, Upload } from 'lucide-react';
+import { Loader2, X, Plus, Trash2, Upload } from 'lucide-react';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 interface QuestionFormModalProps {
   isOpen: boolean;
@@ -10,6 +12,7 @@ interface QuestionFormModalProps {
   question?: Question; // If provided, we are in Edit mode
   defaultCategoryId?: string;
   defaultSubjectName?: string;
+  isLoading?: boolean;
 }
 
 const EMPTY_CATEGORIES: any[] = [];
@@ -21,7 +24,9 @@ export default function QuestionFormModal({
   question,
   defaultCategoryId,
   defaultSubjectName,
+  isLoading = false,
 }: QuestionFormModalProps) {
+  const toast = useToast();
   const { data: categories = EMPTY_CATEGORIES } = useExamCategories();
 
   const subjects = useMemo(() => {
@@ -274,14 +279,15 @@ export default function QuestionFormModal({
         const url = res.data.data?.url || res.data.url;
         if (url) {
           callback(url);
+          toast.success('Image uploaded successfully!');
         } else {
-          alert('Failed to retrieve uploaded image URL');
+          toast.error('Failed to retrieve uploaded image URL');
         }
       } else {
-        alert('Upload failed');
+        toast.error('Upload failed');
       }
     } catch (err: any) {
-      alert('Upload failed: ' + (err.response?.data?.message || err.message));
+      toast.error('Upload failed: ' + extractErrorMessage(err));
     } finally {
       setIsUploadingImg(false);
     }
@@ -919,9 +925,17 @@ export default function QuestionFormModal({
           <button
             type="button"
             onClick={handleSubmit}
-            className="px-5 py-2 bg-accent hover:bg-accent/90 text-white font-bold rounded-xl text-xs shadow-md shadow-accent/15 transition-all"
+            disabled={isLoading || isUploadingImg}
+            className="px-5 py-2 bg-accent hover:bg-accent/90 text-white font-bold rounded-xl text-xs shadow-md shadow-accent/15 transition-all disabled:opacity-50 flex items-center space-x-2"
           >
-            {question ? 'Save Changes' : 'Create Question'}
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>{question ? 'Saving...' : 'Creating...'}</span>
+              </>
+            ) : (
+              <span>{question ? 'Save Changes' : 'Create Question'}</span>
+            )}
           </button>
         </div>
 

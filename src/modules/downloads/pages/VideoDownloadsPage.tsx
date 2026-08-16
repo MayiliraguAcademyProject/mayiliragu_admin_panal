@@ -11,6 +11,7 @@ import {
   User,
   BookOpen
 } from 'lucide-react';
+import RefreshButton from '../../../shared/components/RefreshButton';
 
 interface DownloadLog {
   id: string;
@@ -25,7 +26,7 @@ export default function VideoDownloadsPage() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   
-  const { data, isLoading, isError, refetch } = useVideoDownloads({
+  const { data, isLoading, isError, refetch, isRefetching } = useVideoDownloads({
     search: searchQuery,
     page,
     limit: 15
@@ -55,6 +56,7 @@ export default function VideoDownloadsPage() {
             Track which students downloaded videos to watch offline and when.
           </p>
         </div>
+        <RefreshButton onRefresh={refetch} isRefetching={isRefetching} />
       </div>
 
       {/* Filters & search */}

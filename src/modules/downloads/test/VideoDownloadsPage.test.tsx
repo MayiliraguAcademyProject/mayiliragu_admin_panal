@@ -31,7 +31,7 @@ const state = vi.hoisted(() => {
   let downloadsError = false;
 
   const refetchMock = vi.fn().mockResolvedValue(undefined);
-  const downloadsSpy = vi.fn((params?: { search?: string; page?: number; limit?: number }) => ({
+  const downloadsSpy = vi.fn((_params?: { search?: string; page?: number; limit?: number }) => ({
     data: downloadsData,
     isLoading: downloadsLoading,
     isError: downloadsError,

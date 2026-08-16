@@ -65,7 +65,7 @@ const state = vi.hoisted(() => {
   let isError = false;
   let errorMessage = '';
 
-  const processMutation = vi.fn((payload: unknown, options?: { onSuccess?: () => void }) => {
+  const processMutation = vi.fn((_payload: unknown, options?: { onSuccess?: () => void }) => {
     options?.onSuccess?.();
   });
 

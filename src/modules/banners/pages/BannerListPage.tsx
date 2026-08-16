@@ -22,15 +22,19 @@ import type { Banner } from '../../../core/types';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
 import BannerModal from '../components/BannerModal';
 import type { BannerFormValues } from '../components/BannerModal';
+import RefreshButton from '../../../shared/components/RefreshButton';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function BannerListPage() {
+  const toast = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [bannerToDelete, setBannerToDelete] = useState<string | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   // Queries & Mutations
-  const { data: banners, isLoading, error } = useBannersAdminList();
+  const { data: banners, isLoading, error, refetch, isRefetching } = useBannersAdminList();
   const { data: coursesData } = useCoursesList(1, 50);
 
   const createBannerMutation = useCreateBanner();
@@ -78,6 +82,7 @@ export default function BannerListPage() {
           file: file || undefined,
         });
         console.log('[BannerListPage] ✅ Banner update SUCCESS:', res);
+        toast.success(res?.message || 'Banner updated successfully!');
       } else {
         console.log('[BannerListPage] Creating new banner...');
         const res = await createBannerMutation.mutateAsync({
@@ -97,25 +102,35 @@ export default function BannerListPage() {
           file: file || undefined,
         });
         console.log('[BannerListPage] ✅ Banner creation SUCCESS:', res);
+        toast.success(res?.message || 'Banner created successfully!');
       }
       handleCloseDialog();
     } catch (err) {
       console.error('[BannerListPage] ❌ Failed to save banner:', err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
   const handleToggleActive = async (id: string) => {
     try {
-      await toggleStatusMutation.mutateAsync(id);
+      const res = await toggleStatusMutation.mutateAsync(id);
+      toast.success(res?.message || 'Banner status updated!');
     } catch (err) {
       console.error('Failed to toggle status:', err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
   const handleDeleteConfirm = async () => {
     if (bannerToDelete) {
-      await deleteBannerMutation.mutateAsync(bannerToDelete);
-      setBannerToDelete(null);
+      try {
+        const res = await deleteBannerMutation.mutateAsync(bannerToDelete);
+        toast.success(res?.message || 'Banner deleted successfully!');
+      } catch (err) {
+        toast.error(extractErrorMessage(err));
+      } finally {
+        setBannerToDelete(null);
+      }
     }
   };
 
@@ -138,13 +153,16 @@ export default function BannerListPage() {
             Create, update, and sort interactive promotion banners for the Student mobile application.
           </p>
         </div>
-        <button
-          onClick={handleOpenAddDialog}
-          className="flex items-center justify-center space-x-2 px-5 py-3 bg-accent hover:bg-accent-onContainer text-white rounded-2xl text-xs font-black shadow-lg shadow-accent/20 active:scale-[0.98] transition-all duration-200"
-        >
-          <Plus className="w-4 h-4 stroke-[3]" />
-          <span>Add Banner</span>
-        </button>
+        <div className="flex items-center space-x-3 self-start sm:self-center">
+          <RefreshButton onRefresh={refetch} isRefetching={isRefetching} />
+          <button
+            onClick={handleOpenAddDialog}
+            className="flex items-center justify-center space-x-2 px-5 py-3 bg-accent hover:bg-accent-onContainer text-white rounded-2xl text-xs font-black shadow-lg shadow-accent/20 active:scale-[0.98] transition-all duration-200"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Add Banner</span>
+          </button>
+        </div>
       </div>
 
       {/* Loading & Error States */}
@@ -274,6 +292,7 @@ export default function BannerListPage() {
         onSubmit={onSubmit}
         editingBanner={editingBanner}
         defaultOrder={(banners?.length || 0) + 1}
+        isLoading={createBannerMutation.isPending || updateBannerMutation.isPending}
       />
 
       {/* Confirmation Modal for delete action */}
@@ -284,6 +303,7 @@ export default function BannerListPage() {
         title="Delete Promotion Banner?"
         message="This action is permanent and will remove this banner from the student app carousel."
         confirmText="Delete Banner"
+        isLoading={deleteBannerMutation.isPending}
       />
 
       {/* Fullscreen Banner Preview Modal */}

@@ -4,19 +4,21 @@ import {
   QrCode, 
   Save, 
   Upload, 
-  AlertCircle, 
-  CheckCircle, 
   Loader2 
 } from 'lucide-react';
+import RefreshButton from '../../../shared/components/RefreshButton';
+
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function PaymentSettingsPage() {
-  const { data: settings, isLoading } = useGetPaymentSettings();
+  const toast = useToast();
+  const { data: settings, isLoading, refetch, isRefetching } = useGetPaymentSettings();
   const upsertMutation = useUpsertPaymentSettings();
 
   const [instructions, setInstructions] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -42,28 +44,26 @@ export default function PaymentSettingsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage(null);
 
     if (!previewUrl && !selectedFile) {
-      setMessage({ type: 'error', text: 'Please upload a UPI QR code image.' });
+      toast.error('Please upload a UPI QR code image.');
       return;
     }
 
     if (!instructions.trim()) {
-      setMessage({ type: 'error', text: 'Please enter payment instructions.' });
+      toast.error('Please enter payment instructions.');
       return;
     }
 
     try {
-      await upsertMutation.mutateAsync({
+      const res = await upsertMutation.mutateAsync({
         instructions,
         file: selectedFile || undefined,
       });
-      setMessage({ type: 'success', text: 'Payment settings saved successfully.' });
+      toast.success(res?.message || 'Payment settings saved successfully.');
       setSelectedFile(null);
     } catch (err: any) {
-      console.error(err);
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to save payment settings.' });
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -78,27 +78,17 @@ export default function PaymentSettingsPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-xl font-black text-text-primary tracking-tight">Global Payment Settings</h2>
-        <p className="text-xs text-text-secondary mt-1 font-semibold">
-          Configure the official UPI QR code and payment instructions shown to students upon purchase checkout.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-black text-text-primary tracking-tight">Global Payment Settings</h2>
+          <p className="text-xs text-text-secondary mt-1 font-semibold">
+            Configure the official UPI QR code and payment instructions shown to students upon purchase checkout.
+          </p>
+        </div>
+        <RefreshButton onRefresh={refetch} isRefetching={isRefetching} />
       </div>
 
-      {message && (
-        <div className={`p-4 rounded-2xl border flex items-start space-x-3 text-xs font-bold leading-normal ${
-          message.type === 'success' 
-            ? 'bg-green-500/10 border-green-500/30 text-green-600' 
-            : 'bg-red-500/10 border-red-500/30 text-red-650'
-        }`}>
-          {message.type === 'success' ? (
-            <CheckCircle className="w-5 h-5 flex-shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          )}
-          <span>{message.text}</span>
-        </div>
-      )}
+
 
       <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* QR Code Upload Card */}

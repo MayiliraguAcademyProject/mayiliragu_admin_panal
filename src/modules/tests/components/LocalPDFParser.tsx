@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Upload, FileText, AlertCircle, RefreshCw, Download, CheckCircle, Trash2 } from 'lucide-react';
 import { apiClient, useExamCategories } from '../../../core/api/endpoints';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 // Dynamic PDF.js ES module loader
 const loadPdfJS = async (): Promise<any> => {
@@ -22,7 +24,7 @@ const loadSheetJS = (): Promise<any> => {
       return;
     }
     const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
     script.onload = () => resolve((window as any).XLSX);
     script.onerror = () => reject(new Error('Failed to load SheetJS'));
     document.head.appendChild(script);
@@ -34,6 +36,7 @@ interface LocalPDFParserProps {
 }
 
 export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
+  const toast = useToast();
   const { data: categories = [] } = useExamCategories();
 
   // State management
@@ -831,11 +834,12 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       setSaveProgress(100);
 
       addLog(`SUCCESS! Uploaded all ${parsedQuestions.length} questions directly into database!`, 'success');
-      alert(`Successfully saved ${parsedQuestions.length} questions to database.`);
+      toast.success(`Successfully saved ${parsedQuestions.length} questions to database.`);
       onSuccess();
     } catch (err: any) {
-      addLog(`Database upload failed: ${err.message}`, 'error');
-      alert(`Save failed. Error: ${err.message}`);
+      const msg = extractErrorMessage(err);
+      addLog(`Database upload failed: ${msg}`, 'error');
+      toast.error(`Save failed: ${msg}`);
     } finally {
       setIsSaving(false);
     }

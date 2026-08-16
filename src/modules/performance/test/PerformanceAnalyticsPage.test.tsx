@@ -58,7 +58,7 @@ const state = vi.hoisted(() => {
   let adminData: unknown = defaultAdmin;
   let adminLoading = false;
 
-  const facultyAnalyticsSpy = vi.fn((batch: string) => ({
+  const facultyAnalyticsSpy = vi.fn(() => ({
     data: facultyData,
     isLoading: facultyLoading,
     refetch: vi.fn(),

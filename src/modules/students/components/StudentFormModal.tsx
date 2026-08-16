@@ -6,7 +6,9 @@ interface StudentFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: { name: string; email: string; password?: string }) => Promise<void>;
-  student: Student | null; // Null for create, non-null for edit
+  student?: Student | null;
+  editingStudent?: Student | null;
+  isLoading?: boolean;
 }
 
 export default function StudentFormModal({
@@ -14,18 +16,22 @@ export default function StudentFormModal({
   onClose,
   onSubmit,
   student,
+  editingStudent,
+  isLoading = false,
 }: StudentFormModalProps) {
+  const currentStudent = student || editingStudent || null;
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [internalSubmitting, setInternalSubmitting] = useState(false);
+  const isSubmitting = internalSubmitting || isLoading;
 
   useEffect(() => {
-    if (student) {
-      setName(student.name);
-      setEmail(student.email);
+    if (currentStudent) {
+      setName(currentStudent.name);
+      setEmail(currentStudent.email);
       setPassword('');
     } else {
       setName('');
@@ -34,7 +40,7 @@ export default function StudentFormModal({
     }
     setShowPassword(false);
     setError(null);
-  }, [student, isOpen]);
+  }, [currentStudent, isOpen]);
 
   if (!isOpen) return null;
 
@@ -51,16 +57,16 @@ export default function StudentFormModal({
       setError('A valid email address is required');
       return;
     }
-    if (!student && (!password || password.length < 6)) {
+    if (!currentStudent && (!password || password.length < 6)) {
       setError('Password is required and must be at least 6 characters long');
       return;
     }
-    if (student && password && password.length < 6) {
+    if (currentStudent && password && password.length < 6) {
       setError('Password must be at least 6 characters long');
       return;
     }
 
-    setIsSubmitting(true);
+    setInternalSubmitting(true);
     try {
       await onSubmit({
         name: name.trim(),
@@ -71,7 +77,7 @@ export default function StudentFormModal({
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to save student account.');
     } finally {
-      setIsSubmitting(false);
+      setInternalSubmitting(false);
     }
   };
 

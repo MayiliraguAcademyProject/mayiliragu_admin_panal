@@ -5,18 +5,21 @@ import {
   Smartphone, 
   Save, 
   AlertCircle, 
-  CheckCircle, 
   FileText 
 } from 'lucide-react';
+import RefreshButton from '../../../shared/components/RefreshButton';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function AppConfigPage() {
+  const toast = useToast();
   const [releaseTag, setReleaseTag] = useState('');
   const [releaseNotes, setReleaseNotes] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isRefetching, setIsRefetching] = useState(false);
 
   const GITHUB_DOWNLOAD_PREFIX = 'https://github.com/MayiliraguAcademyProject/mayiliragu_student/releases/download/';
   const GITHUB_DOWNLOAD_SUFFIX = '/app-release.apk';
@@ -43,6 +46,15 @@ export default function AppConfigPage() {
 
   const [quickActions, setQuickActions] = useState<any[]>([]);
 
+  const handleRefresh = async () => {
+    setIsRefetching(true);
+    await Promise.allSettled([
+      fetchConfig(),
+      fetchQuickActions(),
+    ]);
+    setIsRefetching(false);
+  };
+
   useEffect(() => {
     fetchConfig();
     fetchQuickActions();
@@ -59,7 +71,7 @@ export default function AppConfigPage() {
       }
     } catch (error) {
       console.error('Failed to fetch app configuration:', error);
-      setMessage({ type: 'error', text: 'Failed to fetch current app configuration.' });
+      toast.error('Failed to fetch current app configuration.');
     } finally {
       setLoading(false);
     }
@@ -78,19 +90,20 @@ export default function AppConfigPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage(null);
     setValidationError(null);
 
     // Validate empty values
     if (!releaseTag.trim()) {
-      setValidationError('Release Tag is required.');
+      const errText = 'Release Tag is required.';
+      setValidationError(errText);
       return;
     }
 
     // Extract and validate version from tag
     const version = extractVersionFromTag(releaseTag);
     if (!version) {
-      setValidationError('Release tag must contain a semantic version (e.g. v1.0.0-5 or 1.0.0)');
+      const errText = 'Release tag must contain a semantic version (e.g. v1.0.0-5 or 1.0.0)';
+      setValidationError(errText);
       return;
     }
 
@@ -104,15 +117,15 @@ export default function AppConfigPage() {
       });
 
       if (response.data?.status === 'success') {
-        setMessage({ type: 'success', text: response.data.message || 'App configuration updated successfully!' });
+        const succMsg = response.data.message || 'App configuration updated successfully!';
+        toast.success(succMsg);
         const { apkDownloadUrl, releaseNotes } = response.data.data;
         setReleaseTag(extractTag(apkDownloadUrl));
         setReleaseNotes(releaseNotes || '');
       }
     } catch (error: any) {
       console.error('Failed to update app config:', error);
-      const errMsg = error.response?.data?.message || 'Failed to update app configuration.';
-      setMessage({ type: 'error', text: errMsg });
+      toast.error(extractErrorMessage(error));
     } finally {
       setSubmitLoading(false);
     }
@@ -121,25 +134,18 @@ export default function AppConfigPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center space-x-3 mb-8">
-        <div className="p-3 bg-primary/10 text-primary rounded-xl">
-          <Smartphone className="w-8 h-8" />
+      <div className="flex items-center justify-between mb-8 gap-4">
+        <div className="flex items-center space-x-3">
+          <div className="p-3 bg-primary/10 text-primary rounded-xl">
+            <Smartphone className="w-8 h-8" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">App Configuration</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Manage required app version, update releases and APK URLs</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">App Configuration</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Manage required app version, update releases and APK URLs</p>
-        </div>
+        <RefreshButton onRefresh={handleRefresh} isRefetching={isRefetching} />
       </div>
-
-      {/* Messages */}
-      {message && (
-        <div className={`flex items-center space-x-2 p-4 rounded-xl mb-6 ${
-          message.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-rose-50 text-rose-800 border border-rose-100'
-        }`}>
-          {message.type === 'success' ? <CheckCircle className="w-5 h-5 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 flex-shrink-0" />}
-          <span className="text-sm font-medium">{message.text}</span>
-        </div>
-      )}
 
       {/* Main Card */}
       <div className="bg-white dark:bg-cardBg rounded-2xl border border-slate-100 dark:border-border/60 shadow-sm overflow-hidden">

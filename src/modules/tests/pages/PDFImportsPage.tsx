@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { RefreshCw, Trash2, ArrowRight } from 'lucide-react';
 import { apiClient } from '../../../core/api/endpoints';
 import LocalPDFParser from '../components/LocalPDFParser';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 interface Batch {
   id: string;
@@ -17,10 +19,13 @@ interface Batch {
 
 export default function PDFImportsPage() {
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<'parser' | 'history'>('parser');
   const [batches, setBatches] = useState<Batch[]>([]);
   const [isLoadingBatches, setIsLoadingBatches] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reparsingId, setReparsingId] = useState<string | null>(null);
 
   // Fetch batches
   const fetchBatches = async () => {
@@ -49,20 +54,28 @@ export default function PDFImportsPage() {
 
   const handleDeleteBatch = async (id: string) => {
     if (!confirm('Are you sure you want to delete this PDF import batch?')) return;
+    setDeletingId(id);
     try {
-      await apiClient.delete(`/questions/parsed-batches/${id}`);
+      const res = await apiClient.delete(`/questions/parsed-batches/${id}`);
+      toast.success(res?.data?.message || 'Import batch deleted successfully!');
       fetchBatches();
     } catch (err) {
-      alert('Failed to delete batch');
+      toast.error(extractErrorMessage(err));
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const handleReparseBatch = async (id: string) => {
+    setReparsingId(id);
     try {
-      await apiClient.put(`/questions/parsed-batches/${id}/reparse`);
+      const res = await apiClient.put(`/questions/parsed-batches/${id}/reparse`);
+      toast.success(res?.data?.message || 'Reparsing started!');
       fetchBatches();
     } catch (err) {
-      alert('Failed to trigger reparsing');
+      toast.error(extractErrorMessage(err));
+    } finally {
+      setReparsingId(null);
     }
   };
 
@@ -201,15 +214,17 @@ export default function PDFImportsPage() {
                           {b.status === 'FAILED' && (
                             <button
                               onClick={() => handleReparseBatch(b.id)}
-                              className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg"
+                              disabled={reparsingId === b.id}
+                              className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg disabled:opacity-50"
                               title="Retry Ingestion"
                             >
-                              <RefreshCw className="w-4 h-4" />
+                              <RefreshCw className={`w-4 h-4 ${reparsingId === b.id ? 'animate-spin' : ''}`} />
                             </button>
                           )}
                           <button
                             onClick={() => handleDeleteBatch(b.id)}
-                            className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg"
+                            disabled={deletingId === b.id}
+                            className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg disabled:opacity-50"
                             title="Delete Ingestion"
                           >
                             <Trash2 className="w-4 h-4" />

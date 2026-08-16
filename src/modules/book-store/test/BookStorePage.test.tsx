@@ -321,7 +321,8 @@ describe('BookStorePage', () => {
     const deleteButton = container.querySelector('.lucide-trash-2')!.closest('button')!;
     await user.click(deleteButton);
 
-    expect(window.confirm).toHaveBeenCalledWith('Are you sure you want to delete this book?');
+    const modalDeleteBtn = screen.getByRole('button', { name: 'Delete' });
+    await user.click(modalDeleteBtn);
     expect(state.deleteBookMutation).toHaveBeenCalledWith('b1');
   });
 
@@ -491,7 +492,7 @@ describe('BookStorePage', () => {
     await user.click(screen.getByRole('button', { name: 'Update Payment QR Code' }));
 
     expect(state.updateQrMutation).toHaveBeenCalledWith(file);
-    expect(vi.mocked(window.alert)).toHaveBeenCalledWith('Payment QR Code updated successfully!');
+    expect(screen.getByText('Payment QR Code updated successfully!')).toBeTruthy();
   });
 
   it('shows the current active QR code when one is configured', async () => {

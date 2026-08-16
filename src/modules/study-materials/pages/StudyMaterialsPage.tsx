@@ -29,39 +29,44 @@ import {
 import type { StudyMaterial } from '../../../core/types';
 import { ApiConstants } from '../../../core/constants/api_constants';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
+import RefreshButton from '../../../shared/components/RefreshButton';
 import CategoryModal from '../components/CategoryModal';
 import UploadMaterialModal from '../components/UploadMaterialModal';
-import Toast, { type ToastState } from '../../../shared/components/Toast';
 import { categorySchema, materialSchema } from '../components/schemas';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function StudyMaterialsPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'materials' | 'approvals' | 'categories'>('materials');
 
-  // Modals & Toast status
+  // Modals status
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<StudyMaterial | null>(null);
   const [materialToDelete, setMaterialToDelete] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [toast, setToast] = useState<ToastState>({
-    show: false,
-    type: 'success',
-    message: '',
-  });
 
   const showToast = (type: 'success' | 'error' | 'info', message: string) => {
-    setToast({ show: true, type, message });
+    toast[type](message);
   };
 
   // API Hooks
-  const { data: categoriesData, isLoading: isCategoriesLoading } = useStudyCategoriesList();
+  const { data: categoriesData, isLoading: isCategoriesLoading, refetch: refetchCategories, isRefetching: isRefetchingCategories } = useStudyCategoriesList();
   const createCategoryMutation = useCreateStudyCategory();
   const deleteCategoryMutation = useDeleteStudyCategory();
 
-  const { data: materialsData, isLoading: isMaterialsLoading, error: materialsError } = useStudyMaterialsAdminList();
+  const { data: materialsData, isLoading: isMaterialsLoading, error: materialsError, refetch: refetchMaterials, isRefetching: isRefetchingMaterials } = useStudyMaterialsAdminList();
   const createMaterialMutation = useCreateStudyMaterial();
   const updateMaterialMutation = useUpdateStudyMaterial();
   const deleteMaterialMutation = useDeleteStudyMaterial();
+
+  const isRefetching = isRefetchingCategories || isRefetchingMaterials;
+
+  const handleRefreshAll = () => {
+    refetchCategories();
+    refetchMaterials();
+  };
 
   // Forms
   const categoryForm = useForm<z.infer<typeof categorySchema>>({
@@ -163,11 +168,7 @@ export default function StudyMaterialsPage() {
           'Upload Failed: File content is too large (HTTP 413). Please select a file smaller than 100MB or configure server Nginx client_max_body_size.'
         );
       } else {
-        const errorMsg =
-          err?.response?.data?.message ||
-          err?.message ||
-          'Failed to upload study material. Please try again.';
-        showToast('error', errorMsg);
+        showToast('error', extractErrorMessage(err));
       }
     }
   };
@@ -237,6 +238,7 @@ export default function StudyMaterialsPage() {
             Upload and manage e-books, revision notes, PYQs, and handwritten notes, review faculty uploads, and manage library metadata.
           </p>
         </div>
+        <RefreshButton onRefresh={handleRefreshAll} isRefetching={isRefetching} />
       </div>
 
       {/* Tabs */}
@@ -482,6 +484,7 @@ export default function StudyMaterialsPage() {
         onClose={() => setIsCategoryModalOpen(false)}
         onSubmit={onCategorySubmit}
         form={categoryForm}
+        isLoading={createCategoryMutation.isPending}
       />
 
       <UploadMaterialModal
@@ -493,6 +496,7 @@ export default function StudyMaterialsPage() {
         selectedFile={selectedFile}
         onFileChange={setSelectedFile}
         isEditMode={!!editingMaterial}
+        isLoading={createMaterialMutation.isPending || updateMaterialMutation.isPending}
       />
 
       <ConfirmModal
@@ -502,9 +506,8 @@ export default function StudyMaterialsPage() {
         title="Delete Library Material?"
         message="This will hide the document and all associated version histories from the student application view."
         confirmText="Delete Document"
+        isLoading={deleteMaterialMutation.isPending}
       />
-
-      <Toast toast={toast} onClose={() => setToast((prev) => ({ ...prev, show: false }))} />
     </div>
   );
 }

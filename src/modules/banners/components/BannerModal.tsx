@@ -50,6 +50,7 @@ interface BannerModalProps {
   onSubmit: (values: BannerFormValues, file: File | null) => Promise<void>;
   editingBanner: Banner | null;
   defaultOrder: number;
+  isLoading?: boolean;
 }
 
 export default function BannerModal({
@@ -58,6 +59,7 @@ export default function BannerModal({
   onSubmit,
   editingBanner,
   defaultOrder,
+  isLoading = false,
 }: BannerModalProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -81,7 +83,7 @@ export default function BannerModal({
     handleSubmit,
     watch,
     reset,
-    formState: { errors, isSubmitting }
+    formState: { errors, isSubmitting: isFormSubmitting }
   } = useForm<BannerFormValues>({
     resolver: zodResolver(bannerSchema) as any,
     defaultValues: {
@@ -100,6 +102,8 @@ export default function BannerModal({
       isActive: true,
     }
   });
+
+  const isSubmitting = isFormSubmitting || isLoading;
 
   const watchImageUrl = watch('imageUrl');
   const watchLinkType = watch('linkType');

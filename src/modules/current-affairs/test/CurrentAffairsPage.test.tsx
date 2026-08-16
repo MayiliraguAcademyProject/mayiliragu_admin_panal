@@ -121,7 +121,7 @@ const state = vi.hoisted(() => {
   const createSchemeMutation = vi.fn().mockResolvedValue({});
   const updateSchemeMutation = vi.fn().mockResolvedValue({});
   const createDateMutation = vi.fn().mockResolvedValue({});
-  const quizAttemptsQuery = vi.fn((params) => ({ data: { data: quizAttemptsData }, isLoading: false }));
+  const quizAttemptsQuery = vi.fn((_params?: any) => ({ data: { data: quizAttemptsData }, isLoading: false }));
   const refetchQuizzes = vi.fn().mockResolvedValue({ data: { data: [] } });
 
   function reset() {
@@ -215,7 +215,7 @@ vi.mock('../../../core/api/endpoints', () => ({
     mutate: state.createDateMutation,
     isPending: false,
   }),
-  useCurrentAffairsQuizAttemptsAdmin: (params) => state.quizAttemptsQuery(params),
+  useCurrentAffairsQuizAttemptsAdmin: (params: any) => state.quizAttemptsQuery(params),
 }));
 
 function renderPage() {

@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { vi } from 'vitest';
 
+import { ToastProvider } from '../shared/context';
+
 export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
@@ -23,7 +25,7 @@ interface RenderOptions {
   routes?: { path: string; element: ReactElement }[];
 }
 
-/** Render a component wrapped in the app's providers (QueryClient + router). */
+/** Render a component wrapped in the app's providers (QueryClient + router + ToastProvider). */
 export function renderWithProviders(ui: ReactElement, options: RenderOptions = {}) {
   const { route = '/', routes } = options;
   const queryClient = createQueryClient();
@@ -40,7 +42,9 @@ export function renderWithProviders(ui: ReactElement, options: RenderOptions = {
 
   const result = render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[route]}>{content}</MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter initialEntries={[route]}>{content}</MemoryRouter>
+      </ToastProvider>
     </QueryClientProvider>
   );
 
