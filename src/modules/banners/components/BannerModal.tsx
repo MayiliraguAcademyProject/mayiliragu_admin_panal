@@ -6,6 +6,13 @@ import { Image as ImageIcon, Loader2, Upload, Plus, Minus } from 'lucide-react';
 import type { Banner } from '../../../core/types';
 import { useCoursesList, useTestsList } from '../../../core/api/endpoints';
 
+// Helper to parse numbers safely without producing NaN validation errors in Zod
+const parseOptionalNumber = (val: unknown) => {
+  if (val === '' || val === null || val === undefined) return null;
+  const num = Number(val);
+  return Number.isNaN(num) ? null : num;
+};
+
 // Form Validation Schema
 export const bannerSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100),
@@ -13,13 +20,25 @@ export const bannerSchema = z.object({
   linkUrl: z.string().nullable().optional(),
   linkType: z.enum(['COURSE', 'TEST', 'NONE']).default('NONE'),
   linkId: z.string().nullable().optional(),
-  price: z.preprocess((val) => (val === '' || val === null || val === undefined ? null : Number(val)), z.number().min(0).nullable().optional()),
-  offerPrice: z.preprocess((val) => (val === '' || val === null || val === undefined ? null : Number(val)), z.number().min(0).nullable().optional()),
+  price: z.preprocess(parseOptionalNumber, z.number().min(0).nullable().optional()),
+  offerPrice: z.preprocess(parseOptionalNumber, z.number().min(0).nullable().optional()),
   offerValidUntil: z.string().nullable().optional(),
   planDescription: z.string().nullable().optional(),
-  validityDays: z.preprocess((val) => (val === '' || val === null || val === undefined ? null : Number(val)), z.number().int().min(0).nullable().optional()),
-  curriculumJson: z.string().nullable().optional(),
-  order: z.number().int().min(0, 'Order must be 0 or greater'),
+  validityDays: z.preprocess(parseOptionalNumber, z.number().int().min(0).nullable().optional()),
+  curriculumJson: z.preprocess((val) => {
+    if (!val) return null;
+    if (typeof val === 'string') return val;
+    try {
+      return JSON.stringify(val);
+    } catch {
+      return null;
+    }
+  }, z.string().nullable().optional()),
+  order: z.preprocess((val) => {
+    if (val === '' || val === null || val === undefined) return 0;
+    const num = Number(val);
+    return Number.isNaN(num) ? 0 : num;
+  }, z.number().int().min(0, 'Order must be 0 or greater')),
   isActive: z.boolean(),
 });
 
@@ -126,6 +145,7 @@ export default function BannerModal({
   };
 
   useEffect(() => {
+    console.log('[BannerModal] Modal state:', { isOpen, editingBannerId: editingBanner?.id, defaultOrder });
     if (isOpen) {
       setSelectedFile(null);
       setPreviewUrl(null);
@@ -133,16 +153,30 @@ export default function BannerModal({
 
       if (editingBanner) {
         let curriculumList: string[] = [''];
+        let stringifiedCurriculum = '';
+
         if (editingBanner.curriculumJson) {
-          try {
-            const parsed = JSON.parse(editingBanner.curriculumJson);
-            if (Array.isArray(parsed)) {
-              curriculumList = parsed.map((c: any) => typeof c === 'string' ? c : (c.title || ''));
+          let parsed: any = editingBanner.curriculumJson;
+          if (typeof parsed === 'string') {
+            stringifiedCurriculum = parsed;
+            try {
+              parsed = JSON.parse(parsed);
+            } catch (e) {
+              console.warn('[BannerModal] Could not parse curriculumJson string:', e);
             }
-          } catch (e) {
-            console.error(e);
+          } else {
+            try {
+              stringifiedCurriculum = JSON.stringify(parsed);
+            } catch (e) {
+              console.warn('[BannerModal] Could not stringify curriculumJson object:', e);
+            }
+          }
+
+          if (Array.isArray(parsed)) {
+            curriculumList = parsed.map((c: any) => typeof c === 'string' ? c : (c?.title || ''));
           }
         }
+
         setCurriculumItems(curriculumList.length > 0 ? curriculumList : ['']);
 
         reset({
@@ -156,7 +190,7 @@ export default function BannerModal({
           offerValidUntil: editingBanner.offerValidUntil ? new Date(editingBanner.offerValidUntil).toISOString().slice(0, 16) : '',
           planDescription: editingBanner.planDescription || '',
           validityDays: editingBanner.validityDays !== null && editingBanner.validityDays !== undefined ? Number(editingBanner.validityDays) : null,
-          curriculumJson: editingBanner.curriculumJson || '',
+          curriculumJson: stringifiedCurriculum,
           order: editingBanner.order,
           isActive: editingBanner.isActive,
         });
@@ -188,16 +222,35 @@ export default function BannerModal({
   }, [isOpen, editingBanner, defaultOrder, reset]);
 
   const handleFormSubmit = async (values: BannerFormValues) => {
+    console.log('[BannerModal] 🚀 handleFormSubmit triggered!', { values, selectedFile: selectedFile?.name });
     if (!values.imageUrl && !selectedFile) {
+      console.warn('[BannerModal] ⚠️ Validation error: No image provided!');
       setFileError('Please upload an image from local device');
       return;
     }
-    const filteredCurriculum = curriculumItems.filter(item => item.trim() !== '');
-    const curriculumJson = JSON.stringify(filteredCurriculum.map(title => ({ title })));
-    await onSubmit({
+    const isNone = values.linkType === 'NONE';
+    const filteredCurriculum = isNone ? [] : curriculumItems.filter(item => item.trim() !== '');
+    const curriculumJson = filteredCurriculum.length > 0
+      ? JSON.stringify(filteredCurriculum.map(title => ({ title })))
+      : null;
+
+    const payload = {
       ...values,
+      linkId: isNone ? null : (values.linkId || null),
+      linkUrl: isNone ? null : (values.linkUrl || null),
+      price: isNone ? null : values.price,
+      offerPrice: isNone ? null : values.offerPrice,
+      offerValidUntil: isNone ? null : (values.offerValidUntil || null),
+      planDescription: isNone ? null : (values.planDescription || null),
+      validityDays: isNone ? null : values.validityDays,
       curriculumJson,
-    }, selectedFile);
+    };
+    console.log('[BannerModal] Calling onSubmit with payload:', payload, 'File:', selectedFile);
+    await onSubmit(payload, selectedFile);
+  };
+
+  const handleFormInvalid = (errs: any) => {
+    console.error('[BannerModal] ❌ Zod Form Validation Failed!', errs);
   };
 
   if (!isOpen) return null;
@@ -215,7 +268,7 @@ export default function BannerModal({
             </p>
           </div>
 
-          <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(handleFormSubmit, handleFormInvalid)} className="space-y-4">
             {/* Title */}
             <div className="space-y-1.5">
               <label className="block text-[10px] font-black text-text-primary uppercase tracking-wider">
@@ -556,6 +609,7 @@ export default function BannerModal({
               </button>
               <button
                 type="submit"
+                onClick={() => console.log('[BannerModal] 🖱️ Submit button clicked! isSubmitting:', isSubmitting, 'errors:', errors)}
                 disabled={isSubmitting}
                 className="flex items-center justify-center space-x-2 px-6 py-2.5 bg-accent hover:bg-accent-onContainer text-white rounded-xl text-xs font-black shadow-md shadow-accent/15 disabled:opacity-50"
               >
