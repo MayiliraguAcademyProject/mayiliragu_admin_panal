@@ -467,6 +467,8 @@ export interface Book {
   priceSoftCopy?: number | null;
   stockHardCopy: number;
   pdfUrl?: string | null;
+  samplePdfUrl?: string | null;
+  samplePages?: string[];
   categoryId: string;
   isActive: boolean;
   isDeleted: boolean;

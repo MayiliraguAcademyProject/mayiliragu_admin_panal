@@ -29,6 +29,7 @@ const AppConfigPage = React.lazy(() => import('../../modules/app-config/pages/Ap
 const LiveStreamsPage = React.lazy(() => import('../../modules/app-config/pages/LiveStreamsPage'));
 const TestimonialsPage = React.lazy(() => import('../../modules/app-config/pages/TestimonialsPage'));
 const ExamUpdatesPage = React.lazy(() => import('../../modules/app-config/pages/ExamUpdatesPage'));
+const GuestLeadsPage = React.lazy(() => import('../../modules/guest-leads/pages/GuestLeadsPage'));
 
 
 // Loading fallback component
@@ -100,6 +101,14 @@ export const router = createBrowserRouter([
         element: (
           <React.Suspense fallback={<SuspenseFallback />}>
             <CourseRequestsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'guest-leads',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <GuestLeadsPage />
           </React.Suspense>
         ),
       },
