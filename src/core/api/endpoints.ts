@@ -1401,7 +1401,8 @@ export function useCreateBook() {
       stockHardCopy,
       categoryId,
       thumbnail,
-      pdf,
+      samplePdf,
+      samplePages,
     }: {
       title: string;
       description?: string;
@@ -1412,7 +1413,8 @@ export function useCreateBook() {
       stockHardCopy?: number;
       categoryId: string;
       thumbnail?: File;
-      pdf?: File;
+      samplePdf?: File;
+      samplePages?: File[];
     }) => {
       const formData = new FormData();
       formData.append('title', title);
@@ -1424,7 +1426,10 @@ export function useCreateBook() {
       if (stockHardCopy !== undefined) formData.append('stockHardCopy', String(stockHardCopy));
       formData.append('categoryId', categoryId);
       if (thumbnail) formData.append('thumbnail', thumbnail);
-      if (pdf) formData.append('pdf', pdf);
+      if (samplePdf) formData.append('samplePdf', samplePdf);
+      if (samplePages && samplePages.length > 0) {
+        samplePages.forEach((page) => formData.append('samplePages', page));
+      }
 
       const response = await apiClient.post(ApiConstants.books.adminBooks, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -1452,7 +1457,10 @@ export function useUpdateBook() {
       categoryId,
       isActive,
       thumbnail,
-      pdf,
+      samplePdf,
+      samplePages,
+      removeSamplePdf,
+      existingSamplePages,
     }: {
       id: string;
       title?: string;
@@ -1465,7 +1473,10 @@ export function useUpdateBook() {
       categoryId?: string;
       isActive?: boolean;
       thumbnail?: File;
-      pdf?: File;
+      samplePdf?: File;
+      samplePages?: File[];
+      removeSamplePdf?: boolean;
+      existingSamplePages?: string[];
     }) => {
       const formData = new FormData();
       if (title) formData.append('title', title);
@@ -1478,7 +1489,12 @@ export function useUpdateBook() {
       if (categoryId) formData.append('categoryId', categoryId);
       if (isActive !== undefined) formData.append('isActive', String(isActive));
       if (thumbnail) formData.append('thumbnail', thumbnail);
-      if (pdf) formData.append('pdf', pdf);
+      if (samplePdf) formData.append('samplePdf', samplePdf);
+      if (removeSamplePdf) formData.append('removeSamplePdf', 'true');
+      if (existingSamplePages) formData.append('existingSamplePages', JSON.stringify(existingSamplePages));
+      if (samplePages && samplePages.length > 0) {
+        samplePages.forEach((page) => formData.append('samplePages', page));
+      }
 
       const response = await apiClient.put(`${ApiConstants.books.adminBooks}/${id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
