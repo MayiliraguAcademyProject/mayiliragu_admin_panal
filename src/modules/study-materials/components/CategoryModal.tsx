@@ -1,14 +1,17 @@
-import { X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 
 interface CategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (values: any) => void;
   form: any;
+  isLoading?: boolean;
 }
 
-export default function CategoryModal({ isOpen, onClose, onSubmit, form }: CategoryModalProps) {
+export default function CategoryModal({ isOpen, onClose, onSubmit, form, isLoading = false }: CategoryModalProps) {
   if (!isOpen) return null;
+
+  const isSubmitting = form.formState.isSubmitting || isLoading;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -61,10 +64,17 @@ export default function CategoryModal({ isOpen, onClose, onSubmit, form }: Categ
               </button>
               <button
                 type="submit"
-                disabled={form.formState.isSubmitting}
-                className="px-6 py-2.5 bg-accent hover:bg-accent-onContainer text-white rounded-xl text-xs font-black shadow-md disabled:opacity-55"
+                disabled={isSubmitting}
+                className="px-6 py-2.5 bg-accent hover:bg-accent-onContainer text-white rounded-xl text-xs font-black shadow-md disabled:opacity-55 flex items-center space-x-2"
               >
-                Create Category
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Creating...</span>
+                  </>
+                ) : (
+                  <span>Create Category</span>
+                )}
               </button>
             </div>
           </form>

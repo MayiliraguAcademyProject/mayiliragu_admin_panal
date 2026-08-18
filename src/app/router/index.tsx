@@ -22,8 +22,15 @@ const PerformanceAnalyticsPage = React.lazy(() => import('../../modules/performa
 const BookStorePage = React.lazy(() => import('../../modules/book-store/pages/BookStorePage'));
 const VideoDownloadsPage = React.lazy(() => import('../../modules/downloads/pages/VideoDownloadsPage'));
 const NotificationsPage = React.lazy(() => import('../../modules/notifications/pages/NotificationsPage'));
-const AppConfigPage = React.lazy(() => import('../../modules/app-config/pages/AppConfigPage'));
 const CourseRequestsPage = React.lazy(() => import('../../modules/enrollments/pages/CourseRequestsPage'));
+const PaymentSettingsPage = React.lazy(() => import('../../modules/payment-settings/pages/PaymentSettingsPage'));
+const PaymentRequestsPage = React.lazy(() => import('../../modules/payment-requests/pages/PaymentRequestsPage'));
+const AppConfigPage = React.lazy(() => import('../../modules/app-config/pages/AppConfigPage'));
+const LiveStreamsPage = React.lazy(() => import('../../modules/app-config/pages/LiveStreamsPage'));
+const TestimonialsPage = React.lazy(() => import('../../modules/app-config/pages/TestimonialsPage'));
+const ExamUpdatesPage = React.lazy(() => import('../../modules/app-config/pages/ExamUpdatesPage'));
+const GuestLeadsPage = React.lazy(() => import('../../modules/guest-leads/pages/GuestLeadsPage'));
+
 
 // Loading fallback component
 const SuspenseFallback = () => (
@@ -98,6 +105,30 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'guest-leads',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <GuestLeadsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'payment-settings',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <PaymentSettingsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'payment-requests',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <PaymentRequestsPage />
+          </React.Suspense>
+        ),
+      },
+      {
         path: 'tests',
         element: (
           <React.Suspense fallback={<SuspenseFallback />}>
@@ -166,6 +197,30 @@ export const router = createBrowserRouter([
         element: (
           <React.Suspense fallback={<SuspenseFallback />}>
             <AppConfigPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'live-streams',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <LiveStreamsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'testimonials',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <TestimonialsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'exam-updates',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <ExamUpdatesPage />
           </React.Suspense>
         ),
       },

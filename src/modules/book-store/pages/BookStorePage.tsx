@@ -15,7 +15,10 @@ import {
   Mail,
   Phone,
   MapPin,
-  X
+  X,
+  FileText,
+  Image as ImageIcon,
+  ExternalLink,
 } from 'lucide-react';
 import {
   useStudyCategoriesList,
@@ -33,6 +36,10 @@ import {
 } from '../../../core/api/endpoints';
 import type { Book } from '../../../core/types';
 import { ApiConstants } from '../../../core/constants/api_constants';
+import RefreshButton from '../../../shared/components/RefreshButton';
+import ConfirmModal from '../../../shared/components/ConfirmModal';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 // Validation Schemas
 const bookSchema = z.object({
@@ -41,7 +48,7 @@ const bookSchema = z.object({
   author: z.string().min(1, 'Author is required'),
   publisher: z.string().optional(),
   priceHardCopy: z.coerce.number().min(0).optional(),
-  priceSoftCopy: z.coerce.number().min(0).optional(),
+  // priceSoftCopy: z.coerce.number().min(0).optional(),
   stockHardCopy: z.coerce.number().min(0).default(0),
   categoryId: z.string().min(1, 'Category is required'),
   isActive: z.boolean().default(true),
@@ -60,6 +67,7 @@ const couponSchema = z.object({
 });
 
 export default function BookStorePage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'books' | 'coupons' | 'orders' | 'settings'>('books');
 
   // Modals state
@@ -67,30 +75,44 @@ export default function BookStorePage() {
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [samplePdfFile, setSamplePdfFile] = useState<File | null>(null);
+  const [samplePagesFiles, setSamplePagesFiles] = useState<File[]>([]);
+  const [existingSamplePages, setExistingSamplePages] = useState<string[]>([]);
+  const [removeSamplePdf, setRemoveSamplePdf] = useState(false);
   const [selectedQrFile, setSelectedQrFile] = useState<File | null>(null);
   const [activeScreenshotUrl, setActiveScreenshotUrl] = useState<string | null>(null);
+  const [bookToDelete, setBookToDelete] = useState<string | null>(null);
 
   // API hooks
-  const { data: categoriesData } = useStudyCategoriesList();
+  const { data: categoriesData, refetch: refetchCategories, isRefetching: isRefetchingCategories } = useStudyCategoriesList();
   const categories = categoriesData?.data || [];
 
-  const { data: booksData, isLoading: isBooksLoading } = useAdminBooksList();
+  const { data: booksData, isLoading: isBooksLoading, refetch: refetchBooks, isRefetching: isRefetchingBooks } = useAdminBooksList();
   const books = booksData?.data || [];
 
   const createBookMutation = useCreateBook();
   const updateBookMutation = useUpdateBook();
   const deleteBookMutation = useDeleteBook();
 
-  const { data: couponsData, isLoading: isCouponsLoading } = useCouponsList();
+  const { data: couponsData, isLoading: isCouponsLoading, refetch: refetchCoupons, isRefetching: isRefetchingCoupons } = useCouponsList();
   const coupons = couponsData?.data || [];
   const createCouponMutation = useCreateCoupon();
 
-  const { data: ordersData, isLoading: isOrdersLoading } = useAdminOrdersList();
+  const { data: ordersData, isLoading: isOrdersLoading, refetch: refetchOrders, isRefetching: isRefetchingOrders } = useAdminOrdersList();
   const orders = ordersData?.data || [];
 
-  const { data: qrData, isLoading: isQrLoading } = usePaymentQr();
+  const { data: qrData, isLoading: isQrLoading, refetch: refetchQr, isRefetching: isRefetchingQr } = usePaymentQr();
   const updateQrMutation = useUpdatePaymentQr();
+
+  const isRefetching = isRefetchingCategories || isRefetchingBooks || isRefetchingCoupons || isRefetchingOrders || isRefetchingQr;
+
+  const handleRefreshAll = () => {
+    refetchCategories();
+    refetchBooks();
+    refetchCoupons();
+    refetchOrders();
+    refetchQr();
+  };
 
   const updateOrderStatusMutation = useUpdateOrderStatus();
   const updateOrderPaymentMutation = useUpdateOrderPaymentStatus();
@@ -114,14 +136,16 @@ export default function BookStorePage() {
       author: '',
       publisher: '',
       priceHardCopy: undefined,
-      priceSoftCopy: undefined,
       stockHardCopy: 0,
       categoryId: '',
       isActive: true,
     });
     setEditingBook(null);
     setThumbnailFile(null);
-    setPdfFile(null);
+    setSamplePdfFile(null);
+    setSamplePagesFiles([]);
+    setExistingSamplePages([]);
+    setRemoveSamplePdf(false);
     setIsBookModalOpen(true);
   };
 
@@ -132,46 +156,57 @@ export default function BookStorePage() {
       author: book.author || '',
       publisher: book.publisher || '',
       priceHardCopy: book.priceHardCopy ?? undefined,
-      priceSoftCopy: book.priceSoftCopy ?? undefined,
       stockHardCopy: book.stockHardCopy,
       categoryId: book.categoryId,
       isActive: book.isActive,
     });
     setEditingBook(book);
     setThumbnailFile(null);
-    setPdfFile(null);
+    setSamplePdfFile(null);
+    setSamplePagesFiles([]);
+    setExistingSamplePages(book.samplePages || []);
+    setRemoveSamplePdf(false);
     setIsBookModalOpen(true);
   };
 
   const onBookSubmit = async (values: z.infer<typeof bookSchema>) => {
     try {
       if (editingBook) {
-        await updateBookMutation.mutateAsync({
+        const res = await updateBookMutation.mutateAsync({
           id: editingBook.id,
           ...values,
           thumbnail: thumbnailFile || undefined,
-          pdf: pdfFile || undefined,
+          samplePdf: samplePdfFile || undefined,
+          samplePages: samplePagesFiles.length > 0 ? samplePagesFiles : undefined,
+          existingSamplePages,
+          removeSamplePdf,
         });
+        toast.success(res?.message || 'Book updated successfully!');
       } else {
-        await createBookMutation.mutateAsync({
+        const res = await createBookMutation.mutateAsync({
           ...values,
           thumbnail: thumbnailFile || undefined,
-          pdf: pdfFile || undefined,
+          samplePdf: samplePdfFile || undefined,
+          samplePages: samplePagesFiles.length > 0 ? samplePagesFiles : undefined,
         });
+        toast.success(res?.message || 'Book created successfully!');
       }
       setIsBookModalOpen(false);
       bookForm.reset();
     } catch (err) {
-      console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
-  const handleDeleteBook = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this book?')) {
+  const handleDeleteBookConfirm = async () => {
+    if (bookToDelete) {
       try {
-        await deleteBookMutation.mutateAsync(id);
+        const res = await deleteBookMutation.mutateAsync(bookToDelete);
+        toast.success(res?.message || 'Book deleted successfully!');
       } catch (err) {
-        console.error(err);
+        toast.error(extractErrorMessage(err));
+      } finally {
+        setBookToDelete(null);
       }
     }
   };
@@ -179,32 +214,35 @@ export default function BookStorePage() {
   // Coupon Handlers
   const onCouponSubmit = async (values: z.infer<typeof couponSchema>) => {
     try {
-      await createCouponMutation.mutateAsync({
+      const res = await createCouponMutation.mutateAsync({
         ...values,
         startDate: new Date(values.startDate).toISOString(),
         endDate: new Date(values.endDate).toISOString(),
       });
+      toast.success(res?.message || 'Coupon created successfully!');
       setIsCouponModalOpen(false);
       couponForm.reset();
     } catch (err) {
-      console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
   // Order Handlers
   const handleUpdateOrderStatus = async (orderId: string, status: string) => {
     try {
-      await updateOrderStatusMutation.mutateAsync({ id: orderId, orderStatus: status });
+      const res = await updateOrderStatusMutation.mutateAsync({ id: orderId, orderStatus: status });
+      toast.success(res?.message || 'Order status updated!');
     } catch (err) {
-      console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
   const handleUpdatePaymentStatus = async (orderId: string, status: string) => {
     try {
-      await updateOrderPaymentMutation.mutateAsync({ id: orderId, paymentStatus: status });
+      const res = await updateOrderPaymentMutation.mutateAsync({ id: orderId, paymentStatus: status });
+      toast.success(res?.message || 'Payment status updated!');
     } catch (err) {
-      console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -212,25 +250,27 @@ export default function BookStorePage() {
     e.preventDefault();
     if (!selectedQrFile) return;
     try {
-      await updateQrMutation.mutateAsync(selectedQrFile);
+      const res = await updateQrMutation.mutateAsync(selectedQrFile);
       setSelectedQrFile(null);
-      alert('Payment QR Code updated successfully!');
+      toast.success(res?.data?.message || 'Payment QR Code updated successfully!');
     } catch (error) {
-      console.error(error);
-      alert('Failed to update QR Code');
+      toast.error(extractErrorMessage(error));
     }
   };
 
   return (
     <div className="p-6 sm:p-8 space-y-8 animate-fade-in text-text-primary">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-          <Sparkles className="w-6 h-6 text-accent" /> Book Store Control Center
-        </h1>
-        <p className="text-xs text-text-secondary mt-1 font-semibold">
-          Manage hard/soft copy study book listings, set price structures, customize checkout coupons, and process incoming COD orders.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-accent" /> Book Store Control Center
+          </h1>
+          <p className="text-xs text-text-secondary mt-1 font-semibold">
+            Manage hard/soft copy study book listings, set price structures, customize checkout coupons, and process incoming COD orders.
+          </p>
+        </div>
+        <RefreshButton onRefresh={handleRefreshAll} isRefetching={isRefetching} />
       </div>
 
       {/* Tabs */}
@@ -326,12 +366,14 @@ export default function BookStorePage() {
                             {book.priceHardCopy ? `₹${book.priceHardCopy}` : 'N/A'} (Stock: {book.stockHardCopy})
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-text-secondary">Soft Copy:</span>
-                          <span className="font-extrabold text-slate-800">
-                            {book.priceSoftCopy ? `₹${book.priceSoftCopy}` : 'N/A'} {book.pdfUrl ? '✓ PDF' : '✖ File'}
-                          </span>
-                        </div>
+                        {((book.samplePages && book.samplePages.length > 0) || book.samplePdfUrl) && (
+                          <div className="flex items-center gap-1 text-[10px] text-accent font-bold pt-1">
+                            <BookOpen className="w-3 h-3" />
+                            <span>
+                              Sample: {book.samplePages?.length ? `${book.samplePages.length} Pages` : 'PDF Excerpt'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -348,7 +390,7 @@ export default function BookStorePage() {
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDeleteBook(book.id)}
+                        onClick={() => setBookToDelete(book.id)}
                         className="p-2 bg-slate-100 hover:bg-red-50 text-red-650 rounded-xl transition-all"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -788,6 +830,7 @@ export default function BookStorePage() {
                   />
                 </div>
 
+                {/*
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-text-secondary">Soft Copy Price (₹)</label>
                   <input
@@ -798,9 +841,10 @@ export default function BookStorePage() {
                     placeholder="Digital book price"
                   />
                 </div>
+                */}
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-text-secondary">Cover Thumbnail</label>
+                  <label className="text-xs font-bold text-text-secondary">Cover Thumbnail (Cover Image)</label>
                   <input
                     type="file"
                     accept="image/*"
@@ -810,16 +854,115 @@ export default function BookStorePage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-text-secondary">Digital PDF Document</label>
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                    className="w-full text-xs border border-border/80 rounded-xl p-2 bg-slate-50 outline-none"
-                  />
+                  <label className="text-xs font-bold text-text-secondary">Sample PDF Excerpt (.pdf)</label>
+                  {editingBook?.samplePdfUrl && !removeSamplePdf ? (
+                    <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs">
+                      <div className="flex items-center gap-2 text-blue-900 font-bold truncate">
+                        <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <span className="truncate">Sample PDF Attached</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={editingBook.samplePdfUrl.startsWith('http') ? editingBook.samplePdfUrl : ApiConstants.getAssetUrl(editingBook.samplePdfUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-accent hover:underline text-[11px] font-extrabold flex items-center gap-0.5"
+                        >
+                          View <ExternalLink className="w-3 h-3" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setRemoveSamplePdf(true)}
+                          className="px-2 py-0.5 bg-red-100 text-red-700 hover:bg-red-200 rounded text-[10px] font-bold"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      onChange={(e) => {
+                        setSamplePdfFile(e.target.files?.[0] || null);
+                        setRemoveSamplePdf(false);
+                      }}
+                      className="w-full text-xs border border-border/80 rounded-xl p-2 bg-slate-50 outline-none"
+                    />
+                  )}
                 </div>
 
-                <div className="flex items-center space-x-2 pt-6">
+                {/* Sample Page Images Section */}
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-bold text-text-secondary flex justify-between items-center">
+                    <span>Sample Preview Page Images (Multi-page Look Inside)</span>
+                    <span className="text-[10px] text-text-secondary font-normal">Max 10 images</span>
+                  </label>
+
+                  {/* Existing Sample Pages */}
+                  {existingSamplePages.length > 0 && (
+                    <div className="space-y-1 bg-slate-50 border border-border/60 rounded-xl p-3">
+                      <p className="text-[11px] font-bold text-text-secondary">Current Sample Pages:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {existingSamplePages.map((url, idx) => (
+                          <div key={idx} className="relative group w-16 h-20 rounded-lg overflow-hidden border border-border/60 bg-slate-100">
+                            <img
+                              src={url.startsWith('http') ? url : ApiConstants.getAssetUrl(url)}
+                              alt={`Sample page ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={() => setExistingSamplePages((prev) => prev.filter((_, i) => i !== idx))}
+                                className="p-1 bg-red-600 text-white rounded-full hover:bg-red-700 shadow"
+                                title="Delete sample page"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[8px] font-bold text-center py-0.5">
+                              P.{idx + 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        const newFiles = Array.from(e.target.files);
+                        setSamplePagesFiles((prev) => [...prev, ...newFiles].slice(0, 10));
+                      }
+                    }}
+                    className="w-full text-xs border border-border/80 rounded-xl p-2 bg-slate-50 outline-none"
+                  />
+
+                  {samplePagesFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {samplePagesFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center gap-1 bg-accent/10 text-accent px-2.5 py-1 rounded-lg text-xs font-bold">
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span className="max-w-[120px] truncate">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setSamplePagesFiles((prev) => prev.filter((_, i) => i !== idx))}
+                            className="text-red-500 hover:text-red-700 ml-1"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 pt-2 md:col-span-2">
                   <input
                     type="checkbox"
                     id="isActive"
@@ -1017,6 +1160,15 @@ export default function BookStorePage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={bookToDelete !== null}
+        onClose={() => setBookToDelete(null)}
+        onConfirm={handleDeleteBookConfirm}
+        title="Delete Study Book?"
+        message="Are you sure you want to delete this book listing? This action cannot be undone."
+        isLoading={deleteBookMutation.isPending}
+      />
     </div>
   );
 }

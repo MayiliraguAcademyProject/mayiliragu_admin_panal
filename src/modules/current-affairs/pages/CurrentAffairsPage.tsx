@@ -41,6 +41,7 @@ import {
 import type { CurrentAffair, GovernmentScheme, CurrentAffairQuiz, ImportantDate } from '../../../core/types';
 import { ApiConstants } from '../../../core/constants/api_constants';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
+import RefreshButton from '../../../shared/components/RefreshButton';
 
 // Import extracted modals and schemas
 import ArticleModal from '../components/ArticleModal';
@@ -49,8 +50,11 @@ import MagazineModal from '../components/MagazineModal';
 import SchemeModal from '../components/SchemeModal';
 import DateModal from '../components/DateModal';
 import { articleSchema, quizFormSchema, magazineSchema, schemeSchema, dateSchema, quizQuestionSchema } from '../components/schemas';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function CurrentAffairsPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'articles' | 'magazines' | 'schemes' | 'dates' | 'quiz-results'>('articles');
 
   // Quiz Results Tab Filters
@@ -75,7 +79,7 @@ export default function CurrentAffairsPage() {
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
 
   // API Queries & Mutations
-  const { data: articlesData, isLoading: isArticlesLoading, error: articlesError } = useCurrentAffairsAdminList();
+  const { data: articlesData, isLoading: isArticlesLoading, error: articlesError, refetch: refetchArticles, isRefetching: isRefetchingArticles } = useCurrentAffairsAdminList();
   const createArtMutation = useCreateCurrentAffair();
   const updateArtMutation = useUpdateArticleForm();
   const deleteArtMutation = useDeleteCurrentAffair();
@@ -83,22 +87,32 @@ export default function CurrentAffairsPage() {
   const { refetch: refetchQuizzes } = useCurrentAffairQuizzes(quizArticleId || '');
   const saveQuizzesMutation = useCreateCurrentAffairQuizzes();
 
-  const { data: magazinesData, isLoading: isMagazinesLoading } = useMagazinesList();
+  const { data: magazinesData, isLoading: isMagazinesLoading, refetch: refetchMagazines, isRefetching: isRefetchingMagazines } = useMagazinesList();
   const uploadMagMutation = useUploadMagazine();
 
-  const { data: schemesData, isLoading: isSchemesLoading } = useSchemesList();
+  const { data: schemesData, isLoading: isSchemesLoading, refetch: refetchSchemes, isRefetching: isRefetchingSchemes } = useSchemesList();
   const createSchemeMutation = useCreateScheme();
   const updateSchemeMutation = useUpdateScheme();
 
-  const { data: datesData, isLoading: isDatesLoading } = useDatesList();
+  const { data: datesData, isLoading: isDatesLoading, refetch: refetchDates, isRefetching: isRefetchingDates } = useDatesList();
   const createDateMutation = useCreateDate();
 
-  const { data: quizAttemptsData, isLoading: isQuizAttemptsLoading } = useCurrentAffairsQuizAttemptsAdmin({
+  const { data: quizAttemptsData, isLoading: isQuizAttemptsLoading, refetch: refetchAttempts, isRefetching: isRefetchingAttempts } = useCurrentAffairsQuizAttemptsAdmin({
     page: quizAttemptsPage,
     limit: 20,
     search: quizAttemptsSearch,
     isCorrect: quizAttemptsCorrectFilter,
   });
+
+  const isRefetching = isRefetchingArticles || isRefetchingMagazines || isRefetchingSchemes || isRefetchingDates || isRefetchingAttempts;
+
+  const handleRefreshAll = () => {
+    refetchArticles();
+    refetchMagazines();
+    refetchSchemes();
+    refetchDates();
+    refetchAttempts();
+  };
 
   // Helper hook to resolve query updateArtMutation typing issue
   function useUpdateArticleForm() {
@@ -177,23 +191,32 @@ export default function CurrentAffairsPage() {
   const onArticleSubmit = async (values: z.infer<typeof articleSchema>) => {
     try {
       if (editingArticle) {
-        await updateArtMutation.mutateAsync({
+        const res = await updateArtMutation.mutateAsync({
           id: editingArticle.id,
           data: values
         });
+        toast.success(res?.message || 'Article updated successfully!');
       } else {
-        await createArtMutation.mutateAsync(values as unknown as Omit<CurrentAffair, 'id' | 'createdAt' | 'updatedAt'>);
+        const res = await createArtMutation.mutateAsync(values as unknown as Omit<CurrentAffair, 'id' | 'createdAt' | 'updatedAt'>);
+        toast.success(res?.message || 'Article created successfully!');
       }
       setIsArticleModalOpen(false);
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
   const handleDeleteArticleConfirm = async () => {
     if (articleToDelete) {
-      await deleteArtMutation.mutateAsync(articleToDelete);
-      setArticleToDelete(null);
+      try {
+        const res = await deleteArtMutation.mutateAsync(articleToDelete);
+        toast.success(res?.message || 'Article deleted successfully!');
+      } catch (err) {
+        toast.error(extractErrorMessage(err));
+      } finally {
+        setArticleToDelete(null);
+      }
     }
   };
 
@@ -241,13 +264,15 @@ export default function CurrentAffairsPage() {
         explanationEn: q.explanationEn || null,
         explanationTa: q.explanationTa || null,
       }));
-      await saveQuizzesMutation.mutateAsync({
+      const res = await saveQuizzesMutation.mutateAsync({
         articleId: quizArticleId,
         questions: formatted as Omit<CurrentAffairQuiz, 'id' | 'currentAffairId'>[]
       });
+      toast.success(res?.message || 'Quizzes saved successfully!');
       setIsQuizModalOpen(false);
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -255,17 +280,19 @@ export default function CurrentAffairsPage() {
   const onMagazineSubmit = async (values: z.infer<typeof magazineSchema>) => {
     if (!selectedPdfFile) return;
     try {
-      await uploadMagMutation.mutateAsync({
+      const res = await uploadMagMutation.mutateAsync({
         title: values.title,
         month: values.month,
         year: values.year,
         file: selectedPdfFile
       });
+      toast.success(res?.message || 'Magazine uploaded successfully!');
       setIsMagazineModalOpen(false);
       setSelectedPdfFile(null);
       magazineForm.reset();
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -291,16 +318,19 @@ export default function CurrentAffairsPage() {
   const onSchemeSubmit = async (values: z.infer<typeof schemeSchema>) => {
     try {
       if (editingScheme) {
-        await updateSchemeMutation.mutateAsync({
+        const res = await updateSchemeMutation.mutateAsync({
           id: editingScheme.id,
           data: values
         });
+        toast.success(res?.message || 'Scheme updated successfully!');
       } else {
-        await createSchemeMutation.mutateAsync(values as Omit<GovernmentScheme, 'id' | 'createdAt' | 'updatedAt'>);
+        const res = await createSchemeMutation.mutateAsync(values as Omit<GovernmentScheme, 'id' | 'createdAt' | 'updatedAt'>);
+        toast.success(res?.message || 'Scheme created successfully!');
       }
       setIsSchemeModalOpen(false);
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -316,10 +346,12 @@ export default function CurrentAffairsPage() {
 
   const onDateSubmit = async (values: z.infer<typeof dateSchema>) => {
     try {
-      await createDateMutation.mutateAsync(values as Omit<ImportantDate, 'id' | 'createdAt' | 'updatedAt'>);
+      const res = await createDateMutation.mutateAsync(values as Omit<ImportantDate, 'id' | 'createdAt' | 'updatedAt'>);
+      toast.success(res?.message || 'Important date created successfully!');
       setIsDateModalOpen(false);
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -340,6 +372,7 @@ export default function CurrentAffairsPage() {
             Publish daily bilingual current affairs briefs, quizzes, monthly magazines, scheme updates, and calendars.
           </p>
         </div>
+        <RefreshButton onRefresh={handleRefreshAll} isRefetching={isRefetching} />
       </div>
 
       {/* Tabs list */}
@@ -839,6 +872,7 @@ export default function CurrentAffairsPage() {
         title="Delete Current Affairs Article?"
         message="This will hide the article and its associated quiz questions from the student application feed."
         confirmText="Delete Article"
+        isLoading={deleteArtMutation.isPending}
       />
     </div>
   );

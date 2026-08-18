@@ -7,8 +7,11 @@ import { apiClient } from '../../../core/api/client';
 import { GraduationCap, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 import { loginSchema, type LoginFormValues } from '../../../core/validation';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function LoginPage() {
+  const toast = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,9 +42,10 @@ export default function LoginPage() {
       }
 
       login(user as User, accessToken, refreshToken);
+      toast.success('Welcome back, Admin!');
       navigate('/dashboard');
     } catch (err: any) {
-      let msg = err.response?.data?.message || err.message || 'Login failed. Please verify your credentials.';
+      let msg = extractErrorMessage(err) || 'Login failed. Please verify your credentials.';
       if (
         msg.toLowerCase().includes('prisma') ||
         msg.toLowerCase().includes('database') ||
@@ -79,7 +83,7 @@ export default function LoginPage() {
           </p>
 
           {/* Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="w-full mt-8 space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="w-full mt-8 space-y-5">
 
             {/* Error banner */}
             {errorMsg && (

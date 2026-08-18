@@ -14,24 +14,31 @@ import {
   HelpCircle,
   Clock,
   Award,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { useQuestionsList, useExamCategories } from '../../../core/api/endpoints';
 import type { Question, Test } from '../../../core/types';
+import { useToast } from '../../../shared/context';
 
 interface TestBuilderWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => Promise<void>;
   test?: Test;
+  isLoading?: boolean;
 }
 
 export default function TestBuilderWizardModal({
   isOpen,
   onClose,
   onSubmit,
-  test
+  test,
+  isLoading = false,
 }: TestBuilderWizardModalProps) {
+  const toast = useToast();
+  const [internalSubmitting, setInternalSubmitting] = useState(false);
+  const isSubmitting = internalSubmitting || isLoading;
   const [step, setStep] = useState(1);
   const { data: categories = [] } = useExamCategories();
 
@@ -237,22 +244,22 @@ export default function TestBuilderWizardModal({
 
   const handleNext = () => {
     if (step === 1 && !title.trim()) {
-      alert('Test Title is required');
+      toast.error('Test Title is required');
       return;
     }
     if (step === 1 && isSectioned) {
       if (sections.length === 0) {
-        alert('Please define at least one section for a Sectioned Test');
+        toast.error('Please define at least one section for a Sectioned Test');
         return;
       }
       const emptyName = sections.some(s => !s.name.trim());
       if (emptyName) {
-        alert('All sections must have a valid name');
+        toast.error('All sections must have a valid name');
         return;
       }
     }
     if (step === 2 && selectedQuestions.length === 0) {
-      alert('Please select at least one question for this test');
+      toast.error('Please select at least one question for this test');
       return;
     }
     if (step === 2 && isSectioned) {
@@ -263,7 +270,7 @@ export default function TestBuilderWizardModal({
         return count === 0;
       });
       if (emptySection) {
-        alert(`Section "${emptySection.name}" has 0 questions. All sections must have at least one question.`);
+        toast.error(`Section "${emptySection.name}" has 0 questions. All sections must have at least one question.`);
         return;
       }
     }
@@ -310,7 +317,12 @@ export default function TestBuilderWizardModal({
       questions: questionsPayload
     };
 
-    await onSubmit(payload);
+    setInternalSubmitting(true);
+    try {
+      await onSubmit(payload);
+    } finally {
+      setInternalSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -1314,9 +1326,17 @@ export default function TestBuilderWizardModal({
               <button
                 type="button"
                 onClick={handleSave}
-                className="px-5 py-2 bg-accent hover:bg-accent-onContainer text-white text-xs font-bold rounded-xl shadow-md shadow-accent/15 transition-all"
+                disabled={isSubmitting}
+                className="px-5 py-2 bg-accent hover:bg-accent-onContainer text-white text-xs font-bold rounded-xl shadow-md shadow-accent/15 transition-all disabled:opacity-50 flex items-center space-x-2"
               >
-                {test ? 'Save Changes' : 'Create & Publish'}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>{test ? 'Saving...' : 'Creating...'}</span>
+                  </>
+                ) : (
+                  <span>{test ? 'Save Changes' : 'Create & Publish'}</span>
+                )}
               </button>
             )}
           </div>

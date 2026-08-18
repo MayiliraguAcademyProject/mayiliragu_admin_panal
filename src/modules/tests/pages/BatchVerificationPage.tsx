@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Save, X, Trash2, Plus, Sparkles, Check, ChevronRight, ChevronLeft, RefreshCw } from 'lucide-react';
 import { apiClient } from '../../../core/api/endpoints';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 interface ParsedQuestion {
   id: string;
@@ -33,6 +35,7 @@ interface ParsedQuestion {
 }
 
 export default function BatchVerificationPage() {
+  const toast = useToast();
   const { batchId } = useParams<{ batchId: string }>();
   const navigate = useNavigate();
 
@@ -164,8 +167,9 @@ export default function BatchVerificationPage() {
       const updatedList = [...questions];
       updatedList[selectedIdx] = res.data.data;
       setQuestions(updatedList);
+      toast.success(res?.data?.message || 'Draft saved successfully!');
     } catch (err) {
-      alert('Failed to save draft');
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -173,18 +177,19 @@ export default function BatchVerificationPage() {
     if (!currentQuestion) return;
     await handleSaveDraft();
     try {
-      await apiClient.patch(`/questions/parsed-questions/${currentQuestion.id}/approve`);
+      const res = await apiClient.patch(`/questions/parsed-questions/${currentQuestion.id}/approve`);
       // Update local status
       const updatedList = [...questions];
       updatedList[selectedIdx].status = 'APPROVED';
       setQuestions(updatedList);
+      toast.success(res?.data?.message || 'Question approved!');
 
       // Auto advance
       if (selectedIdx < questions.length - 1) {
         handleSelectQuestion(selectedIdx + 1);
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to approve question');
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -194,26 +199,27 @@ export default function BatchVerificationPage() {
     if (reasonNote === null) return;
 
     try {
-      await apiClient.patch(`/questions/parsed-questions/${currentQuestion.id}/reject`, {
+      const res = await apiClient.patch(`/questions/parsed-questions/${currentQuestion.id}/reject`, {
         rejection_note: reasonNote,
       });
       const updatedList = [...questions];
       updatedList[selectedIdx].status = 'REJECTED';
       updatedList[selectedIdx].rejectionNote = reasonNote;
       setQuestions(updatedList);
+      toast.success(res?.data?.message || 'Question rejected!');
     } catch (err) {
-      alert('Failed to reject question');
+      toast.error(extractErrorMessage(err));
     }
   };
 
   const handleBulkApprove = async () => {
-    if (!confirm('Approve all pending questions without warnings?')) return;
+    if (!window.confirm('Approve all pending questions without warnings?')) return;
     try {
       const res = await apiClient.post(`/questions/parsed-batches/${batchId}/approve-all`);
-      alert(`Bulk approval completed. Approved: ${res.data.data.approved}, Skipped: ${res.data.data.skipped}`);
+      toast.success(`Bulk approval completed. Approved: ${res.data.data.approved}, Skipped: ${res.data.data.skipped}`);
       fetchDetails();
     } catch (err) {
-      alert('Bulk approval failed');
+      toast.error(extractErrorMessage(err));
     }
   };
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, X, Copy, Check, Upload, Image as ImageIcon } from 'lucide-react';
+import { Loader2, X, Upload, Image as ImageIcon } from 'lucide-react';
 import { lessonSchema, type LessonFormValues } from '../../../core/validation';
 import type { Lesson } from '../../../core/types';
 
@@ -10,8 +10,9 @@ interface LessonModalProps {
   onClose: () => void;
   onSubmit: (values: LessonFormValues, file?: File | null) => Promise<void>;
   editingLesson: Lesson | null;
-  copiedEmail: boolean;
-  onCopyEmail: () => void;
+  copiedEmail?: boolean;
+  onCopyEmail?: () => void;
+  isLoading?: boolean;
 }
 
 export default function LessonModal({
@@ -19,8 +20,7 @@ export default function LessonModal({
   onClose,
   onSubmit,
   editingLesson,
-  copiedEmail,
-  onCopyEmail,
+  isLoading = false,
 }: LessonModalProps) {
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -30,18 +30,17 @@ export default function LessonModal({
     handleSubmit,
     setValue,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting: isFormSubmitting },
   } = useForm<LessonFormValues>({
     resolver: zodResolver(lessonSchema),
     defaultValues: {
       title: '',
       description: '',
       image: '',
-      driveFileId: '',
-      durationMinutes: 5,
-      downloadEnabled: false,
     },
   });
+
+  const isSubmitting = isFormSubmitting || isLoading;
 
   useEffect(() => {
     if (isOpen) {
@@ -50,18 +49,12 @@ export default function LessonModal({
         setValue('title', editingLesson.title);
         setValue('description', editingLesson.description || '');
         setValue('image', editingLesson.image || '');
-        setValue('driveFileId', editingLesson.driveFileId);
-        setValue('durationMinutes', Math.round(editingLesson.duration / 60));
-        setValue('downloadEnabled', editingLesson.downloadEnabled ?? false);
         setUploadMode(editingLesson.image ? 'url' : 'file');
       } else {
         reset({
           title: '',
           description: '',
           image: '',
-          driveFileId: '',
-          durationMinutes: 5,
-          downloadEnabled: false,
         });
         setUploadMode('file');
       }
@@ -78,15 +71,15 @@ export default function LessonModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <form 
         onSubmit={handleSubmit(onFormSubmit)}
-        className="w-full max-w-3xl bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+        className="w-full max-w-lg bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
       >
         <div className="p-6 border-b border-border/40 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-extrabold text-text-primary tracking-tight">
-              {editingLesson ? 'Edit Lesson Details' : 'Create New Lesson'}
+              {editingLesson ? 'Edit Lesson' : 'Create New Lesson'}
             </h3>
             <p className="text-xs text-text-secondary mt-1">
-              Fill in lesson details, thumbnail image, and Google Drive video ID.
+              Detailed unit (e.g. Fundamental Rights) that will contain video lectures.
             </p>
           </div>
           <button 
@@ -99,46 +92,14 @@ export default function LessonModal({
         </div>
 
         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          {/* Instructions Box */}
-          <div className="bg-[#F4F8FF] border border-[#D0E2FF] rounded-2xl p-4 space-y-2">
-            <h4 className="text-xs font-extrabold text-[#002D70] uppercase tracking-wider flex items-center gap-1.5">
-              Google Drive Streaming Setup
-            </h4>
-            <p className="text-[11px] text-[#002D70]/80 leading-relaxed font-semibold">
-              Before setting a video ID, ensure your Google Drive file is shared with the application service account:
-            </p>
-            <div className="flex items-center justify-between bg-white border border-[#B8D6FF] rounded-xl px-3 py-1.5 mt-2">
-              <span className="text-[10px] text-text-primary font-mono select-all truncate max-w-[80%]">
-                mayiliraguacadamy@mayiliragu-501911.iam.gserviceaccount.com
-              </span>
-              <button
-                type="button"
-                onClick={onCopyEmail}
-                className="flex items-center space-x-1 text-[10px] font-black text-accent hover:text-accent-onContainer flex-shrink-0"
-              >
-                {copiedEmail ? (
-                  <>
-                    <Check className="w-3 h-3 stroke-[3]" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
           {/* Title */}
           <div className="space-y-1.5">
             <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-              Lesson Title
+              Lesson Title <span className="text-error">*</span>
             </label>
             <input
               type="text"
-              placeholder="e.g. Setting up Flutter Environment"
+              placeholder="e.g. Fundamental Rights & Duties"
               {...register('title')}
               disabled={isSubmitting}
               className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
@@ -160,7 +121,7 @@ export default function LessonModal({
             </div>
             <textarea
               rows={3}
-              placeholder="Outline what students will learn in this session (optional)..."
+              placeholder="Outline what students will learn across the videos in this lesson..."
               {...register('description')}
               disabled={isSubmitting}
               className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all resize-none ${
@@ -251,67 +212,6 @@ export default function LessonModal({
                 </div>
               </div>
             )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {/* Drive ID */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                Google Drive Video ID
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 1a2b3c4d5e6f..."
-                {...register('driveFileId')}
-                disabled={isSubmitting}
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
-                  errors.driveFileId ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
-                } text-text-primary bg-slate-50/20`}
-              />
-              {errors.driveFileId && (
-                <p className="text-[11px] text-error font-semibold pl-1">{errors.driveFileId.message}</p>
-              )}
-            </div>
-
-            {/* Duration */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                Duration (Minutes)
-              </label>
-              <input
-                type="number"
-                placeholder="e.g. 15"
-                {...register('durationMinutes', { valueAsNumber: true })}
-                disabled={isSubmitting}
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
-                  errors.durationMinutes ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
-                } text-text-primary bg-slate-50/20`}
-              />
-              {errors.durationMinutes && (
-                <p className="text-[11px] text-error font-semibold pl-1">{errors.durationMinutes.message}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Download Toggle */}
-          <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-border/60 rounded-2xl">
-            <div className="space-y-0.5">
-              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                Enable Offline Download
-              </label>
-              <p className="text-[10px] text-text-secondary font-medium">
-                Allows students to download this lesson and watch it offline.
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                {...register('downloadEnabled')}
-                disabled={isSubmitting}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
-            </label>
           </div>
         </div>
 
