@@ -25,12 +25,26 @@ export const ApiConstants = {
     reorder: '/modules/reorder',
     swap: '/modules/sort/swap',
   },
+  topics: {
+    base: '/topics',
+    detail: (topicId: string) => `/topics/${topicId}`,
+    byModule: (moduleId: string) => `/modules/${moduleId}/topics`,
+    reorder: (moduleId: string) => `/modules/${moduleId}/topics/reorder`,
+  },
   lessons: {
     base: '/lessons',
     detail: (lessonId: string) => `/lessons/${lessonId}`,
+    byTopic: (topicId: string) => `/topics/${topicId}/lessons`,
     reorder: '/lessons/reorder',
+    reorderByTopic: (topicId: string) => `/topics/${topicId}/lessons/reorder`,
     swap: '/lessons/sort/swap',
     downloads: '/lessons/admin/downloads',
+  },
+  videos: {
+    base: '/videos',
+    detail: (videoId: string) => `/videos/${videoId}`,
+    byLesson: (lessonId: string) => `/lessons/${lessonId}/videos`,
+    reorder: (lessonId: string) => `/lessons/${lessonId}/videos/reorder`,
   },
   students: {
     base: '/enrollments/students',

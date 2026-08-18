@@ -7,9 +7,9 @@ export interface User {
   role: Role;
 }
 
-export interface Lesson {
+export interface LessonVideo {
   id: string;
-  moduleId: string;
+  lessonId: string;
   title: string;
   description?: string | null;
   image?: string | null;
@@ -21,12 +21,41 @@ export interface Lesson {
   updatedAt: string;
 }
 
+export interface Lesson {
+  id: string;
+  topicId?: string;
+  moduleId?: string;
+  title: string;
+  description?: string | null;
+  image?: string | null;
+  order: number;
+  videos?: LessonVideo[];
+  // Backward compatibility
+  driveFileId?: string;
+  duration?: number;
+  downloadEnabled?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Topic {
+  id: string;
+  moduleId: string;
+  title: string;
+  description?: string | null;
+  order: number;
+  lessons?: Lesson[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Module {
   id: string;
   courseId: string;
   title: string;
   order: number;
-  lessons: Lesson[];
+  topics?: Topic[];
+  lessons?: Lesson[]; // backward compatibility
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +68,7 @@ export interface Course {
   lockMode?: 'free' | 'sequential';
   isDemo?: boolean;
   totalLessons?: number;
+  totalVideos?: number;
   modules?: Module[];
   createdAt: string;
   updatedAt: string;
