@@ -395,11 +395,11 @@ export default function BannerModal({
                 <select
                   {...register('linkType')}
                   disabled={isSubmitting}
-                  className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+                  className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-cardBg"
                 >
-                  <option value="NONE">None (No Action)</option>
-                  <option value="COURSE">Course Detail</option>
-                  <option value="TEST">Test Batch Detail</option>
+                  <option value="NONE" className="bg-cardBg text-text-primary">None (No Action)</option>
+                  <option value="COURSE" className="bg-cardBg text-text-primary">Course Detail</option>
+                  <option value="TEST" className="bg-cardBg text-text-primary">Test Batch Detail</option>
                 </select>
               </div>
 
@@ -411,18 +411,18 @@ export default function BannerModal({
                   <select
                     {...register('linkId')}
                     disabled={isSubmitting}
-                    className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+                    className="w-full px-4 py-2.5 rounded-xl border text-xs font-semibold outline-none border-border focus:ring-accent focus:border-accent text-text-primary bg-cardBg"
                   >
-                    <option value="">Select an item...</option>
+                    <option value="" className="bg-cardBg text-text-primary">Select an item...</option>
                     {watchLinkType === 'COURSE' &&
                       coursesData?.data?.map((course: any) => (
-                        <option key={course.id} value={course.id}>
+                        <option key={course.id} value={course.id} className="bg-cardBg text-text-primary">
                           {course.title}
                         </option>
                       ))}
                     {watchLinkType === 'TEST' &&
                       testsData?.map((test: any) => (
-                        <option key={test.id} value={test.id}>
+                        <option key={test.id} value={test.id} className="bg-cardBg text-text-primary">
                           {test.title}
                         </option>
                       ))}
