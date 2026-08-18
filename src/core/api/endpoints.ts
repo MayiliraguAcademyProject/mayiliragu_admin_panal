@@ -238,27 +238,80 @@ export function useDeleteModule(courseId: string) {
 }
 
 // ==========================================
+// COURSE TOPICS HOOKS
+// ==========================================
+
+export function useCreateCourseTopic(courseId: string, moduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { title: string; description?: string; order?: number }) => {
+      const response = await apiClient.post(ApiConstants.topics.byModule(moduleId), data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useUpdateCourseTopic(courseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { title?: string; description?: string; order?: number } }) => {
+      const response = await apiClient.patch(ApiConstants.topics.detail(id), data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useDeleteCourseTopic(courseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiClient.delete(ApiConstants.topics.detail(id));
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useReorderCourseTopics(courseId: string, moduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const response = await apiClient.put(ApiConstants.topics.reorder(moduleId), { orderedIds });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+// ==========================================
 // LESSONS HOOKS
 // ==========================================
 
-export function useCreateLesson(courseId: string, moduleId: string) {
+export function useCreateLesson(courseId: string, topicId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ data, file }: { data: { title: string; description?: string; image?: string; driveFileId: string; duration: number; order: number; downloadEnabled?: boolean }; file?: File | null }) => {
+    mutationFn: async ({ data, file }: { data: { title: string; description?: string; image?: string; order?: number }; file?: File | null }) => {
       const formData = new FormData();
-      formData.append('moduleId', moduleId);
+      formData.append('topicId', topicId);
       formData.append('title', data.title);
       if (data.description !== undefined) formData.append('description', data.description || '');
       if (data.image !== undefined) formData.append('image', data.image || '');
-      formData.append('driveFileId', data.driveFileId);
-      formData.append('duration', String(data.duration));
-      formData.append('order', String(data.order));
-      if (data.downloadEnabled !== undefined) formData.append('downloadEnabled', String(data.downloadEnabled));
+      if (data.order !== undefined) formData.append('order', String(data.order));
       if (file) {
         formData.append('file', file);
       }
 
-      const response = await apiClient.post(ApiConstants.lessons.base, formData, {
+      const response = await apiClient.post(ApiConstants.lessons.byTopic(topicId), formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       return response.data;
@@ -272,20 +325,17 @@ export function useCreateLesson(courseId: string, moduleId: string) {
 export function useUpdateLesson(courseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data, file }: { id: string; data: { title?: string; description?: string; image?: string; driveFileId?: string; duration?: number; order?: number; downloadEnabled?: boolean }; file?: File | null }) => {
+    mutationFn: async ({ id, data, file }: { id: string; data: { title?: string; description?: string; image?: string; order?: number }; file?: File | null }) => {
       const formData = new FormData();
       if (data.title !== undefined) formData.append('title', data.title);
       if (data.description !== undefined) formData.append('description', data.description || '');
       if (data.image !== undefined) formData.append('image', data.image || '');
-      if (data.driveFileId !== undefined) formData.append('driveFileId', data.driveFileId);
-      if (data.duration !== undefined) formData.append('duration', String(data.duration));
       if (data.order !== undefined) formData.append('order', String(data.order));
-      if (data.downloadEnabled !== undefined) formData.append('downloadEnabled', String(data.downloadEnabled));
       if (file) {
         formData.append('file', file);
       }
 
-      const response = await apiClient.put(ApiConstants.lessons.detail(id), formData, {
+      const response = await apiClient.patch(ApiConstants.lessons.detail(id), formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       return response.data;
@@ -295,6 +345,7 @@ export function useUpdateLesson(courseId: string) {
     },
   });
 }
+
 export function useDeleteLesson(courseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -308,11 +359,15 @@ export function useDeleteLesson(courseId: string) {
   });
 }
 
-export function useReorderModules(courseId: string) {
+export function useReorderLessons(courseId: string, topicId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (items: { id: string; order: number }[]) => {
-      const response = await apiClient.patch(ApiConstants.modules.reorder, { items });
+    mutationFn: async (orderedIds: string[] | { id: string; order: number }[]) => {
+      if (topicId && Array.isArray(orderedIds) && typeof orderedIds[0] === 'string') {
+        const response = await apiClient.put(ApiConstants.lessons.reorderByTopic(topicId), { orderedIds });
+        return response.data;
+      }
+      const response = await apiClient.patch(ApiConstants.lessons.reorder, { items: orderedIds });
       return response.data;
     },
     onSuccess: () => {
@@ -321,11 +376,97 @@ export function useReorderModules(courseId: string) {
   });
 }
 
-export function useReorderLessons(courseId: string) {
+// ==========================================
+// VIDEOS HOOKS
+// ==========================================
+
+export function useCreateVideo(courseId: string, lessonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ data, file }: { data: { title: string; description?: string; image?: string; driveFileId: string; durationMinutes?: number; duration?: number; order?: number; downloadEnabled?: boolean }; file?: File | null }) => {
+      const formData = new FormData();
+      formData.append('title', data.title);
+      formData.append('driveFileId', data.driveFileId);
+      if (data.description !== undefined) formData.append('description', data.description || '');
+      if (data.image !== undefined) formData.append('image', data.image || '');
+      if (data.durationMinutes !== undefined) formData.append('durationMinutes', String(data.durationMinutes));
+      if (data.duration !== undefined) formData.append('duration', String(data.duration));
+      if (data.order !== undefined) formData.append('order', String(data.order));
+      if (data.downloadEnabled !== undefined) formData.append('downloadEnabled', String(data.downloadEnabled));
+      if (file) {
+        formData.append('file', file);
+      }
+
+      const response = await apiClient.post(ApiConstants.videos.byLesson(lessonId), formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useUpdateVideo(courseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data, file }: { id: string; data: { title?: string; description?: string; image?: string; driveFileId?: string; durationMinutes?: number; duration?: number; order?: number; downloadEnabled?: boolean }; file?: File | null }) => {
+      const formData = new FormData();
+      if (data.title !== undefined) formData.append('title', data.title);
+      if (data.description !== undefined) formData.append('description', data.description || '');
+      if (data.image !== undefined) formData.append('image', data.image || '');
+      if (data.driveFileId !== undefined) formData.append('driveFileId', data.driveFileId);
+      if (data.durationMinutes !== undefined) formData.append('durationMinutes', String(data.durationMinutes));
+      if (data.duration !== undefined) formData.append('duration', String(data.duration));
+      if (data.order !== undefined) formData.append('order', String(data.order));
+      if (data.downloadEnabled !== undefined) formData.append('downloadEnabled', String(data.downloadEnabled));
+      if (file) {
+        formData.append('file', file);
+      }
+
+      const response = await apiClient.patch(ApiConstants.videos.detail(id), formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useDeleteVideo(courseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiClient.delete(ApiConstants.videos.detail(id));
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useReorderVideos(courseId: string, lessonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const response = await apiClient.put(ApiConstants.videos.reorder(lessonId), { orderedIds });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['course', courseId] });
+    },
+  });
+}
+
+export function useReorderModules(courseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (items: { id: string; order: number }[]) => {
-      const response = await apiClient.patch(ApiConstants.lessons.reorder, { items });
+      const response = await apiClient.patch(ApiConstants.modules.reorder, { items });
       return response.data;
     },
     onSuccess: () => {

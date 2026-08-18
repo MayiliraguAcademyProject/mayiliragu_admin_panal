@@ -1,27 +1,29 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, X, Upload, Image as ImageIcon } from 'lucide-react';
-import { lessonSchema, type LessonFormValues } from '../../../core/validation';
-import type { Lesson } from '../../../core/types';
+import { Loader2, X, Copy, Check, Upload, Image as ImageIcon } from 'lucide-react';
+import { videoSchema, type VideoFormValues } from '../../../core/validation';
+import type { LessonVideo } from '../../../core/types';
 
-interface LessonModalProps {
+interface VideoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (values: LessonFormValues, file?: File | null) => Promise<void>;
-  editingLesson: Lesson | null;
-  copiedEmail?: boolean;
-  onCopyEmail?: () => void;
+  onSubmit: (values: VideoFormValues, file?: File | null) => Promise<void>;
+  editingVideo: LessonVideo | null;
+  copiedEmail: boolean;
+  onCopyEmail: () => void;
   isLoading?: boolean;
 }
 
-export default function LessonModal({
+export default function VideoModal({
   isOpen,
   onClose,
   onSubmit,
-  editingLesson,
+  editingVideo,
+  copiedEmail,
+  onCopyEmail,
   isLoading = false,
-}: LessonModalProps) {
+}: VideoModalProps) {
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -31,12 +33,15 @@ export default function LessonModal({
     setValue,
     reset,
     formState: { errors, isSubmitting: isFormSubmitting },
-  } = useForm<LessonFormValues>({
-    resolver: zodResolver(lessonSchema),
+  } = useForm<VideoFormValues>({
+    resolver: zodResolver(videoSchema),
     defaultValues: {
       title: '',
       description: '',
       image: '',
+      driveFileId: '',
+      durationMinutes: 5,
+      downloadEnabled: false,
     },
   });
 
@@ -45,23 +50,29 @@ export default function LessonModal({
   useEffect(() => {
     if (isOpen) {
       setSelectedFile(null);
-      if (editingLesson) {
-        setValue('title', editingLesson.title);
-        setValue('description', editingLesson.description || '');
-        setValue('image', editingLesson.image || '');
-        setUploadMode(editingLesson.image ? 'url' : 'file');
+      if (editingVideo) {
+        setValue('title', editingVideo.title);
+        setValue('description', editingVideo.description || '');
+        setValue('image', editingVideo.image || '');
+        setValue('driveFileId', editingVideo.driveFileId);
+        setValue('durationMinutes', Math.round(editingVideo.duration / 60));
+        setValue('downloadEnabled', editingVideo.downloadEnabled ?? false);
+        setUploadMode(editingVideo.image ? 'url' : 'file');
       } else {
         reset({
           title: '',
           description: '',
           image: '',
+          driveFileId: '',
+          durationMinutes: 5,
+          downloadEnabled: false,
         });
         setUploadMode('file');
       }
     }
-  }, [isOpen, editingLesson, setValue, reset]);
+  }, [isOpen, editingVideo, setValue, reset]);
 
-  const onFormSubmit = async (values: LessonFormValues) => {
+  const onFormSubmit = async (values: VideoFormValues) => {
     await onSubmit(values, selectedFile);
   };
 
@@ -71,15 +82,15 @@ export default function LessonModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <form 
         onSubmit={handleSubmit(onFormSubmit)}
-        className="w-full max-w-lg bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+        className="w-full max-w-2xl bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
       >
         <div className="p-6 border-b border-border/40 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-extrabold text-text-primary tracking-tight">
-              {editingLesson ? 'Edit Lesson' : 'Create New Lesson'}
+              {editingVideo ? 'Edit Video' : 'Add Video to Lesson'}
             </h3>
             <p className="text-xs text-text-secondary mt-1">
-              Detailed unit (e.g. Fundamental Rights) that will contain video lectures.
+              Add a video lecture with Google Drive ID and playback duration.
             </p>
           </div>
           <button 
@@ -92,14 +103,46 @@ export default function LessonModal({
         </div>
 
         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* Instructions Box */}
+          <div className="bg-[#F4F8FF] border border-[#D0E2FF] rounded-2xl p-4 space-y-2">
+            <h4 className="text-xs font-extrabold text-[#002D70] uppercase tracking-wider flex items-center gap-1.5">
+              Google Drive Streaming Setup
+            </h4>
+            <p className="text-[11px] text-[#002D70]/80 leading-relaxed font-semibold">
+              Before setting a video ID, ensure your Google Drive file is shared with the application service account:
+            </p>
+            <div className="flex items-center justify-between bg-white border border-[#B8D6FF] rounded-xl px-3 py-1.5 mt-2">
+              <span className="text-[10px] text-text-primary font-mono select-all truncate max-w-[80%]">
+                mayiliraguacadamy@mayiliragu-501911.iam.gserviceaccount.com
+              </span>
+              <button
+                type="button"
+                onClick={onCopyEmail}
+                className="flex items-center space-x-1 text-[10px] font-black text-accent hover:text-accent-onContainer flex-shrink-0"
+              >
+                {copiedEmail ? (
+                  <>
+                    <Check className="w-3 h-3 stroke-[3]" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
           {/* Title */}
           <div className="space-y-1.5">
             <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-              Lesson Title <span className="text-error">*</span>
+              Video Title <span className="text-error">*</span>
             </label>
             <input
               type="text"
-              placeholder="e.g. Fundamental Rights & Duties"
+              placeholder="e.g. Part 1: Historical Background"
               {...register('title')}
               disabled={isSubmitting}
               className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
@@ -115,29 +158,26 @@ export default function LessonModal({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                Description / Summary
+                Description / Notes
               </label>
               <span className="text-[10px] font-bold text-text-secondary uppercase">Optional</span>
             </div>
             <textarea
-              rows={3}
-              placeholder="Outline what students will learn across the videos in this lesson..."
+              rows={2}
+              placeholder="Brief summary of this video session (optional)..."
               {...register('description')}
               disabled={isSubmitting}
               className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all resize-none ${
                 errors.description ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
               } text-text-primary bg-slate-50/20`}
             />
-            {errors.description && (
-              <p className="text-[11px] text-error font-semibold pl-1">{errors.description.message}</p>
-            )}
           </div>
 
-          {/* Lesson Thumbnail Image */}
+          {/* Thumbnail Image */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                Lesson Thumbnail Image
+                Video Thumbnail Image
               </label>
               <span className="text-[10px] font-bold text-text-secondary uppercase">Optional</span>
             </div>
@@ -190,7 +230,7 @@ export default function LessonModal({
                   <div className="text-center space-y-1">
                     <Upload className="w-6 h-6 text-accent mx-auto" />
                     <p className="text-xs font-extrabold text-text-primary">
-                      {selectedFile ? selectedFile.name : (editingLesson?.image ? 'Keep Current Image / Choose New File' : 'Select Lesson Thumbnail Image')}
+                      {selectedFile ? selectedFile.name : (editingVideo?.image ? 'Keep Current Image / Choose New File' : 'Select Video Thumbnail Image')}
                     </p>
                     <p className="text-[10px] text-text-secondary font-semibold">
                       PNG, JPG, WEBP up to 10MB
@@ -204,7 +244,7 @@ export default function LessonModal({
                   <ImageIcon className="w-4 h-4 text-text-secondary absolute left-3.5" />
                   <input
                     type="url"
-                    placeholder="https://example.com/lesson-image.png"
+                    placeholder="https://example.com/video-image.png"
                     {...register('image')}
                     disabled={isSubmitting}
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border text-sm font-medium outline-none focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
@@ -212,6 +252,67 @@ export default function LessonModal({
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Drive ID */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
+                Google Drive Video ID <span className="text-error">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 1a2b3c4d5e6f..."
+                {...register('driveFileId')}
+                disabled={isSubmitting}
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
+                  errors.driveFileId ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
+                } text-text-primary bg-slate-50/20`}
+              />
+              {errors.driveFileId && (
+                <p className="text-[11px] text-error font-semibold pl-1">{errors.driveFileId.message}</p>
+              )}
+            </div>
+
+            {/* Duration */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
+                Duration (Minutes)
+              </label>
+              <input
+                type="number"
+                placeholder="e.g. 15"
+                {...register('durationMinutes', { valueAsNumber: true })}
+                disabled={isSubmitting}
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
+                  errors.durationMinutes ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
+                } text-text-primary bg-slate-50/20`}
+              />
+              {errors.durationMinutes && (
+                <p className="text-[11px] text-error font-semibold pl-1">{errors.durationMinutes.message}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Download Toggle */}
+          <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-border/60 rounded-2xl">
+            <div className="space-y-0.5">
+              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
+                Enable Offline Download
+              </label>
+              <p className="text-[10px] text-text-secondary font-medium">
+                Allows students to download this video and watch it offline.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                {...register('downloadEnabled')}
+                disabled={isSubmitting}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+            </label>
           </div>
         </div>
 
@@ -232,7 +333,7 @@ export default function LessonModal({
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 animate-spin text-white" />
             ) : (
-              <span>{editingLesson ? 'Save Changes' : 'Create Lesson'}</span>
+              <span>{editingVideo ? 'Save Changes' : 'Add Video'}</span>
             )}
           </button>
         </div>

@@ -22,22 +22,39 @@ export type CourseFormValues = z.infer<typeof courseSchema>;
 
 // Module Validation Schema
 export const moduleSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters').max(100),
+  title: z.string().min(1, 'Title is required').max(100),
 });
 
 export type ModuleFormValues = z.infer<typeof moduleSchema>;
 
+// Topic Validation Schema
+export const topicSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(100),
+  description: z.string().optional().or(z.literal('')),
+});
+
+export type TopicFormValues = z.infer<typeof topicSchema>;
+
 // Lesson Validation Schema
 export const lessonSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters').max(100),
+  title: z.string().min(1, 'Title is required').max(100),
+  description: z.string().optional().or(z.literal('')),
+  image: z.string().optional().or(z.literal('')),
+});
+
+export type LessonFormValues = z.infer<typeof lessonSchema>;
+
+// Video Validation Schema
+export const videoSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(200),
   description: z.string().optional().or(z.literal('')),
   image: z.string().optional().or(z.literal('')),
   driveFileId: z.string().min(1, 'Google Drive File ID is required').refine(
     isValidDriveFileId,
     'Enter ONLY the File ID itself, not the full Drive URL'
   ),
-  durationMinutes: z.number().int().positive('Duration must be a positive integer'),
+  durationMinutes: z.number().nonnegative('Duration must be non-negative'),
   downloadEnabled: z.boolean().optional(),
 });
 
-export type LessonFormValues = z.infer<typeof lessonSchema>;
+export type VideoFormValues = z.infer<typeof videoSchema>;
