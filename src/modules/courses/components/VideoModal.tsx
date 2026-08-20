@@ -10,8 +10,8 @@ interface VideoModalProps {
   onClose: () => void;
   onSubmit: (values: VideoFormValues, file?: File | null) => Promise<void>;
   editingVideo: LessonVideo | null;
-  copiedEmail: boolean;
-  onCopyEmail: () => void;
+  copiedEmail?: boolean;
+  onCopyEmail?: () => void;
   isLoading?: boolean;
 }
 
@@ -20,7 +20,7 @@ export default function VideoModal({
   onClose,
   onSubmit,
   editingVideo,
-  copiedEmail,
+  copiedEmail = false,
   onCopyEmail,
   isLoading = false,
 }: VideoModalProps) {
@@ -87,10 +87,10 @@ export default function VideoModal({
         <div className="p-6 border-b border-border/40 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-extrabold text-text-primary tracking-tight">
-              {editingVideo ? 'Edit Video' : 'Add Video to Lesson'}
+              {editingVideo ? 'Edit Video Lecture' : 'Add Video Lecture'}
             </h3>
             <p className="text-xs text-text-secondary mt-1">
-              Add a video lecture with Google Drive ID and playback duration.
+              Supports both YouTube video links and Google Drive video files.
             </p>
           </div>
           <button 
@@ -103,35 +103,54 @@ export default function VideoModal({
         </div>
 
         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          {/* Instructions Box */}
-          <div className="bg-[#F4F8FF] border border-[#D0E2FF] rounded-2xl p-4 space-y-2">
-            <h4 className="text-xs font-extrabold text-[#002D70] uppercase tracking-wider flex items-center gap-1.5">
-              Google Drive Streaming Setup
-            </h4>
-            <p className="text-[11px] text-[#002D70]/80 leading-relaxed font-semibold">
-              Before setting a video ID, ensure your Google Drive file is shared with the application service account:
-            </p>
-            <div className="flex items-center justify-between bg-white border border-[#B8D6FF] rounded-xl px-3 py-1.5 mt-2">
-              <span className="text-[10px] text-text-primary font-mono select-all truncate max-w-[80%]">
-                mayiliraguacadamy@mayiliragu-501911.iam.gserviceaccount.com
-              </span>
-              <button
-                type="button"
-                onClick={onCopyEmail}
-                className="flex items-center space-x-1 text-[10px] font-black text-accent hover:text-accent-onContainer flex-shrink-0"
-              >
-                {copiedEmail ? (
-                  <>
-                    <Check className="w-3 h-3 stroke-[3]" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    <span>Copy</span>
-                  </>
+          {/* Instructions Box: YouTube & Google Drive */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* YouTube Guide */}
+            <div className="bg-[#FFF8F2] border border-[#FFE0C2] rounded-2xl p-3.5 space-y-1.5 flex flex-col justify-between">
+              <div>
+                <h4 className="text-xs font-extrabold text-[#8A3800] uppercase tracking-wider flex items-center gap-1.5">
+                  1. YouTube Video
+                </h4>
+                <p className="text-[10px] text-[#8A3800]/90 leading-relaxed font-semibold mt-1">
+                  Paste any YouTube URL or 11-char ID. Set video to <strong>Unlisted</strong> with <strong>Allow embedding</strong> enabled.
+                </p>
+              </div>
+            </div>
+
+            {/* Google Drive Guide */}
+            <div className="bg-[#F4F8FF] border border-[#D0E2FF] rounded-2xl p-3.5 space-y-1.5 flex flex-col justify-between">
+              <div>
+                <h4 className="text-xs font-extrabold text-[#002D70] uppercase tracking-wider flex items-center gap-1.5">
+                  2. Google Drive Video
+                </h4>
+                <p className="text-[10px] text-[#002D70]/80 leading-relaxed font-semibold mt-1">
+                  Share file (Viewer) with service account:
+                </p>
+              </div>
+              <div className="flex items-center justify-between bg-white border border-[#B8D6FF] rounded-lg px-2 py-1 mt-1">
+                <span className="text-[9px] text-text-primary font-mono select-all truncate max-w-[75%]">
+                  mayiliraguacadamy@mayiliragu-501911.iam.gserviceaccount.com
+                </span>
+                {onCopyEmail && (
+                  <button
+                    type="button"
+                    onClick={onCopyEmail}
+                    className="flex items-center space-x-0.5 text-[9px] font-black text-accent hover:text-accent-onContainer flex-shrink-0"
+                  >
+                    {copiedEmail ? (
+                      <>
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-2.5 h-2.5" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+              </div>
             </div>
           </div>
 
@@ -255,14 +274,14 @@ export default function VideoModal({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* Drive ID */}
+            {/* Video Source: YouTube or Google Drive */}
             <div className="space-y-1.5">
               <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                Google Drive Video ID <span className="text-error">*</span>
+                YouTube URL/ID or Google Drive ID <span className="text-error">*</span>
               </label>
               <input
                 type="text"
-                placeholder="e.g. 1a2b3c4d5e6f..."
+                placeholder="e.g. https://youtu.be/... or dQw4w9WgXcQ or 1a2b3c4d..."
                 {...register('driveFileId')}
                 disabled={isSubmitting}
                 className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
