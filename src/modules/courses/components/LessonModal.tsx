@@ -78,8 +78,8 @@ export default function LessonModal({
             <h3 className="text-lg font-extrabold text-text-primary tracking-tight">
               {editingLesson ? 'Edit Lesson' : 'Create New Lesson'}
             </h3>
-            <p className="text-xs text-text-secondary mt-10">
-              Fill in lesson title, description, and configure the YouTube video source.
+            <p className="text-xs text-text-secondary mt-1">
+              Set the lesson title, description, and thumbnail image.
             </p>
           </div>
           <button 
@@ -93,18 +93,13 @@ export default function LessonModal({
 
         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
           {/* Instructions Box */}
-          <div className="bg-[#FFF8F2] border border-[#FFE0C2] rounded-2xl p-4 space-y-2">
-            <h4 className="text-xs font-extrabold text-[#8A3800] uppercase tracking-wider flex items-center gap-1.5">
-              YouTube Video Setup Guide
+          <div className="bg-[#F4F8FF] border border-[#D0E2FF] rounded-2xl p-4 space-y-1.5">
+            <h4 className="text-xs font-extrabold text-[#002D70] uppercase tracking-wider flex items-center gap-1.5">
+              Lesson Chapter / Lecture Set
             </h4>
-            <p className="text-[11px] text-[#8A3800]/90 leading-relaxed font-semibold">
-              To embed a lesson video from YouTube, configure your YouTube video settings as follows:
+            <p className="text-[11px] text-[#002D70]/80 leading-relaxed font-semibold">
+              A lesson organizes your course topic into chapters. Once created, you can add individual <strong>YouTube</strong> or <strong>Google Drive</strong> video lectures inside it.
             </p>
-            <ul className="text-[10px] text-[#8A3800]/80 list-disc list-inside space-y-1 font-medium pl-1">
-              <li>Upload your video as <strong>Unlisted</strong> so it isn't publicly searchable on YouTube.</li>
-              <li>Make sure <strong>Allow embedding</strong> is enabled under content settings.</li>
-              <li>Enable comments if you want students to ask questions.</li>
-            </ul>
           </div>
 
           {/* Title */}
