@@ -15,7 +15,12 @@ import {
   HelpCircle,
   FileText,
   FileDown,
-  ExternalLink
+  ExternalLink,
+  Users,
+  Award,
+  CheckCircle2,
+  XCircle,
+  Search
 } from 'lucide-react';
 import {
   useCurrentAffairsAdminList,
@@ -30,11 +35,13 @@ import {
   useCreateScheme,
   useUpdateScheme,
   useDatesList,
-  useCreateDate
+  useCreateDate,
+  useCurrentAffairsQuizAttemptsAdmin
 } from '../../../core/api/endpoints';
 import type { CurrentAffair, GovernmentScheme, CurrentAffairQuiz, ImportantDate } from '../../../core/types';
 import { ApiConstants } from '../../../core/constants/api_constants';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
+import RefreshButton from '../../../shared/components/RefreshButton';
 
 // Import extracted modals and schemas
 import ArticleModal from '../components/ArticleModal';
@@ -43,9 +50,17 @@ import MagazineModal from '../components/MagazineModal';
 import SchemeModal from '../components/SchemeModal';
 import DateModal from '../components/DateModal';
 import { articleSchema, quizFormSchema, magazineSchema, schemeSchema, dateSchema, quizQuestionSchema } from '../components/schemas';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function CurrentAffairsPage() {
-  const [activeTab, setActiveTab] = useState<'articles' | 'magazines' | 'schemes' | 'dates'>('articles');
+  const toast = useToast();
+  const [activeTab, setActiveTab] = useState<'articles' | 'magazines' | 'schemes' | 'dates' | 'quiz-results'>('articles');
+
+  // Quiz Results Tab Filters
+  const [quizAttemptsSearch, setQuizAttemptsSearch] = useState('');
+  const [quizAttemptsCorrectFilter, setQuizAttemptsCorrectFilter] = useState<'all' | 'true' | 'false'>('all');
+  const [quizAttemptsPage, setQuizAttemptsPage] = useState(1);
 
   // Modals status
   const [isArticleModalOpen, setIsArticleModalOpen] = useState(false);
@@ -64,7 +79,7 @@ export default function CurrentAffairsPage() {
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
 
   // API Queries & Mutations
-  const { data: articlesData, isLoading: isArticlesLoading, error: articlesError } = useCurrentAffairsAdminList();
+  const { data: articlesData, isLoading: isArticlesLoading, error: articlesError, refetch: refetchArticles, isRefetching: isRefetchingArticles } = useCurrentAffairsAdminList();
   const createArtMutation = useCreateCurrentAffair();
   const updateArtMutation = useUpdateArticleForm();
   const deleteArtMutation = useDeleteCurrentAffair();
@@ -72,15 +87,32 @@ export default function CurrentAffairsPage() {
   const { refetch: refetchQuizzes } = useCurrentAffairQuizzes(quizArticleId || '');
   const saveQuizzesMutation = useCreateCurrentAffairQuizzes();
 
-  const { data: magazinesData, isLoading: isMagazinesLoading } = useMagazinesList();
+  const { data: magazinesData, isLoading: isMagazinesLoading, refetch: refetchMagazines, isRefetching: isRefetchingMagazines } = useMagazinesList();
   const uploadMagMutation = useUploadMagazine();
 
-  const { data: schemesData, isLoading: isSchemesLoading } = useSchemesList();
+  const { data: schemesData, isLoading: isSchemesLoading, refetch: refetchSchemes, isRefetching: isRefetchingSchemes } = useSchemesList();
   const createSchemeMutation = useCreateScheme();
   const updateSchemeMutation = useUpdateScheme();
 
-  const { data: datesData, isLoading: isDatesLoading } = useDatesList();
+  const { data: datesData, isLoading: isDatesLoading, refetch: refetchDates, isRefetching: isRefetchingDates } = useDatesList();
   const createDateMutation = useCreateDate();
+
+  const { data: quizAttemptsData, isLoading: isQuizAttemptsLoading, refetch: refetchAttempts, isRefetching: isRefetchingAttempts } = useCurrentAffairsQuizAttemptsAdmin({
+    page: quizAttemptsPage,
+    limit: 20,
+    search: quizAttemptsSearch,
+    isCorrect: quizAttemptsCorrectFilter,
+  });
+
+  const isRefetching = isRefetchingArticles || isRefetchingMagazines || isRefetchingSchemes || isRefetchingDates || isRefetchingAttempts;
+
+  const handleRefreshAll = () => {
+    refetchArticles();
+    refetchMagazines();
+    refetchSchemes();
+    refetchDates();
+    refetchAttempts();
+  };
 
   // Helper hook to resolve query updateArtMutation typing issue
   function useUpdateArticleForm() {
@@ -159,23 +191,32 @@ export default function CurrentAffairsPage() {
   const onArticleSubmit = async (values: z.infer<typeof articleSchema>) => {
     try {
       if (editingArticle) {
-        await updateArtMutation.mutateAsync({
+        const res = await updateArtMutation.mutateAsync({
           id: editingArticle.id,
           data: values
         });
+        toast.success(res?.message || 'Article updated successfully!');
       } else {
-        await createArtMutation.mutateAsync(values as unknown as Omit<CurrentAffair, 'id' | 'createdAt' | 'updatedAt'>);
+        const res = await createArtMutation.mutateAsync(values as unknown as Omit<CurrentAffair, 'id' | 'createdAt' | 'updatedAt'>);
+        toast.success(res?.message || 'Article created successfully!');
       }
       setIsArticleModalOpen(false);
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
   const handleDeleteArticleConfirm = async () => {
     if (articleToDelete) {
-      await deleteArtMutation.mutateAsync(articleToDelete);
-      setArticleToDelete(null);
+      try {
+        const res = await deleteArtMutation.mutateAsync(articleToDelete);
+        toast.success(res?.message || 'Article deleted successfully!');
+      } catch (err) {
+        toast.error(extractErrorMessage(err));
+      } finally {
+        setArticleToDelete(null);
+      }
     }
   };
 
@@ -223,13 +264,15 @@ export default function CurrentAffairsPage() {
         explanationEn: q.explanationEn || null,
         explanationTa: q.explanationTa || null,
       }));
-      await saveQuizzesMutation.mutateAsync({
+      const res = await saveQuizzesMutation.mutateAsync({
         articleId: quizArticleId,
         questions: formatted as Omit<CurrentAffairQuiz, 'id' | 'currentAffairId'>[]
       });
+      toast.success(res?.message || 'Quizzes saved successfully!');
       setIsQuizModalOpen(false);
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -237,17 +280,19 @@ export default function CurrentAffairsPage() {
   const onMagazineSubmit = async (values: z.infer<typeof magazineSchema>) => {
     if (!selectedPdfFile) return;
     try {
-      await uploadMagMutation.mutateAsync({
+      const res = await uploadMagMutation.mutateAsync({
         title: values.title,
         month: values.month,
         year: values.year,
         file: selectedPdfFile
       });
+      toast.success(res?.message || 'Magazine uploaded successfully!');
       setIsMagazineModalOpen(false);
       setSelectedPdfFile(null);
       magazineForm.reset();
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -273,16 +318,19 @@ export default function CurrentAffairsPage() {
   const onSchemeSubmit = async (values: z.infer<typeof schemeSchema>) => {
     try {
       if (editingScheme) {
-        await updateSchemeMutation.mutateAsync({
+        const res = await updateSchemeMutation.mutateAsync({
           id: editingScheme.id,
           data: values
         });
+        toast.success(res?.message || 'Scheme updated successfully!');
       } else {
-        await createSchemeMutation.mutateAsync(values as Omit<GovernmentScheme, 'id' | 'createdAt' | 'updatedAt'>);
+        const res = await createSchemeMutation.mutateAsync(values as Omit<GovernmentScheme, 'id' | 'createdAt' | 'updatedAt'>);
+        toast.success(res?.message || 'Scheme created successfully!');
       }
       setIsSchemeModalOpen(false);
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -298,10 +346,12 @@ export default function CurrentAffairsPage() {
 
   const onDateSubmit = async (values: z.infer<typeof dateSchema>) => {
     try {
-      await createDateMutation.mutateAsync(values as Omit<ImportantDate, 'id' | 'createdAt' | 'updatedAt'>);
+      const res = await createDateMutation.mutateAsync(values as Omit<ImportantDate, 'id' | 'createdAt' | 'updatedAt'>);
+      toast.success(res?.message || 'Important date created successfully!');
       setIsDateModalOpen(false);
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
@@ -322,6 +372,7 @@ export default function CurrentAffairsPage() {
             Publish daily bilingual current affairs briefs, quizzes, monthly magazines, scheme updates, and calendars.
           </p>
         </div>
+        <RefreshButton onRefresh={handleRefreshAll} isRefetching={isRefetching} />
       </div>
 
       {/* Tabs list */}
@@ -357,6 +408,14 @@ export default function CurrentAffairsPage() {
         >
           <Calendar className="w-4 h-4" />
           <span>Important Dates</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('quiz-results')}
+          className={`flex items-center space-x-2 px-5 py-3 border-b-2 font-black text-xs transition-all ${activeTab === 'quiz-results' ? 'border-accent text-accent' : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+        >
+          <HelpCircle className="w-4 h-4" />
+          <span>Quiz Results</span>
         </button>
       </div>
 
@@ -591,6 +650,180 @@ export default function CurrentAffairsPage() {
         </div>
       )}
 
+      {/* TAB CONTENT: QUIZ RESULTS */}
+      {activeTab === 'quiz-results' && (
+        <div className="space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="bg-cardBg border border-border/80 rounded-2xl p-5 shadow-sm flex items-center space-x-4">
+              <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl">
+                <HelpCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary font-bold">Total Quiz Submissions</p>
+                <h3 className="text-2xl font-black text-text-primary mt-1">
+                  {quizAttemptsData?.data?.summary?.totalSubmissions?.toLocaleString() || 0}
+                </h3>
+              </div>
+            </div>
+
+            <div className="bg-cardBg border border-border/80 rounded-2xl p-5 shadow-sm flex items-center space-x-4">
+              <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary font-bold">Active Quiz Takers</p>
+                <h3 className="text-2xl font-black text-text-primary mt-1">
+                  {quizAttemptsData?.data?.summary?.totalUniqueStudents?.toLocaleString() || 0}
+                </h3>
+              </div>
+            </div>
+
+            <div className="bg-cardBg border border-border/80 rounded-2xl p-5 shadow-sm flex items-center space-x-4">
+              <div className="p-3 bg-purple-500/10 text-purple-500 rounded-xl">
+                <Award className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary font-bold">Average Accuracy</p>
+                <h3 className="text-2xl font-black text-text-primary mt-1">
+                  {quizAttemptsData?.data?.summary?.overallAccuracy ?? 0}%
+                </h3>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-cardBg border border-border/80 rounded-2xl p-4 shadow-sm">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+              <input
+                type="text"
+                placeholder="Search student, email, article, or question..."
+                value={quizAttemptsSearch}
+                onChange={e => {
+                  setQuizAttemptsSearch(e.target.value);
+                  setQuizAttemptsPage(1);
+                }}
+                className="w-full pl-9 pr-4 py-2 bg-background border border-border/80 rounded-xl text-xs font-semibold focus:outline-none focus:border-accent"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold text-text-secondary">Filter:</span>
+              <select
+                value={quizAttemptsCorrectFilter}
+                onChange={e => {
+                  setQuizAttemptsCorrectFilter(e.target.value as 'all' | 'true' | 'false');
+                  setQuizAttemptsPage(1);
+                }}
+                className="px-3 py-2 bg-background border border-border/80 rounded-xl text-xs font-semibold focus:outline-none focus:border-accent"
+              >
+                <option value="all">All Attempts</option>
+                <option value="true">Correct Only</option>
+                <option value="false">Incorrect Only</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Attempts Data Table */}
+          {isQuizAttemptsLoading ? (
+            <div className="flex justify-center p-12">
+              <Loader2 className="w-8 h-8 text-accent animate-spin" />
+            </div>
+          ) : !quizAttemptsData?.data?.attempts || quizAttemptsData.data.attempts.length === 0 ? (
+            <div className="text-center py-12 border border-dashed border-border rounded-3xl bg-white/40">
+              <p className="text-xs text-text-secondary font-semibold">No quiz attempts recorded yet.</p>
+            </div>
+          ) : (
+            <div className="bg-cardBg border border-border/80 rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-border/80 bg-background/50 text-[11px] font-black uppercase text-text-secondary tracking-wider">
+                      <th className="p-4">Student</th>
+                      <th className="p-4">Article & Question</th>
+                      <th className="p-4">Submitted Answer</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Attempted At</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60 text-xs font-semibold">
+                    {quizAttemptsData.data.attempts.map(att => (
+                      <tr key={att.id} className="hover:bg-background/40 transition-colors">
+                        <td className="p-4">
+                          <div className="font-extrabold text-text-primary">{att.studentName}</div>
+                          <div className="text-[11px] text-text-secondary">{att.studentEmail}</div>
+                        </td>
+                        <td className="p-4 max-w-xs">
+                          <div className="font-bold text-accent line-clamp-1">{att.articleTitle}</div>
+                          <div className="text-[11px] text-text-secondary line-clamp-2 mt-0.5">{att.questionPrompt}</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="inline-flex items-center space-x-1.5 font-bold">
+                            <span className={`px-2 py-0.5 rounded text-[11px] ${att.isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                              Option {att.selectedAnswer}
+                            </span>
+                            {!att.isCorrect && (
+                              <span className="text-[11px] text-text-secondary">
+                                (Correct: {att.correctAnswer})
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          {att.isCorrect ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-600 font-extrabold text-[10px] rounded-full">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Correct</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-red-500/10 text-red-600 font-extrabold text-[10px] rounded-full">
+                              <XCircle className="w-3 h-3" />
+                              <span>Incorrect</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 text-[11px] text-text-secondary whitespace-nowrap">
+                          {new Date(att.attemptedAt).toLocaleString(undefined, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Footer */}
+              {quizAttemptsData.data.meta && quizAttemptsData.data.meta.totalPages > 1 && (
+                <div className="flex items-center justify-between p-4 border-t border-border/80 bg-background/30 text-xs font-bold">
+                  <span className="text-text-secondary">
+                    Page {quizAttemptsData.data.meta.page} of {quizAttemptsData.data.meta.totalPages} ({quizAttemptsData.data.meta.total} total)
+                  </span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      disabled={quizAttemptsPage <= 1}
+                      onClick={() => setQuizAttemptsPage(p => Math.max(1, p - 1))}
+                      className="px-3 py-1.5 bg-background border border-border/80 rounded-lg disabled:opacity-40 font-bold hover:bg-cardBg transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      disabled={quizAttemptsPage >= quizAttemptsData.data.meta.totalPages}
+                      onClick={() => setQuizAttemptsPage(p => p + 1)}
+                      className="px-3 py-1.5 bg-background border border-border/80 rounded-lg disabled:opacity-40 font-bold hover:bg-cardBg transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* EXTRACTED MODAL COMPONENTS */}
       <ArticleModal
         isOpen={isArticleModalOpen}
@@ -639,6 +872,7 @@ export default function CurrentAffairsPage() {
         title="Delete Current Affairs Article?"
         message="This will hide the article and its associated quiz questions from the student application feed."
         confirmText="Delete Article"
+        isLoading={deleteArtMutation.isPending}
       />
     </div>
   );

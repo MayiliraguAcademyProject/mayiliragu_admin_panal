@@ -10,6 +10,7 @@ interface CourseModalProps {
   onClose: () => void;
   onSubmit: (values: CourseFormValues, file?: File | null) => Promise<void>;
   editingCourse: Course | null;
+  isLoading?: boolean;
 }
 
 export default function CourseModal({
@@ -17,6 +18,7 @@ export default function CourseModal({
   onClose,
   onSubmit,
   editingCourse,
+  isLoading = false,
 }: CourseModalProps) {
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -27,15 +29,28 @@ export default function CourseModal({
     handleSubmit,
     setValue,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting: isFormSubmitting },
   } = useForm<CourseFormValues>({
     resolver: zodResolver(courseSchema),
     defaultValues: {
       title: '',
       description: '',
       thumbnail: '',
+      lockMode: 'free',
+      isDemo: false,
     },
   });
+
+  const isSubmitting = isFormSubmitting || isLoading;
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = 'unset';
+      };
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -46,6 +61,7 @@ export default function CourseModal({
         setValue('description', editingCourse.description);
         setValue('thumbnail', editingCourse.thumbnail);
         setValue('lockMode', editingCourse.lockMode || 'free');
+        setValue('isDemo', editingCourse.isDemo ?? false);
         setUploadMode(editingCourse.thumbnail ? 'url' : 'file');
       } else {
         reset({
@@ -53,6 +69,7 @@ export default function CourseModal({
           description: '',
           thumbnail: '',
           lockMode: 'free',
+          isDemo: false,
         });
         setUploadMode('file');
       }
@@ -70,9 +87,17 @@ export default function CourseModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-lg bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300">
-        <div className="p-6 sm:p-8 space-y-6">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300 max-h-[90vh] flex flex-col my-auto"
+      >
+        <div className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1 overscroll-contain">
           <div>
             <h3 className="text-xl font-extrabold text-text-primary tracking-tight">
               {editingCourse ? 'Edit Course Details' : 'Create Course'}
@@ -129,14 +154,35 @@ export default function CourseModal({
               <select
                 {...register('lockMode')}
                 disabled={isSubmitting}
-                className="w-full px-4 py-2.5 rounded-xl border border-border text-sm font-medium outline-none focus:ring-accent focus:border-accent text-text-primary bg-slate-50/20"
+                className="w-full px-4 py-2.5 rounded-xl border border-border text-sm font-medium outline-none focus:ring-accent focus:border-accent text-text-primary bg-cardBg"
               >
-                <option value="free">Free Access (All videos unlocked)</option>
-                <option value="sequential">Sequential Unlock (Line by line as videos completed)</option>
+                <option value="free" className="bg-cardBg text-text-primary">Free Access (All videos unlocked)</option>
+                <option value="sequential" className="bg-cardBg text-text-primary">Sequential Unlock (Line by line as videos completed)</option>
               </select>
               <p className="text-[11px] text-text-secondary font-medium pl-1">
                 Sequential mode forces students to complete each video (90%+ watched) before the next video unlocks.
               </p>
+            </div>
+
+            {/* Demo Course Access Toggle */}
+            <div className="p-3.5 rounded-2xl border border-border/80 bg-slate-50/30 flex items-center justify-between">
+              <div className="space-y-0.5 pr-4">
+                <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider cursor-pointer">
+                  Demo Course Access
+                </label>
+                <p className="text-[11px] text-text-secondary font-medium">
+                  Enable free preview video playback for non-enrolled students in the mobile app.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  {...register('isDemo')}
+                  disabled={isSubmitting}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+              </label>
             </div>
 
             {/* Thumbnail Image */}

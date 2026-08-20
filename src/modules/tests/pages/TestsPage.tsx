@@ -29,10 +29,12 @@ import TestReviewsModal from '../components/TestReviewsModal';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
 import ConnectionModal from '../components/ConnectionModal';
 import CategoryModal from '../components/CategoryModal';
+import RefreshButton from '../../../shared/components/RefreshButton';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 import { 
   FileText, 
   Search, 
-  RotateCw, 
   Plus, 
   Trash2, 
   BookOpen, 
@@ -59,6 +61,7 @@ const iconMap: Record<string, any> = {
 };
 
 export default function TestsPage() {
+  const toast = useToast();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'bank' | 'connect' | 'builder' | 'analytics'>('bank');
 
@@ -118,8 +121,8 @@ export default function TestsPage() {
   const [newCatIcon, setNewCatIcon] = useState('GraduationCap');
 
   // React Query queries
-  const { data: stats, isLoading: isStatsLoading, refetch: refetchStats } = useQuestionStats();
-  const { data: questions = [], isLoading: isQuestionsLoading, refetch: refetchQuestions } = useQuestionsList({
+  const { data: stats, isLoading: isStatsLoading, refetch: refetchStats, isRefetching: isRefetchingStats } = useQuestionStats();
+  const { data: questions = [], isLoading: isQuestionsLoading, refetch: refetchQuestions, isRefetching: isRefetchingQuestions } = useQuestionsList({
     subject: selectedSubject,
     type: selectedType,
     difficulty: selectedDifficulty,
@@ -128,8 +131,10 @@ export default function TestsPage() {
 
   const { data: coursesData } = useCoursesList(1, 50);
   const { data: selectedCourseDetail } = useCourseDetail(newConnCourseId);
-  const { refetch: refetchAnalytics } = useTestAnalytics();
-  const { data: attempts = [], refetch: refetchAttempts } = useAllTestAttempts();
+  const { refetch: refetchAnalytics, isRefetching: isRefetchingAnalytics } = useTestAnalytics();
+  const { data: attempts = [], refetch: refetchAttempts, isRefetching: isRefetchingAttempts } = useAllTestAttempts();
+
+  const isRefetching = isRefetchingStats || isRefetchingQuestions || isRefetchingAnalytics || isRefetchingAttempts;
 
   const handleRefreshAll = () => {
     refetchStats();
@@ -189,18 +194,31 @@ export default function TestsPage() {
 
   const handleConfirmDeleteQuestion = async () => {
     if (questionIdToDelete) {
-      await deleteQuestionMutation.mutateAsync(questionIdToDelete);
+      try {
+        const res = await deleteQuestionMutation.mutateAsync(questionIdToDelete);
+        toast.success(res?.message || 'Question deleted successfully!');
+      } catch (err) {
+        toast.error(extractErrorMessage(err));
+      } finally {
+        setQuestionIdToDelete(null);
+      }
     }
   };
 
   const handleQuestionSubmit = async (data: any) => {
-    if (editingQuestion) {
-      await updateQuestionMutation.mutateAsync({ id: editingQuestion.id, data });
-    } else {
-      await createQuestionMutation.mutateAsync(data);
+    try {
+      if (editingQuestion) {
+        const res = await updateQuestionMutation.mutateAsync({ id: editingQuestion.id, data });
+        toast.success(res?.message || 'Question updated successfully!');
+      } else {
+        const res = await createQuestionMutation.mutateAsync(data);
+        toast.success(res?.message || 'Question created successfully!');
+      }
+      setIsQuestionModalOpen(false);
+      setEditingQuestion(undefined);
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
     }
-    setIsQuestionModalOpen(false);
-    setEditingQuestion(undefined);
   };
 
   const { data: tests = [], isLoading: isTestsLoading } = useTestsList();
@@ -252,61 +270,69 @@ export default function TestsPage() {
 
   const handleDeleteTest = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this test?')) {
-      await deleteTestMutation.mutateAsync(id);
+      try {
+        const res = await deleteTestMutation.mutateAsync(id);
+        toast.success(res?.message || 'Test deleted successfully!');
+      } catch (err) {
+        toast.error(extractErrorMessage(err));
+      }
     }
   };
 
   const handleTestSubmit = async (data: any) => {
-    if (editingTestId) {
-      await updateTestMutation.mutateAsync({ id: editingTestId, data });
-    } else {
-      await createTestMutation.mutateAsync(data);
+    try {
+      if (editingTestId) {
+        const res = await updateTestMutation.mutateAsync({ id: editingTestId, data });
+        toast.success(res?.message || 'Test updated successfully!');
+      } else {
+        const res = await createTestMutation.mutateAsync(data);
+        toast.success(res?.message || 'Test created successfully!');
+      }
+      setIsTestModalOpen(false);
+      setEditingTestId(undefined);
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
     }
-    setIsTestModalOpen(false);
-    setEditingTestId(undefined);
   };
 
   const handleCreateConnection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newConnCourseId || !newConnTestId) return;
 
-    await updateTestMutation.mutateAsync({
-      id: newConnTestId,
-      data: {
-        course_id: newConnCourseId,
-        module_id: newConnModuleId || null,
-      },
-    });
-
-    setIsConnectionModalOpen(false);
-    setNewConnCourseId('');
-    setNewConnModuleId('');
-    setNewConnTestId('');
+    try {
+      const res = await updateTestMutation.mutateAsync({
+        id: newConnTestId,
+        data: {
+          course_id: newConnCourseId,
+          module_id: newConnModuleId || null,
+        },
+      });
+      toast.success(res?.message || 'Test connected successfully!');
+      setIsConnectionModalOpen(false);
+      setNewConnCourseId('');
+      setNewConnModuleId('');
+      setNewConnTestId('');
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
+    }
   };
-
-  // const deleteConnection = async (id: string) => {
-  //   if (window.confirm('Are you sure you want to remove this connection?')) {
-  //     await updateTestMutation.mutateAsync({
-  //       id,
-  //       data: {
-  //         course_id: null,
-  //         module_id: null,
-  //       },
-  //     });
-  //   }
-  // };
 
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName || !newCatDescription) return;
-    await createCategoryMutation.mutateAsync({
-      name: newCatName,
-      description: newCatDescription,
-      iconName: newCatIcon,
-    });
-    setIsCategoryModalOpen(false);
-    setNewCatName('');
-    setNewCatDescription('');
+    try {
+      const res = await createCategoryMutation.mutateAsync({
+        name: newCatName,
+        description: newCatDescription,
+        iconName: newCatIcon,
+      });
+      toast.success(res?.message || 'Category created successfully!');
+      setIsCategoryModalOpen(false);
+      setNewCatName('');
+      setNewCatDescription('');
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
+    }
   };
 
   const getSubjectCount = (categoryId: string) => {
@@ -348,13 +374,7 @@ export default function TestsPage() {
           })}
         </div>
 
-        <button
-          onClick={handleRefreshAll}
-          className="p-2 bg-slate-50 border border-border/40 hover:border-slate-350 hover:bg-slate-100 rounded-xl text-text-secondary transition-colors"
-          title="Refresh Data"
-        >
-          <RotateCw className="w-4 h-4" />
-        </button>
+        <RefreshButton onRefresh={handleRefreshAll} isRefetching={isRefetching} title="Refresh Data" />
       </div>
 
       {/* Main Tab Content */}
@@ -1120,6 +1140,7 @@ export default function TestsPage() {
         onConfirm={handleConfirmDeleteQuestion}
         title="Delete Question"
         message="Are you sure you want to permanently delete this question from the database? This action cannot be undone."
+        isLoading={deleteQuestionMutation.isPending}
       />
 
       <ConfirmModal
@@ -1128,6 +1149,7 @@ export default function TestsPage() {
         onConfirm={handleConfirmDeleteAllQuestions}
         title="Delete All Questions"
         message="Are you sure you want to permanently delete ALL questions from the database? This action is irreversible and cannot be undone."
+        isLoading={deleteAllQuestionsMutation.isPending}
       />
 
       <ConfirmModal
@@ -1136,6 +1158,7 @@ export default function TestsPage() {
         onConfirm={handleConfirmDeleteCategory}
         title="Delete Category"
         message={`Are you sure you want to delete the category "${categoryToDelete?.name}"? This will delete all associated subjects and topics.`}
+        isLoading={deleteCategoryMutation.isPending}
       />
 
       <TestReviewsModal

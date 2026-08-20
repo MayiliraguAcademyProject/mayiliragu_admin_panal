@@ -7,9 +7,9 @@ export interface User {
   role: Role;
 }
 
-export interface Lesson {
+export interface LessonVideo {
   id: string;
-  moduleId: string;
+  lessonId: string;
   title: string;
   description?: string | null;
   image?: string | null;
@@ -21,12 +21,41 @@ export interface Lesson {
   updatedAt: string;
 }
 
+export interface Lesson {
+  id: string;
+  topicId?: string;
+  moduleId?: string;
+  title: string;
+  description?: string | null;
+  image?: string | null;
+  order: number;
+  videos?: LessonVideo[];
+  // Backward compatibility
+  driveFileId?: string;
+  duration?: number;
+  downloadEnabled?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Topic {
+  id: string;
+  moduleId: string;
+  title: string;
+  description?: string | null;
+  order: number;
+  lessons?: Lesson[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Module {
   id: string;
   courseId: string;
   title: string;
   order: number;
-  lessons: Lesson[];
+  topics?: Topic[];
+  lessons?: Lesson[]; // backward compatibility
   createdAt: string;
   updatedAt: string;
 }
@@ -37,7 +66,9 @@ export interface Course {
   description: string;
   thumbnail: string;
   lockMode?: 'free' | 'sequential';
+  isDemo?: boolean;
   totalLessons?: number;
+  totalVideos?: number;
   modules?: Module[];
   createdAt: string;
   updatedAt: string;
@@ -288,6 +319,14 @@ export interface Banner {
   title: string;
   imageUrl: string;
   linkUrl?: string | null;
+  linkType?: 'COURSE' | 'TEST' | 'NONE';
+  linkId?: string | null;
+  price?: number | null;
+  offerPrice?: number | null;
+  offerValidUntil?: string | null;
+  planDescription?: string | null;
+  validityDays?: number | null;
+  curriculumJson?: string | null;
   isActive: boolean;
   order: number;
   createdAt: string;
@@ -458,6 +497,8 @@ export interface Book {
   priceSoftCopy?: number | null;
   stockHardCopy: number;
   pdfUrl?: string | null;
+  samplePdfUrl?: string | null;
+  samplePages?: string[];
   categoryId: string;
   isActive: boolean;
   isDeleted: boolean;
@@ -536,6 +577,31 @@ export interface EnrollmentRequest {
     id?: string;
     title: string;
     thumbnail?: string;
+  };
+}
+
+export interface PaymentSettings {
+  id: string;
+  qrImageUrl: string;
+  instructions: string;
+  updatedAt: string;
+}
+
+export interface PaymentRequest {
+  id: string;
+  studentId: string;
+  linkType: 'COURSE' | 'TEST';
+  linkId: string;
+  amount: number;
+  screenshotUrl: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  adminNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  student: {
+    id: string;
+    name: string;
+    email: string;
   };
 }
 

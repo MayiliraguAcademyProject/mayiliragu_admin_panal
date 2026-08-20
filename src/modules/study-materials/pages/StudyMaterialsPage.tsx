@@ -29,11 +29,15 @@ import {
 import type { StudyMaterial } from '../../../core/types';
 import { ApiConstants } from '../../../core/constants/api_constants';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
+import RefreshButton from '../../../shared/components/RefreshButton';
 import CategoryModal from '../components/CategoryModal';
 import UploadMaterialModal from '../components/UploadMaterialModal';
 import { categorySchema, materialSchema } from '../components/schemas';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function StudyMaterialsPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'materials' | 'approvals' | 'categories'>('materials');
 
   // Modals status
@@ -43,15 +47,26 @@ export default function StudyMaterialsPage() {
   const [materialToDelete, setMaterialToDelete] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
+    toast[type](message);
+  };
+
   // API Hooks
-  const { data: categoriesData, isLoading: isCategoriesLoading } = useStudyCategoriesList();
+  const { data: categoriesData, isLoading: isCategoriesLoading, refetch: refetchCategories, isRefetching: isRefetchingCategories } = useStudyCategoriesList();
   const createCategoryMutation = useCreateStudyCategory();
   const deleteCategoryMutation = useDeleteStudyCategory();
 
-  const { data: materialsData, isLoading: isMaterialsLoading, error: materialsError } = useStudyMaterialsAdminList();
+  const { data: materialsData, isLoading: isMaterialsLoading, error: materialsError, refetch: refetchMaterials, isRefetching: isRefetchingMaterials } = useStudyMaterialsAdminList();
   const createMaterialMutation = useCreateStudyMaterial();
   const updateMaterialMutation = useUpdateStudyMaterial();
   const deleteMaterialMutation = useDeleteStudyMaterial();
+
+  const isRefetching = isRefetchingCategories || isRefetchingMaterials;
+
+  const handleRefreshAll = () => {
+    refetchCategories();
+    refetchMaterials();
+  };
 
   // Forms
   const categoryForm = useForm<z.infer<typeof categorySchema>>({
@@ -68,10 +83,12 @@ export default function StudyMaterialsPage() {
   const onCategorySubmit = async (values: z.infer<typeof categorySchema>) => {
     try {
       await createCategoryMutation.mutateAsync(values);
+      showToast('success', 'Category created successfully!');
       setIsCategoryModalOpen(false);
       categoryForm.reset();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      showToast('error', err?.response?.data?.message || 'Failed to create category.');
     }
   };
 
@@ -79,8 +96,10 @@ export default function StudyMaterialsPage() {
     if (window.confirm('Are you sure you want to delete this category?')) {
       try {
         await deleteCategoryMutation.mutateAsync(id);
-      } catch (err) {
+        showToast('success', 'Category deleted successfully!');
+      } catch (err: any) {
         console.error(err);
+        showToast('error', err?.response?.data?.message || 'Failed to delete category.');
       }
     }
   };
@@ -120,21 +139,37 @@ export default function StudyMaterialsPage() {
           ...values,
           file: selectedFile || undefined,
         });
+        showToast('success', 'Study material updated successfully!');
       } else {
         if (!selectedFile) {
-          alert('Please select a file to upload');
+          showToast('error', 'Please select a file to upload.');
           return;
         }
         await createMaterialMutation.mutateAsync({
           ...values,
           file: selectedFile,
         });
+        showToast('success', 'Study material uploaded and published successfully!');
       }
       setIsUploadModalOpen(false);
       setSelectedFile(null);
       materialForm.reset();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      const is413 =
+        err?.response?.status === 413 ||
+        err?.status === 413 ||
+        err?.message?.includes('413') ||
+        err?.response?.data?.message?.includes('413');
+
+      if (is413) {
+        showToast(
+          'error',
+          'Upload Failed: File content is too large (HTTP 413). Please select a file smaller than 100MB or configure server Nginx client_max_body_size.'
+        );
+      } else {
+        showToast('error', extractErrorMessage(err));
+      }
     }
   };
 
@@ -142,8 +177,10 @@ export default function StudyMaterialsPage() {
     if (materialToDelete) {
       try {
         await deleteMaterialMutation.mutateAsync(materialToDelete);
-      } catch (err) {
+        showToast('success', 'Study material deleted successfully!');
+      } catch (err: any) {
         console.error(err);
+        showToast('error', err?.response?.data?.message || 'Failed to delete study material.');
       } finally {
         setMaterialToDelete(null);
       }
@@ -156,8 +193,10 @@ export default function StudyMaterialsPage() {
         id: mat.id,
         status: 'APPROVED',
       });
-    } catch (err) {
+      showToast('success', `"${mat.title}" has been approved.`);
+    } catch (err: any) {
       console.error(err);
+      showToast('error', 'Failed to approve material.');
     }
   };
 
@@ -167,8 +206,10 @@ export default function StudyMaterialsPage() {
         id: mat.id,
         status: 'REJECTED',
       });
-    } catch (err) {
+      showToast('info', `"${mat.title}" was marked as rejected.`);
+    } catch (err: any) {
       console.error(err);
+      showToast('error', 'Failed to reject material.');
     }
   };
 
@@ -197,6 +238,7 @@ export default function StudyMaterialsPage() {
             Upload and manage e-books, revision notes, PYQs, and handwritten notes, review faculty uploads, and manage library metadata.
           </p>
         </div>
+        <RefreshButton onRefresh={handleRefreshAll} isRefetching={isRefetching} />
       </div>
 
       {/* Tabs */}
@@ -442,6 +484,7 @@ export default function StudyMaterialsPage() {
         onClose={() => setIsCategoryModalOpen(false)}
         onSubmit={onCategorySubmit}
         form={categoryForm}
+        isLoading={createCategoryMutation.isPending}
       />
 
       <UploadMaterialModal
@@ -453,6 +496,7 @@ export default function StudyMaterialsPage() {
         selectedFile={selectedFile}
         onFileChange={setSelectedFile}
         isEditMode={!!editingMaterial}
+        isLoading={createMaterialMutation.isPending || updateMaterialMutation.isPending}
       />
 
       <ConfirmModal
@@ -462,6 +506,7 @@ export default function StudyMaterialsPage() {
         title="Delete Library Material?"
         message="This will hide the document and all associated version histories from the student application view."
         confirmText="Delete Document"
+        isLoading={deleteMaterialMutation.isPending}
       />
     </div>
   );

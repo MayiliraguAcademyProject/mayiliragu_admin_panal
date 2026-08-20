@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth-store';
+import { ErrorBoundary } from '../../shared/components/ErrorBoundary';
 import {
   LayoutDashboard,
   BookOpen,
@@ -21,7 +22,13 @@ import {
   Sun,
   Moon,
   Smartphone,
-  UserCheck
+  UserCheck,
+  UserPlus,
+  CreditCard,
+  DollarSign,
+  Video,
+  MessageSquare,
+  FileText
 } from 'lucide-react';
 import { useThemeStore } from '../../store/theme-store';
 
@@ -41,18 +48,24 @@ export default function MainLayoutShell() {
 
   const navItems: NavItem[] = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Courses', path: '/courses', icon: BookOpen },
-    { name: 'Course Requests', path: '/course-requests', icon: UserCheck },
-    { name: 'Students', path: '/student-management', icon: Users },
-    { name: 'Tests & Question Bank', path: '/tests', icon: GraduationCap },
-    { name: 'Banners', path: '/banners', icon: Image },
-    { name: 'Current Affairs', path: '/current-affairs', icon: Newspaper },
-    { name: 'Study Library', path: '/study-materials', icon: Library },
-    { name: 'Book Store', path: '/book-store', icon: ShoppingBag },
-    { name: 'Video Downloads', path: '/video-downloads', icon: Download },
-    { name: 'Push Notifications', path: '/notifications', icon: Bell },
-    { name: 'Performance Analytics', path: '/performance-analytics', icon: TrendingUp },
     { name: 'App Config', path: '/app-config', icon: Smartphone },
+    { name: 'Banners', path: '/banners', icon: Image },
+    { name: 'Book Store', path: '/book-store', icon: ShoppingBag },
+    { name: 'Course Requests', path: '/course-requests', icon: UserCheck },
+    { name: 'Courses', path: '/courses', icon: BookOpen },
+    { name: 'Current Affairs', path: '/current-affairs', icon: Newspaper },
+    { name: 'Exam Updates', path: '/exam-updates', icon: FileText },
+    { name: 'Guest Inquiries', path: '/guest-leads', icon: UserPlus },
+    { name: 'Live Streams', path: '/live-streams', icon: Video },
+    { name: 'Payment Requests', path: '/payment-requests', icon: DollarSign },
+    { name: 'Payment Settings', path: '/payment-settings', icon: CreditCard },
+    { name: 'Performance Analytics', path: '/performance-analytics', icon: TrendingUp },
+    { name: 'Push Notifications', path: '/notifications', icon: Bell },
+    { name: 'Students', path: '/student-management', icon: Users },
+    { name: 'Study Library', path: '/study-materials', icon: Library },
+    { name: 'Testimonials', path: '/testimonials', icon: MessageSquare },
+    { name: 'Tests & Question Bank', path: '/tests', icon: GraduationCap },
+    { name: 'Video Downloads', path: '/video-downloads', icon: Download },
   ];
 
   const handleLogout = () => {
@@ -256,7 +269,9 @@ export default function MainLayoutShell() {
         {/* Content Outlet scroll Container */}
         <main className="flex-1 overflow-y-auto relative">
           <div className="max-w-[1600px] mx-auto min-h-full">
-            <Outlet />
+            <ErrorBoundary key={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </main>
       </div>

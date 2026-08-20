@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from '../../shared/components/ProtectedRoute';
 import { PublicRoute } from '../../shared/components/PublicRoute';
 import MainLayoutShell from '../layouts/MainLayoutShell';
+import RouterErrorPage from '../../shared/components/RouterErrorPage';
 
 // Lazy load pages for performance as requested in performance rules
 const LoginPage = React.lazy(() => import('../../modules/auth/pages/LoginPage'));
@@ -21,8 +22,15 @@ const PerformanceAnalyticsPage = React.lazy(() => import('../../modules/performa
 const BookStorePage = React.lazy(() => import('../../modules/book-store/pages/BookStorePage'));
 const VideoDownloadsPage = React.lazy(() => import('../../modules/downloads/pages/VideoDownloadsPage'));
 const NotificationsPage = React.lazy(() => import('../../modules/notifications/pages/NotificationsPage'));
-const AppConfigPage = React.lazy(() => import('../../modules/app-config/pages/AppConfigPage'));
 const CourseRequestsPage = React.lazy(() => import('../../modules/enrollments/pages/CourseRequestsPage'));
+const PaymentSettingsPage = React.lazy(() => import('../../modules/payment-settings/pages/PaymentSettingsPage'));
+const PaymentRequestsPage = React.lazy(() => import('../../modules/payment-requests/pages/PaymentRequestsPage'));
+const AppConfigPage = React.lazy(() => import('../../modules/app-config/pages/AppConfigPage'));
+const LiveStreamsPage = React.lazy(() => import('../../modules/app-config/pages/LiveStreamsPage'));
+const TestimonialsPage = React.lazy(() => import('../../modules/app-config/pages/TestimonialsPage'));
+const ExamUpdatesPage = React.lazy(() => import('../../modules/app-config/pages/ExamUpdatesPage'));
+const GuestLeadsPage = React.lazy(() => import('../../modules/guest-leads/pages/GuestLeadsPage'));
+
 
 // Loading fallback component
 const SuspenseFallback = () => (
@@ -34,6 +42,7 @@ const SuspenseFallback = () => (
 export const router = createBrowserRouter([
   {
     path: '/login',
+    errorElement: <RouterErrorPage />,
     element: (
       <PublicRoute>
         <React.Suspense fallback={<SuspenseFallback />}>
@@ -44,6 +53,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/',
+    errorElement: <RouterErrorPage />,
     element: (
       <ProtectedRoute>
         <MainLayoutShell />
@@ -91,6 +101,30 @@ export const router = createBrowserRouter([
         element: (
           <React.Suspense fallback={<SuspenseFallback />}>
             <CourseRequestsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'guest-leads',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <GuestLeadsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'payment-settings',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <PaymentSettingsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'payment-requests',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <PaymentRequestsPage />
           </React.Suspense>
         ),
       },
@@ -163,6 +197,30 @@ export const router = createBrowserRouter([
         element: (
           <React.Suspense fallback={<SuspenseFallback />}>
             <AppConfigPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'live-streams',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <LiveStreamsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'testimonials',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <TestimonialsPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'exam-updates',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <ExamUpdatesPage />
           </React.Suspense>
         ),
       },

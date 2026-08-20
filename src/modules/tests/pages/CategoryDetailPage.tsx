@@ -14,6 +14,8 @@ import QuestionFormModal from '../components/QuestionFormModal';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
 import SubjectModal from '../components/SubjectModal';
 import TopicModal from '../components/TopicModal';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 import { 
   ArrowLeft, 
   BookOpen, 
@@ -25,6 +27,7 @@ import {
 } from 'lucide-react';
 
 export default function CategoryDetailPage() {
+  const toast = useToast();
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
 
@@ -86,18 +89,31 @@ export default function CategoryDetailPage() {
 
   const handleConfirmDeleteQuestion = async () => {
     if (questionIdToDelete) {
-      await deleteQuestionMutation.mutateAsync(questionIdToDelete);
+      try {
+        const res = await deleteQuestionMutation.mutateAsync(questionIdToDelete);
+        toast.success(res?.message || 'Question deleted successfully!');
+      } catch (err) {
+        toast.error(extractErrorMessage(err));
+      } finally {
+        setQuestionIdToDelete(null);
+      }
     }
   };
 
   const handleQuestionSubmit = async (data: any) => {
-    if (editingQuestion) {
-      await updateQuestionMutation.mutateAsync({ id: editingQuestion.id, data });
-    } else {
-      await createQuestionMutation.mutateAsync(data);
+    try {
+      if (editingQuestion) {
+        const res = await updateQuestionMutation.mutateAsync({ id: editingQuestion.id, data });
+        toast.success(res?.message || 'Question updated successfully!');
+      } else {
+        const res = await createQuestionMutation.mutateAsync(data);
+        toast.success(res?.message || 'Question created successfully!');
+      }
+      setIsQuestionModalOpen(false);
+      setEditingQuestion(undefined);
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
     }
-    setIsQuestionModalOpen(false);
-    setEditingQuestion(undefined);
   };
 
   // Get subjects belonging to this category
@@ -169,17 +185,27 @@ export default function CategoryDetailPage() {
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSubName || !categoryId) return;
-    await createSubjectMutation.mutateAsync({ categoryId, name: newSubName });
-    setIsSubjectModalOpen(false);
-    setNewSubName('');
+    try {
+      const res = await createSubjectMutation.mutateAsync({ categoryId, name: newSubName });
+      toast.success(res?.message || 'Subject created successfully!');
+      setIsSubjectModalOpen(false);
+      setNewSubName('');
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
+    }
   };
 
   const handleCreateTopic = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTopName || !expandedSubId) return;
-    await createTopicMutation.mutateAsync({ subjectId: expandedSubId, name: newTopName });
-    setIsTopicModalOpen(false);
-    setNewTopName('');
+    try {
+      const res = await createTopicMutation.mutateAsync({ subjectId: expandedSubId, name: newTopName });
+      toast.success(res?.message || 'Topic created successfully!');
+      setIsTopicModalOpen(false);
+      setNewTopName('');
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
+    }
   };
 
   if (!currentCategory) {
@@ -510,7 +536,8 @@ export default function CategoryDetailPage() {
         onClose={() => setQuestionIdToDelete(null)}
         onConfirm={handleConfirmDeleteQuestion}
         title="Delete Question"
-        message="Are you sure you want to permanently delete this question from the database? This action cannot be undone."
+        message="Are you sure you want to delete this question? This action cannot be undone."
+        isLoading={deleteQuestionMutation.isPending}
       />
 
     </div>

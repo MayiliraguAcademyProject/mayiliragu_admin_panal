@@ -22,8 +22,12 @@ import {
 import type { CourseFormValues } from '../../../core/validation';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
 import CourseModal from '../components/CourseModal';
+import RefreshButton from '../../../shared/components/RefreshButton';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 export default function CourseListPage() {
+  const toast = useToast();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,7 +36,7 @@ export default function CourseListPage() {
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const { data, isLoading, isError, refetch } = useCoursesList(page, 10);
+  const { data, isLoading, isError, refetch, isRefetching } = useCoursesList(page, 10);
   const createCourseMutation = useCreateCourse();
   const updateCourseMutation = useUpdateCourse();
   const deleteCourseMutation = useDeleteCourse();
@@ -55,29 +59,34 @@ export default function CourseListPage() {
   const onSubmit = async (values: CourseFormValues, file?: File | null) => {
     try {
       if (editingCourse) {
-        await updateCourseMutation.mutateAsync({
+        const res = await updateCourseMutation.mutateAsync({
           id: editingCourse.id,
           data: values,
           file: file || undefined,
         });
+        toast.success(res?.message || 'Course updated successfully!');
       } else {
-        await createCourseMutation.mutateAsync({
+        const res = await createCourseMutation.mutateAsync({
           ...values,
           file: file || undefined,
         });
+        toast.success(res?.message || 'Course created successfully!');
       }
       handleCloseDialog();
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     }
   };
 
   const executeDelete = async (id: string) => {
     setIsDeletingId(id);
     try {
-      await deleteCourseMutation.mutateAsync(id);
+      const res = await deleteCourseMutation.mutateAsync(id);
+      toast.success(res?.message || 'Course deleted successfully!');
     } catch (err) {
       console.error(err);
+      toast.error(extractErrorMessage(err));
     } finally {
       setIsDeletingId(null);
     }
@@ -119,13 +128,16 @@ export default function CourseListPage() {
             Build and schedule courses, modules, and lessons.
           </p>
         </div>
-        <button
-          onClick={handleOpenCreateDialog}
-          className="self-start sm:self-center flex items-center space-x-2 bg-accent hover:bg-accent-onContainer text-white font-bold py-3 px-5 rounded-xl shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/35 transition-all duration-200 active:scale-[0.98]"
-        >
-          <Plus className="w-5 h-5" />
-          <span className="text-sm">Add Course</span>
-        </button>
+        <div className="flex items-center space-x-3 self-start sm:self-center">
+          <RefreshButton onRefresh={refetch} isRefetching={isRefetching} />
+          <button
+            onClick={handleOpenCreateDialog}
+            className="flex items-center space-x-2 bg-accent hover:bg-accent-onContainer text-white font-bold py-3 px-5 rounded-xl shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/35 transition-all duration-200 active:scale-[0.98]"
+          >
+            <Plus className="w-5 h-5" />
+            <span className="text-sm">Add Course</span>
+          </button>
+        </div>
       </div>
 
       {/* Filters & search */}
@@ -179,9 +191,16 @@ export default function CourseListPage() {
               <div className="w-2/3 p-5 flex flex-col justify-between">
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black tracking-widest text-accent uppercase bg-accent/5 px-2.5 py-1 rounded-full">
-                      Course
-                    </span>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-[10px] font-black tracking-widest text-accent uppercase bg-accent/5 px-2.5 py-1 rounded-full">
+                        Course
+                      </span>
+                      {course.isDemo && (
+                        <span className="text-[10px] font-black tracking-widest text-orange-600 uppercase bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
+                          Demo
+                        </span>
+                      )}
+                    </div>
                     
                     {/* Hover controls container */}
                     <div 
@@ -262,6 +281,7 @@ export default function CourseListPage() {
         onClose={handleCloseDialog}
         onSubmit={onSubmit}
         editingCourse={editingCourse}
+        isLoading={createCourseMutation.isPending || updateCourseMutation.isPending}
       />
 
       <ConfirmModal
@@ -271,6 +291,7 @@ export default function CourseListPage() {
           if (confirmDeleteId) executeDelete(confirmDeleteId);
         }}
         title="Delete Course"
+        isLoading={deleteCourseMutation.isPending || isDeletingId !== null}
         message={`Are you sure you want to delete the course "${
           data?.data?.find((c: any) => c.id === confirmDeleteId)?.title || ''
         }"? All associated modules and lessons will be lost.`}
