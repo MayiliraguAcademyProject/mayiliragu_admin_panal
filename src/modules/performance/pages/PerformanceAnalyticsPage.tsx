@@ -9,14 +9,22 @@ import {
   Award,
   BookOpen
 } from 'lucide-react';
+import RefreshButton from '../../../shared/components/RefreshButton';
 
 export default function PerformanceAnalyticsPage() {
   const [activeTab, setActiveTab] = useState<'faculty' | 'admin'>('faculty');
   const [selectedBatch, setSelectedBatch] = useState<string>('Morning Batch 2026');
 
   // API hooks
-  const { data: facultyData, isLoading: isFacultyLoading } = useFacultyClassAnalytics(selectedBatch);
-  const { data: adminData, isLoading: isAdminLoading } = useAdminBatchComparisons();
+  const { data: facultyData, isLoading: isFacultyLoading, refetch: refetchFaculty, isRefetching: isRefetchingFaculty } = useFacultyClassAnalytics(selectedBatch);
+  const { data: adminData, isLoading: isAdminLoading, refetch: refetchAdmin, isRefetching: isRefetchingAdmin } = useAdminBatchComparisons();
+
+  const isRefetching = isRefetchingFaculty || isRefetchingAdmin;
+
+  const handleRefreshAll = () => {
+    refetchFaculty();
+    refetchAdmin();
+  };
 
   const classAverage = facultyData?.data?.classAverage ?? 0;
   const atRiskCount = facultyData?.data?.atRiskCount ?? 0;
@@ -29,13 +37,16 @@ export default function PerformanceAnalyticsPage() {
   return (
     <div className="p-6 sm:p-8 space-y-8 animate-fade-in text-text-primary">
       {/* Header section */}
-      <div>
-        <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-          <TrendingUp className="w-6 h-6 text-accent" /> Performance Analytics
-        </h1>
-        <p className="text-xs text-text-secondary mt-1 font-semibold">
-          Monitor class learning statistics, track at-risk students, analyze weak topics, and compare batch-wise achievements.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
+            <TrendingUp className="w-6 h-6 text-accent" /> Performance Analytics
+          </h1>
+          <p className="text-xs text-text-secondary mt-1 font-semibold">
+            Monitor class learning statistics, track at-risk students, analyze weak topics, and compare batch-wise achievements.
+          </p>
+        </div>
+        <RefreshButton onRefresh={handleRefreshAll} isRefetching={isRefetching} />
       </div>
 
       {/* Tabs */}

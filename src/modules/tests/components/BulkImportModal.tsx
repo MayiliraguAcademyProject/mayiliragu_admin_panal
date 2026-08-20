@@ -7,6 +7,8 @@ import {
   Loader2 
 } from 'lucide-react';
 import { useImportQuestions } from '../../../core/api/endpoints';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 interface BulkImportModalProps {
   isOpen: boolean;
@@ -15,6 +17,7 @@ interface BulkImportModalProps {
 }
 
 export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalProps) {
+  const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -88,7 +91,9 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
     try {
       const result = await importMutation.mutateAsync({ file, testId: selectedTestId || undefined });
       if (result.status === 'success') {
-        setSuccessMsg(result.message || 'Successfully imported all questions!');
+        const msg = result.message || 'Successfully imported all questions!';
+        setSuccessMsg(msg);
+        toast.success(msg);
         setFile(null);
         setSelectedTestId('');
         setTimeout(() => {
@@ -99,12 +104,14 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
       }
     } catch (err: any) {
       const responseData = err.response?.data;
+      const msg = extractErrorMessage(err);
       if (responseData && responseData.summary && responseData.summary.errors) {
         setErrorDetails(responseData.summary.errors);
         setGeneralError(responseData.message || 'Import failed due to row-level validation errors.');
       } else {
-        setGeneralError(responseData?.message || err.message || 'An unexpected error occurred during import.');
+        setGeneralError(msg);
       }
+      toast.error(msg);
     }
   };
 

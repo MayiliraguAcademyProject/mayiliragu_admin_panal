@@ -57,10 +57,14 @@ import ExamAppModal from '../components/ExamAppModal';
 import DocModal from '../components/DocModal';
 import CommModal from '../components/CommModal';
 import ResetDeviceModal from '../components/ResetDeviceModal';
+import RefreshButton from '../../../shared/components/RefreshButton';
+import { useToast } from '../../../shared/context';
+import { extractErrorMessage } from '../../../shared/utils';
 
 type TabType = 'overview' | 'address_education' | 'exam_prep' | 'fees_payments' | 'performance' | 'mentoring' | 'exam_apps' | 'docs_history';
 
 export default function StudentManagementPage() {
+  const toast = useToast();
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -87,7 +91,7 @@ export default function StudentManagementPage() {
   const [isResettingDevice, setIsResettingDevice] = useState(false);
 
   // Queries
-  const { data: students = [], isLoading: isStudentsLoading, isError: isStudentsError, refetch: refetchStudents } = useStudentsList();
+  const { data: students = [], isLoading: isStudentsLoading, isError: isStudentsError, refetch: refetchStudents, isRefetching: isRefetchingStudents } = useStudentsList();
   const { data: enrollments = [], isLoading: isEnrollmentsLoading } = useStudentEnrollments(selectedStudent?.id ?? '');
   const { data: coursesData } = useCoursesList(1, 50);
   const { data: examCategories = [], isLoading: isCategoriesLoading } = useExamCategories();
@@ -450,20 +454,23 @@ export default function StudentManagementPage() {
         
         {/* Search header */}
         <div className="p-4 sm:p-5 border-b border-border/50 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <h2 className="text-xl font-black text-text-primary tracking-tight">
               Students Directory
             </h2>
-            <button
-              onClick={() => {
-                setEditingStudent(null);
-                setIsFormOpen(true);
-              }}
-              className="flex items-center space-x-1 bg-accent/10 hover:bg-accent/20 text-accent font-bold py-1.5 px-3 rounded-xl text-xs transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New Student</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <RefreshButton onRefresh={refetchStudents} isRefetching={isRefetchingStudents} className="p-1.5 py-1.5 rounded-xl border border-border/60 text-xs font-bold" />
+              <button
+                onClick={() => {
+                  setEditingStudent(null);
+                  setIsFormOpen(true);
+                }}
+                className="flex items-center space-x-1 bg-accent/10 hover:bg-accent/20 text-accent font-bold py-1.5 px-3 rounded-xl text-xs transition-colors h-8"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Student</span>
+              </button>
+            </div>
           </div>
           <div className="flex items-center bg-slate-50 border border-border/60 rounded-2xl px-4 py-2.5 shadow-xs">
             <Search className="w-4 h-4 text-gray-400 mr-2.5 flex-shrink-0" />
@@ -498,7 +505,7 @@ export default function StudentManagementPage() {
                   className={`p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer flex items-center justify-between group ${
                     isSelected
                       ? 'bg-accent/5 border-accent text-accent shadow-sm'
-                      : 'border-border/40 hover:border-slate-350 hover:bg-slate-50 text-text-primary'
+                      : 'border-border/40 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 text-text-primary'
                   }`}
                 >
                   <div className="flex items-center space-x-3 min-w-0">
@@ -1180,7 +1187,7 @@ export default function StudentManagementPage() {
                             {enrollments.map((enrollment: any) => (
                               <div
                                 key={enrollment.id}
-                                className="bg-cardBg border border-border/60 rounded-2xl p-4 flex items-center justify-between shadow-xs hover:border-slate-350 transition-colors"
+                                className="bg-cardBg border border-border/60 rounded-2xl p-4 flex items-center justify-between shadow-xs hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
                               >
                                 <div className="flex items-center space-x-3 min-w-0">
                                   <div className="w-12 h-12 bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 relative border border-border/45">
@@ -1895,6 +1902,8 @@ export default function StudentManagementPage() {
         onConfirm={handleConfirmDeleteStudent}
         title="Delete Student Profile"
         message={`Are you sure you want to permanently delete student "${studentToDelete?.name}"? All associated enrollments and profiles will be deleted.`}
+        confirmText="Delete"
+        isLoading={deleteStudentMutation.isPending}
       />
 
       <ConfirmModal
@@ -1905,6 +1914,7 @@ export default function StudentManagementPage() {
         message={`Are you sure you want to revoke the enrollment for course "${enrollmentToRevoke?.title}"?`}
         confirmText="Revoke"
         type="danger"
+        isLoading={revokeMutation.isPending || isRevokingId !== null}
       />
 
       <ResetDeviceModal
@@ -1914,12 +1924,12 @@ export default function StudentManagementPage() {
           if (!selectedStudent) return;
           setIsResettingDevice(true);
           try {
-            await apiClient.delete(`/profile/admin/students/${selectedStudent.id}/device`);
+            const res = await apiClient.delete(`/profile/admin/students/${selectedStudent.id}/device`);
             setIsResetDeviceModalOpen(false);
             refetchProfile();
-            alert(`Device binding reset successfully for ${selectedStudent.name}.`);
+            toast.success(res?.data?.message || `Device binding reset successfully for ${selectedStudent.name}.`);
           } catch (err: any) {
-            alert(err.response?.data?.message || 'Failed to reset device binding');
+            toast.error(extractErrorMessage(err));
           } finally {
             setIsResettingDevice(false);
           }

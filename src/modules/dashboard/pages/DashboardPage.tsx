@@ -9,9 +9,10 @@ import {
   BookMarked
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import RefreshButton from '../../../shared/components/RefreshButton';
 
 export default function DashboardPage() {
-  const { data: stats, isLoading, isError, refetch } = useAdminStats();
+  const { data: stats, isLoading, isError, refetch, isRefetching } = useAdminStats();
 
   const cards = [
     {
@@ -85,13 +86,16 @@ export default function DashboardPage() {
     <div className="p-6 sm:p-8 space-y-8 animate-fade-in">
 
       {/* Header section */}
-      <div>
-        <h1 className="text-3xl font-black text-text-primary tracking-tight">
-          System Overview
-        </h1>
-        <p className="text-text-secondary text-sm font-medium mt-1">
-          Monitor your LMS portal performance and manage curriculum schedules.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-text-primary tracking-tight">
+            System Overview
+          </h1>
+          <p className="text-text-secondary text-sm font-medium mt-1">
+            Monitor your LMS portal performance and manage curriculum schedules.
+          </p>
+        </div>
+        <RefreshButton onRefresh={refetch} isRefetching={isRefetching} />
       </div>
 
       {/* Grid count cards */}
