@@ -771,7 +771,7 @@ export function useDeleteAllQuestions() {
 // TESTS & TEST BUILDER ENDPOINTS
 // ==========================================
 
-export function useTestsList(filters?: { categoryId?: string; courseId?: string }) {
+export function useTestsList(filters?: { categoryId?: string; courseId?: string; testMode?: string }) {
   return useQuery<Test[]>({
     queryKey: ['tests', filters],
     queryFn: async () => {
