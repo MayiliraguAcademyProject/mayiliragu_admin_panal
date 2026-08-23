@@ -280,6 +280,14 @@ export interface Question {
   wordLimit?: number;
   explanation_image_url?: string | null;
   explanationImageUrl?: string | null;
+  source_batch?: string | null;
+  sourceBatch?: string | null;
+}
+
+export interface QuestionBatch {
+  name: string;
+  count: number;
+  latestUpload: string;
 }
 
 export interface QuestionStats {

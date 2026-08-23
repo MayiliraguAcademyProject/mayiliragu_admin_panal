@@ -6,7 +6,7 @@ import {
   CheckCircle, 
   Loader2 
 } from 'lucide-react';
-import { useImportQuestions } from '../../../core/api/endpoints';
+import { useImportQuestions, useQuestionBatches } from '../../../core/api/endpoints';
 import { useToast } from '../../../shared/context';
 import { extractErrorMessage } from '../../../shared/utils';
 
@@ -20,6 +20,7 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [batchName, setBatchName] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [errorDetails, setErrorDetails] = useState<any[]>([]);
   const [generalError, setGeneralError] = useState<string | null>(null);
@@ -28,6 +29,7 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
   const [selectedTestId, setSelectedTestId] = useState<string>('');
   
   const importMutation = useImportQuestions();
+  const { data: existingBatches = [] } = useQuestionBatches();
 
   if (!isOpen) return null;
 
@@ -78,6 +80,7 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
     }
 
     setFile(selectedFile);
+    setBatchName(selectedFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').trim());
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,12 +92,17 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
     setSuccessMsg(null);
 
     try {
-      const result = await importMutation.mutateAsync({ file, testId: selectedTestId || undefined });
+      const result = await importMutation.mutateAsync({ 
+        file, 
+        testId: selectedTestId || undefined,
+        batchName: batchName.trim() || undefined
+      });
       if (result.status === 'success') {
         const msg = result.message || 'Successfully imported all questions!';
         setSuccessMsg(msg);
         toast.success(msg);
         setFile(null);
+        setBatchName('');
         setSelectedTestId('');
         setTimeout(() => {
           onSuccess();
@@ -184,7 +192,28 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImpo
               <p className="text-[10px] text-slate-400 font-medium">
                 Selecting a test will link all imported questions to that specific test.
               </p>
-            </div> */}
+            {/* Batch Name Input Field */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black uppercase text-slate-500 tracking-wider flex items-center justify-between">
+                <span>Batch Name / Tag</span>
+                <span className="text-[9px] text-accent font-semibold lowercase">optional</span>
+              </label>
+              <input
+                type="text"
+                list="bulk-batch-suggestions"
+                value={batchName}
+                onChange={(e) => setBatchName(e.target.value)}
+                placeholder="e.g. TNPSC 2026 Model Test 1"
+                className="w-full px-3.5 py-2.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent font-bold text-slate-700 placeholder:font-normal"
+              />
+              <datalist id="bulk-batch-suggestions">
+                {existingBatches.map((b) => (
+                  <option key={b.name} value={b.name}>
+                    {b.name} ({b.count} questions)
+                  </option>
+                ))}
+              </datalist>
+            </div>
 
             <div 
               onDragEnter={handleDrag}

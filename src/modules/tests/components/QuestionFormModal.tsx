@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useExamCategories, apiClient } from '../../../core/api/endpoints';
+import { useExamCategories, useQuestionBatches, apiClient } from '../../../core/api/endpoints';
 import { type Question } from '../../../core/types';
 import { Loader2, X, Plus, Trash2, Upload } from 'lucide-react';
 import { useToast } from '../../../shared/context';
@@ -9,7 +9,7 @@ interface QuestionFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
-  question?: Question; // If provided, we are in Edit mode
+  question?: Question | null;
   defaultCategoryId?: string;
   defaultSubjectName?: string;
   isLoading?: boolean;
@@ -28,6 +28,7 @@ export default function QuestionFormModal({
 }: QuestionFormModalProps) {
   const toast = useToast();
   const { data: categories = EMPTY_CATEGORIES } = useExamCategories();
+  const { data: existingBatches = [] } = useQuestionBatches();
 
   const subjects = useMemo(() => {
     return categories.flatMap((cat) => cat.subjects || []);
@@ -44,6 +45,7 @@ export default function QuestionFormModal({
   const [categoryId, setCategoryId] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
+  const [sourceBatch, setSourceBatch] = useState('');
   const [difficulty, setDifficulty] = useState('medium');
   const [explanationEn, setExplanationEn] = useState('');
   const [explanationTa, setExplanationTa] = useState('');
@@ -128,6 +130,7 @@ export default function QuestionFormModal({
        }
        setModelAnswer(question.model_answer || question.modelAnswer || '');
        setWordLimit(question.word_limit ?? question.wordLimit ?? 200);
+       setSourceBatch(question.source_batch || question.sourceBatch || '');
     } else {
        // Create Mode
        setQuestionTextEn('');
@@ -155,6 +158,7 @@ export default function QuestionFormModal({
        setCategoryId('');
        setSubjectId('');
        setTopicId('');
+       setSourceBatch('');
      }
    }, [question, isOpen]);
 
@@ -307,6 +311,7 @@ export default function QuestionFormModal({
       exam_category: categoryId,
       subject_id: subjectId || undefined,
       topic_id: topicId || undefined,
+      source_batch: sourceBatch.trim() || undefined,
       difficulty,
       explanation_en: explanationEn || undefined,
       explanation_ta: explanationTa || undefined,
@@ -358,20 +363,20 @@ export default function QuestionFormModal({
       <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh] scale-100 transition-all duration-300 animate-in fade-in zoom-in-95">
         
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 rounded-t-2xl">
           <div>
-            <h3 className="text-sm font-black text-slate-800">
-              {question ? 'Edit Question' : 'Create New Question'}
-            </h3>
-            <p className="text-[10px] text-slate-500 font-bold mt-0.5">
-              Add bilingual assessments for tests and quizzes
+            <h2 className="text-base font-black text-slate-800">
+              {question ? 'Edit Question Details' : 'Create New Assessment Question'}
+            </h2>
+            <p className="text-xs font-semibold text-slate-400 mt-0.5">
+              Define question body, taxonomy metadata, option keys, and scoring logic
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -379,7 +384,7 @@ export default function QuestionFormModal({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           
           {/* Metadata Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1.5">
                 Exam Category *
@@ -431,6 +436,28 @@ export default function QuestionFormModal({
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1.5 flex items-center justify-between">
+                <span>Batch Name</span>
+                <span className="text-[9px] text-accent font-semibold lowercase">optional</span>
+              </label>
+              <input
+                type="text"
+                list="qform-batch-suggestions"
+                value={sourceBatch}
+                onChange={(e) => setSourceBatch(e.target.value)}
+                placeholder="e.g. TNPSC 2026 Mock 1"
+                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent font-medium text-slate-700"
+              />
+              <datalist id="qform-batch-suggestions">
+                {existingBatches.map((b) => (
+                  <option key={b.name} value={b.name}>
+                    {b.name} ({b.count} questions)
+                  </option>
+                ))}
+              </datalist>
             </div>
           </div>
 

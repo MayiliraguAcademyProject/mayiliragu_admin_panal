@@ -15,9 +15,10 @@ import {
   Clock,
   Award,
   Sparkles,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
-import { useQuestionsList, useExamCategories } from '../../../core/api/endpoints';
+import { useQuestionsList, useQuestionBatches, useExamCategories } from '../../../core/api/endpoints';
 import type { Question, Test } from '../../../core/types';
 import { useToast } from '../../../shared/context';
 
@@ -27,6 +28,12 @@ interface TestBuilderWizardModalProps {
   onSubmit: (data: any) => Promise<void>;
   test?: Test;
   isLoading?: boolean;
+  preSelectedQuestions?: Question[];
+  prefilledTitle?: string;
+  prefilledSubjectId?: string;
+  prefilledCategoryId?: string;
+  prefilledBatchName?: string;
+  prefilledSections?: any[];
 }
 
 export default function TestBuilderWizardModal({
@@ -35,12 +42,19 @@ export default function TestBuilderWizardModal({
   onSubmit,
   test,
   isLoading = false,
+  preSelectedQuestions,
+  prefilledTitle,
+  prefilledSubjectId,
+  prefilledCategoryId,
+  prefilledBatchName,
+  prefilledSections,
 }: TestBuilderWizardModalProps) {
   const toast = useToast();
   const [internalSubmitting, setInternalSubmitting] = useState(false);
   const isSubmitting = internalSubmitting || isLoading;
   const [step, setStep] = useState(1);
   const { data: categories = [] } = useExamCategories();
+  const { data: questionBatches = [] } = useQuestionBatches();
 
   const subjects = useMemo(() => {
     return categories.flatMap((cat) => cat.subjects || []);
@@ -77,6 +91,8 @@ export default function TestBuilderWizardModal({
   const [repoSubject, setRepoSubject] = useState('all');
   const [repoType, setRepoType] = useState('all');
   const [repoDifficulty, setRepoDifficulty] = useState('all');
+  const [repoSourceBatch, setRepoSourceBatch] = useState('all');
+  const [repoUnusedOnly, setRepoUnusedOnly] = useState(false);
   const [repoSearch, setRepoSearch] = useState('');
   const [randomCount, setRandomCount] = useState(5);
 
@@ -85,6 +101,8 @@ export default function TestBuilderWizardModal({
     subject: repoSubject !== 'all' ? repoSubject : undefined,
     type: repoType !== 'all' ? repoType : undefined,
     difficulty: repoDifficulty !== 'all' ? repoDifficulty : undefined,
+    sourceBatch: repoSourceBatch !== 'all' ? repoSourceBatch : undefined,
+    unusedOnly: repoUnusedOnly ? true : undefined,
   });
 
   // Client side search matching
@@ -110,7 +128,7 @@ export default function TestBuilderWizardModal({
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
-  // Load test if editing
+  // Load test if editing or pre-filled from upload
   useEffect(() => {
     if (test) {
       const mode = test.test_mode || (test.is_sectioned ? 'TEST_SERIES' : 'SUBJECT_WISE');
@@ -150,6 +168,80 @@ export default function TestBuilderWizardModal({
         setSelectedQuestions(sorted);
       }
       setStep(1);
+    } else if (preSelectedQuestions && preSelectedQuestions.length > 0) {
+      // 1-Click Fast-Track Flow from PDF Parser / Upload
+      const isMultiSubject = !prefilledSubjectId;
+      const initialMode = isMultiSubject ? 'TEST_SERIES' : 'SUBJECT_WISE';
+      setTestMode(initialMode);
+      setTitle(prefilledTitle || (isMultiSubject ? 'New Mock Test Series' : 'New Practice Test'));
+      setDescription(`Comprehensive test with ${preSelectedQuestions.length} questions from ${prefilledBatchName || 'uploaded questions'}.`);
+      setDuration(Math.max(10, Math.round(preSelectedQuestions.length * 1.5)));
+      setCutoffMarks(Math.max(1, Math.round(preSelectedQuestions.length * 0.4)));
+      setCategoryId(prefilledCategoryId || '');
+      setSubjectId(prefilledSubjectId || '');
+      setTopicId('');
+      setIsPublished(true);
+      setIsPaid(false);
+      setTargetCategory(prefilledCategoryId || '');
+      setScheduledAt('');
+      
+      if (prefilledSections && prefilledSections.length > 0) {
+        setIsSectioned(true);
+        setTestMode('TEST_SERIES');
+        const formattedSections = prefilledSections.map((s: any, idx: number) => ({
+          tempId: s.id || `sec_${idx + 1}`,
+          name: s.name || `Section ${idx + 1}`,
+          order: idx,
+          duration: Number(s.duration) || 20,
+          cutoff_marks: Number(s.cutoff_marks) || 35,
+          total_marks: Number(s.total_marks) || 0
+        }));
+        setSections(formattedSections);
+        const totalDuration = prefilledSections.reduce((sum: number, s: any) => sum + (Number(s.duration) || 0), 0);
+        if (totalDuration > 0) {
+          setDuration(totalDuration);
+        }
+
+        const mapped = preSelectedQuestions.map((q: any, qIdx: number) => {
+          const qNum = q.number || (qIdx + 1);
+          const matchingSec = prefilledSections.find((s: any) =>
+            (s.fromNumber && s.toNumber && qNum >= s.fromNumber && qNum <= s.toNumber) ||
+            (s.name && q.sectionName && s.name.trim().toLowerCase() === q.sectionName.trim().toLowerCase())
+          ) || formattedSections[0];
+          const matchedTempId = matchingSec.tempId || matchingSec.id || formattedSections[0].tempId;
+          return {
+            ...q,
+            section_id: matchedTempId,
+            section_temp_id: matchedTempId
+          };
+        });
+        setSelectedQuestions(mapped);
+      } else if (isMultiSubject) {
+        setIsSectioned(true);
+        const defaultSections = [
+          { tempId: 'sec_1', name: 'Section 1 (e.g. Quantitative / Aptitude)', order: 0, duration: Math.max(10, Math.round(preSelectedQuestions.length * 0.75)), cutoff_marks: 35, total_marks: 0 },
+          { tempId: 'sec_2', name: 'Section 2 (e.g. Reasoning / General Studies)', order: 1, duration: Math.max(10, Math.round(preSelectedQuestions.length * 0.75)), cutoff_marks: 35, total_marks: 0 }
+        ];
+        setSections(defaultSections);
+        const mapped = preSelectedQuestions.map((q) => ({
+          ...q,
+          section_id: defaultSections[0].tempId,
+          section_temp_id: defaultSections[0].tempId
+        }));
+        setSelectedQuestions(mapped);
+      } else {
+        setIsSectioned(false);
+        setSections([]);
+        setSelectedQuestions(preSelectedQuestions);
+      }
+
+      if (prefilledSubjectId) {
+        setRepoSubject(prefilledSubjectId);
+      }
+      if (prefilledBatchName) {
+        setRepoSourceBatch(prefilledBatchName);
+      }
+      setStep(1);
     } else {
       // Reset
       setTestMode('SUBJECT_WISE');
@@ -167,9 +259,12 @@ export default function TestBuilderWizardModal({
       setIsSectioned(false);
       setSections([]);
       setSelectedQuestions([]);
+      setRepoSubject('all');
+      setRepoSourceBatch('all');
+      setRepoUnusedOnly(false);
       setStep(1);
     }
-  }, [test, isOpen]);
+  }, [test, isOpen, preSelectedQuestions, prefilledTitle, prefilledSubjectId, prefilledCategoryId, prefilledBatchName]);
 
   // Keep duration in sync with sum of section durations if sectioned
   useEffect(() => {
@@ -282,6 +377,10 @@ export default function TestBuilderWizardModal({
         toast.error('Subject is required for Subject-Wise tests');
         return;
       }
+      // Auto-scope Step 3 repository to the subject selected in Step 2
+      if (repoSubject === 'all' || !repoSubject) {
+        setRepoSubject(subjectId);
+      }
     }
     if (step === 2 && testMode === 'TEST_SERIES') {
       if (sections.length < 2) {
@@ -321,8 +420,8 @@ export default function TestBuilderWizardModal({
     const questionsPayload = selectedQuestions.map((q, idx) => ({
       questionId: q.id,
       order: idx,
-      section_id: q.section_id || null,
-      section_temp_id: q.section_temp_id || null
+      section_id: testMode === 'TEST_SERIES' ? (q.section_id || null) : null,
+      section_temp_id: testMode === 'TEST_SERIES' ? (q.section_temp_id || null) : null
     }));
 
     const payload = {
@@ -340,7 +439,7 @@ export default function TestBuilderWizardModal({
       topic_id: testMode === 'SUBJECT_WISE' ? (topicId || null) : null,
       is_published: isPublished,
       is_paid: isPaid,
-      target_category: targetCategory || null,
+      target_category: testMode === 'TEST_SERIES' ? (targetCategory || null) : null,
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
       is_sectioned: testMode === 'TEST_SERIES',
       sections: testMode === 'TEST_SERIES' ? sections.map((s, idx) => ({
@@ -367,7 +466,7 @@ export default function TestBuilderWizardModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-6xl h-[88vh] bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="w-full max-w-5xl h-[88vh] bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
         
         {/* Header */}
         <div className="p-6 border-b border-border/45 flex items-center justify-between bg-slate-50/50">
@@ -408,12 +507,27 @@ export default function TestBuilderWizardModal({
           ))}
         </div>
 
+        {/* 1-Click Fast-Track Pre-fill Banner */}
+        {prefilledBatchName && selectedQuestions.length > 0 && (
+          <div className="mx-6 mt-3 px-4 py-2.5 bg-emerald-50/90 border border-emerald-200/80 rounded-2xl text-emerald-900 text-xs font-bold flex items-center justify-between shadow-xs">
+            <div className="flex items-center space-x-2.5">
+              <Sparkles className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>
+                Pre-filled from upload: <strong>{prefilledBatchName}</strong> ({selectedQuestions.length} Questions pre-selected in workspace)
+              </span>
+            </div>
+            <span className="text-[9px] bg-emerald-200/70 px-2 py-0.5 rounded-md text-emerald-950 font-black uppercase tracking-wider">
+              1-Click Fast Track
+            </span>
+          </div>
+        )}
+
         {/* Content Area */}
         <div className="flex-1 overflow-hidden min-h-0 flex flex-col p-6">
           
           {/* STEP 1: TEST MODE SELECTION */}
           {step === 1 && (
-            <div className="flex-1 overflow-y-auto space-y-6 max-w-2xl mx-auto w-full py-6 flex flex-col justify-center">
+            <div className="flex-1 overflow-y-auto space-y-6 max-w-3xl mx-auto w-full py-6 flex flex-col justify-center">
               <div className="text-center space-y-2 mb-2">
                 <h3 className="text-base font-black text-text-primary uppercase tracking-wider">
                   Select Test Architecture Mode
@@ -505,7 +619,7 @@ export default function TestBuilderWizardModal({
 
           {/* STEP 2: METADATA & SCOPE */}
           {step === 2 && (
-            <div className="flex-1 overflow-y-auto space-y-6 max-w-2xl mx-auto w-full py-4">
+            <div className="flex-1 overflow-y-auto space-y-6 max-w-3xl mx-auto w-full py-4">
               <div className="space-y-4">
                 
                 {/* Title */}
@@ -704,44 +818,77 @@ export default function TestBuilderWizardModal({
                       </div>
                     )}
 
-                    <div className="space-y-3">
+                    {/* Table Header with clear labels */}
+                    <div className="flex items-center gap-3 px-3 py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded-xl text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">
+                      <span className="w-6 text-center">#</span>
+                      <span className="flex-1">Section Name (Subject / Topic)</span>
+                      <span className="w-32 flex items-center space-x-1">
+                        <Clock className="w-3 h-3 text-blue-500" />
+                        <span>Timer (Mins)</span>
+                      </span>
+                      <span className="w-32 flex items-center space-x-1">
+                        <Award className="w-3 h-3 text-emerald-500" />
+                        <span>Cutoff Marks</span>
+                      </span>
+                      <span className="w-20 text-right pr-2">Reorder / Del</span>
+                    </div>
+
+                    <div className="space-y-2.5">
                       {sections.map((sec, idx) => (
-                        <div key={sec.id || sec.tempId || idx} className="flex items-center gap-3 p-3 border border-border/50 rounded-xl bg-cardBg text-xs">
-                          <span className="font-extrabold text-text-secondary w-4 text-center">{idx + 1}</span>
-                          <div className="flex-1 grid grid-cols-3 gap-2">
+                        <div key={sec.id || sec.tempId || idx} className="flex items-center gap-3 p-2.5 border border-border/60 rounded-xl bg-cardBg shadow-xs text-xs hover:border-accent/40 transition-colors">
+                          <span className="font-extrabold text-accent w-6 text-center text-xs">{idx + 1}</span>
+                          
+                          {/* Section Name */}
+                          <div className="flex-1">
                             <input
                               type="text"
                               value={sec.name}
-                              placeholder="Section Name"
+                              placeholder="e.g. Quantitative Aptitude"
                               onChange={(e) => {
                                 const newSecs = [...sections];
                                 newSecs[idx].name = e.target.value;
                                 setSections(newSecs);
                               }}
-                              className="px-2 py-1 bg-white border border-border/60 rounded-lg text-xs font-semibold text-text-primary outline-none focus:border-accent"
+                              className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-border/60 rounded-lg text-xs font-bold text-text-primary outline-none focus:border-accent"
                             />
+                          </div>
+
+                          {/* Duration (Time in Minutes) */}
+                          <div className="w-32 relative">
                             <input
                               type="number"
+                              min="1"
                               value={sec.duration}
-                              placeholder="Duration (min)"
+                              placeholder="20"
                               onChange={(e) => {
                                 const newSecs = [...sections];
                                 newSecs[idx].duration = Math.max(1, Number(e.target.value));
                                 setSections(newSecs);
                               }}
-                              className="px-2 py-1 bg-white border border-border/60 rounded-lg text-xs font-semibold text-text-primary outline-none focus:border-accent"
+                              className="w-full pl-2.5 pr-9 py-1.5 bg-slate-50 dark:bg-slate-900 border border-border/60 rounded-lg text-xs font-bold text-text-primary outline-none focus:border-accent"
                             />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-text-secondary pointer-events-none">
+                              mins
+                            </span>
+                          </div>
+
+                          {/* Cutoff Marks */}
+                          <div className="w-32 relative">
                             <input
                               type="number"
+                              min="0"
                               value={sec.cutoff_marks}
-                              placeholder="Cutoff (%)"
+                              placeholder="35"
                               onChange={(e) => {
                                 const newSecs = [...sections];
                                 newSecs[idx].cutoff_marks = Math.max(0, Number(e.target.value));
                                 setSections(newSecs);
                               }}
-                              className="px-2 py-1 bg-white border border-border/60 rounded-lg text-xs font-semibold text-text-primary outline-none focus:border-accent"
+                              className="w-full pl-2.5 pr-11 py-1.5 bg-slate-50 dark:bg-slate-900 border border-border/60 rounded-lg text-xs font-bold text-text-primary outline-none focus:border-accent"
                             />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-text-secondary pointer-events-none">
+                              marks
+                            </span>
                           </div>
                           
                           <div className="flex items-center space-x-1">
@@ -875,7 +1022,7 @@ export default function TestBuilderWizardModal({
                   </div>
 
                   {/* Filter Toolbar */}
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-4 gap-1.5">
                     <select
                       value={repoSubject}
                       onChange={(e) => setRepoSubject(e.target.value)}
@@ -910,6 +1057,19 @@ export default function TestBuilderWizardModal({
                       <option value="medium">Medium</option>
                       <option value="hard">Hard</option>
                     </select>
+
+                    <select
+                      value={repoSourceBatch}
+                      onChange={(e) => setRepoSourceBatch(e.target.value)}
+                      className="px-2 py-1 bg-white border border-border/60 rounded-lg text-[10px] font-bold text-text-secondary outline-none focus:border-accent"
+                    >
+                      <option value="all">📁 All Batches</option>
+                      {questionBatches.map((b) => (
+                        <option key={b.name} value={b.name}>
+                          📄 {b.name} ({b.count} Qs)
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -923,6 +1083,17 @@ export default function TestBuilderWizardModal({
                         className="w-full pl-8 pr-3 py-1.5 bg-white border border-border/70 rounded-xl text-[10px] font-bold text-text-primary outline-none focus:border-accent"
                       />
                     </div>
+
+                    {/* Unused only toggle */}
+                    <label className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-white border border-border/70 rounded-xl text-[10px] font-extrabold text-text-secondary cursor-pointer hover:border-accent shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={repoUnusedOnly}
+                        onChange={(e) => setRepoUnusedOnly(e.target.checked)}
+                        className="rounded border-gray-300 text-accent focus:ring-0 w-3.5 h-3.5"
+                      />
+                      <span className="whitespace-nowrap">Unused Only</span>
+                    </label>
 
                     {/* Random auto-pick option */}
                     <div className="flex items-center space-x-1 border border-dashed border-accent/40 bg-accent/5 px-2 py-1 rounded-lg">
@@ -1250,6 +1421,14 @@ export default function TestBuilderWizardModal({
                         const q = selectedQuestions[previewIndex];
                         if (!q) return null;
                         return (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-text-primary">
+                                Question {previewIndex + 1}
+                              </span>
+                              {q.type && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary uppercase">
+                                  {q.type}
                                 </span>
                               )}
                             </div>
