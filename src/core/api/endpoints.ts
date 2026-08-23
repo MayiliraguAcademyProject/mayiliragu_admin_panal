@@ -13,6 +13,7 @@ import type {
   Student, 
   Enrollment, 
   Question, 
+  QuestionBatch,
   QuestionStats,
   Test,
   Banner,
@@ -678,26 +679,49 @@ export function useQuestionsList(filters: {
   type?: string;
   difficulty?: string;
   search?: string;
+  sourceBatch?: string;
+  topic?: string;
+  unusedOnly?: boolean;
 }) {
   return useQuery<Question[]>({
     queryKey: ['questions', filters],
     queryFn: async () => {
       const params: Record<string, string> = {};
-      if (filters.subject && filters.subject !== 'All Subjects') {
+      if (filters.subject && filters.subject !== 'All Subjects' && filters.subject !== 'all') {
         params.subject = filters.subject;
       }
-      if (filters.type && filters.type !== 'All Types') {
+      if (filters.type && filters.type !== 'All Types' && filters.type !== 'all') {
         params.type = filters.type;
       }
-      if (filters.difficulty && filters.difficulty !== 'Difficulty: All') {
+      if (filters.difficulty && filters.difficulty !== 'Difficulty: All' && filters.difficulty !== 'all') {
         params.difficulty = filters.difficulty;
       }
       if (filters.search) {
         params.search = filters.search;
       }
+      if (filters.sourceBatch && filters.sourceBatch !== 'All Batches' && filters.sourceBatch !== 'all') {
+        params.sourceBatch = filters.sourceBatch;
+      }
+      if (filters.topic && filters.topic !== 'all') {
+        params.topic = filters.topic;
+      }
+      if (filters.unusedOnly) {
+        params.unusedOnly = 'true';
+      }
       const response = await apiClient.get(ApiConstants.questions.base, { params });
       return response.data.data;
     },
+  });
+}
+
+export function useQuestionBatches() {
+  return useQuery<QuestionBatch[]>({
+    queryKey: ['questionBatches'],
+    queryFn: async () => {
+      const response = await apiClient.get('/questions/batches');
+      return response.data.data;
+    },
+    staleTime: 60 * 1000,
   });
 }
 
@@ -1130,11 +1154,14 @@ export async function exportQuestionsToExcel(filters: {
 export function useImportQuestions() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ file, testId }: { file: File; testId?: string }) => {
+    mutationFn: async ({ file, testId, batchName }: { file: File; testId?: string; batchName?: string }) => {
       const formData = new FormData();
       formData.append('file', file);
       if (testId) {
         formData.append('testId', testId);
+      }
+      if (batchName) {
+        formData.append('batchName', batchName);
       }
       const response = await apiClient.post(ApiConstants.questions.import, formData, {
         headers: {
@@ -1146,6 +1173,7 @@ export function useImportQuestions() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['questions'] });
       queryClient.invalidateQueries({ queryKey: ['questionStats'] });
+      queryClient.invalidateQueries({ queryKey: ['questionBatches'] });
     },
   });
 }

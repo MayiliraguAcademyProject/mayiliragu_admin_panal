@@ -18,7 +18,8 @@ import {
   useCreateCategory,
   useDeleteCategory,
   useTestAnalytics,
-  useAllTestAttempts
+  useAllTestAttempts,
+  useQuestionBatches
 } from '../../../core/api/endpoints';
 import { exportQuestionsToExcel } from '../../../core/api/endpoints';
 import { type Question, type Test } from '../../../core/types';
@@ -104,6 +105,7 @@ export default function TestsPage() {
   const [selectedSubject, setSelectedSubject] = useState('All Subjects');
   const [selectedType, setSelectedType] = useState('All Types');
   const [selectedDifficulty, setSelectedDifficulty] = useState('Difficulty: All');
+  const [selectedBatch, setSelectedBatch] = useState('All Batches');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals state
@@ -122,10 +124,12 @@ export default function TestsPage() {
 
   // React Query queries
   const { data: stats, isLoading: isStatsLoading, refetch: refetchStats, isRefetching: isRefetchingStats } = useQuestionStats();
+  const { data: questionBatches = [] } = useQuestionBatches();
   const { data: questions = [], isLoading: isQuestionsLoading, refetch: refetchQuestions, isRefetching: isRefetchingQuestions } = useQuestionsList({
     subject: selectedSubject,
     type: selectedType,
     difficulty: selectedDifficulty,
+    sourceBatch: selectedBatch !== 'All Batches' ? selectedBatch : undefined,
     search: searchQuery,
   });
 
@@ -271,13 +275,21 @@ export default function TestsPage() {
     setIsTestModalOpen(true);
   };
 
-  const handleDeleteTest = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this test?')) {
+  const [testToDelete, setTestToDelete] = useState<Test | null>(null);
+
+  const handleDeleteTest = (t: Test) => {
+    setTestToDelete(t);
+  };
+
+  const handleConfirmDeleteTest = async () => {
+    if (testToDelete) {
       try {
-        const res = await deleteTestMutation.mutateAsync(id);
+        const res = await deleteTestMutation.mutateAsync(testToDelete.id);
         toast.success(res?.message || 'Test deleted successfully!');
       } catch (err) {
         toast.error(extractErrorMessage(err));
+      } finally {
+        setTestToDelete(null);
       }
     }
   };
@@ -460,6 +472,19 @@ export default function TestsPage() {
                   <option value="Hard">Hard</option>
                 </select>
 
+                <select
+                  value={selectedBatch}
+                  onChange={(e) => setSelectedBatch(e.target.value)}
+                  className="px-3 py-2 bg-slate-50 border border-border/50 rounded-xl text-xs font-bold text-text-secondary outline-none focus:border-accent max-w-xs"
+                >
+                  <option value="All Batches">📁 All Batches</option>
+                  {questionBatches.map((b) => (
+                    <option key={b.name} value={b.name}>
+                      📄 {b.name} ({b.count})
+                    </option>
+                  ))}
+                </select>
+
                 <button
                   onClick={() => setIsBulkImportOpen(true)}
                   className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-border/50 text-text-secondary font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all"
@@ -550,7 +575,12 @@ export default function TestsPage() {
                               )}
                             </td>
                             <td className="py-4 px-4 text-text-secondary font-bold uppercase tracking-wider text-[10px]">
-                              {q.subject_id || 'General'}
+                              <div>{q.subject_id || 'General'}</div>
+                              {q.source_batch && (
+                                <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold text-[8px] normal-case tracking-normal border border-blue-100">
+                                  📁 {q.source_batch}
+                                </span>
+                              )}
                             </td>
                             <td className="py-4 px-4 text-text-secondary font-semibold uppercase tracking-wider text-[10px]">
                               {q.type.replace('_', ' ')}
@@ -883,7 +913,7 @@ export default function TestsPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteTest(t.id)}
+                              onClick={() => handleDeleteTest(t)}
                               className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg hover:border-rose-450 hover:text-rose-600 font-bold text-[10px] transition-colors"
                             >
                               Delete
@@ -1194,6 +1224,17 @@ export default function TestsPage() {
         title="Delete Category"
         message={`Are you sure you want to delete the category "${categoryToDelete?.name}"? This will delete all associated subjects and topics.`}
         isLoading={deleteCategoryMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={testToDelete !== null}
+        onClose={() => setTestToDelete(null)}
+        onConfirm={handleConfirmDeleteTest}
+        title="Delete Test Assessment"
+        message={`Are you sure you want to delete "${testToDelete?.title}"? All student attempts and records associated with this test will be affected.`}
+        confirmText="Delete Test"
+        type="danger"
+        isLoading={deleteTestMutation.isPending}
       />
 
       <TestReviewsModal
