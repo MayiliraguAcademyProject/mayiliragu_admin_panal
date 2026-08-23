@@ -337,6 +337,8 @@ export interface Banner {
   planDescription?: string | null;
   validityDays?: number | null;
   curriculumJson?: string | null;
+  curriculumPdfUrl?: string | null;
+  curriculumPdfName?: string | null;
   isActive: boolean;
   order: number;
   createdAt: string;

@@ -886,9 +886,12 @@ export function useCreateBanner() {
       planDescription,
       validityDays,
       curriculumJson,
+      curriculumPdfUrl,
+      curriculumPdfName,
       order,
       isActive,
       file,
+      pdf,
     }: {
       title: string;
       imageUrl?: string;
@@ -901,9 +904,12 @@ export function useCreateBanner() {
       planDescription?: string | null;
       validityDays?: number | null;
       curriculumJson?: string | null;
+      curriculumPdfUrl?: string | null;
+      curriculumPdfName?: string | null;
       order: number;
       isActive: boolean;
       file?: File;
+      pdf?: File;
     }) => {
       const formData = new FormData();
       formData.append('title', title);
@@ -917,10 +923,15 @@ export function useCreateBanner() {
       if (planDescription) formData.append('planDescription', planDescription);
       if (validityDays !== undefined && validityDays !== null) formData.append('validityDays', String(validityDays));
       if (curriculumJson) formData.append('curriculumJson', curriculumJson);
+      if (curriculumPdfUrl) formData.append('curriculumPdfUrl', curriculumPdfUrl);
+      if (curriculumPdfName) formData.append('curriculumPdfName', curriculumPdfName);
       formData.append('order', String(order));
       formData.append('isActive', String(isActive));
       if (file) {
         formData.append('file', file);
+      }
+      if (pdf) {
+        formData.append('pdf', pdf);
       }
 
       const response = await apiClient.post(ApiConstants.banners.base, formData, {
@@ -937,7 +948,17 @@ export function useCreateBanner() {
 export function useUpdateBanner() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data, file }: { id: string; data: Partial<Banner>; file?: File }) => {
+    mutationFn: async ({
+      id,
+      data,
+      file,
+      pdf,
+    }: {
+      id: string;
+      data: Partial<Banner>;
+      file?: File;
+      pdf?: File;
+    }) => {
       const formData = new FormData();
       if (data.title !== undefined) formData.append('title', data.title);
       if (data.imageUrl !== undefined) formData.append('imageUrl', data.imageUrl);
@@ -950,10 +971,15 @@ export function useUpdateBanner() {
       if (data.planDescription !== undefined) formData.append('planDescription', data.planDescription || '');
       if (data.validityDays !== undefined) formData.append('validityDays', data.validityDays !== null ? String(data.validityDays) : '');
       if (data.curriculumJson !== undefined) formData.append('curriculumJson', data.curriculumJson || '');
+      if (data.curriculumPdfUrl !== undefined) formData.append('curriculumPdfUrl', data.curriculumPdfUrl || '');
+      if (data.curriculumPdfName !== undefined) formData.append('curriculumPdfName', data.curriculumPdfName || '');
       if (data.order !== undefined) formData.append('order', String(data.order));
       if (data.isActive !== undefined) formData.append('isActive', String(data.isActive));
       if (file) {
         formData.append('file', file);
+      }
+      if (pdf) {
+        formData.append('pdf', pdf);
       }
 
       const response = await apiClient.put(ApiConstants.banners.detail(id), formData, {
