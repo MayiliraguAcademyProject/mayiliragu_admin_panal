@@ -30,6 +30,8 @@ const LiveStreamsPage = React.lazy(() => import('../../modules/app-config/pages/
 const TestimonialsPage = React.lazy(() => import('../../modules/app-config/pages/TestimonialsPage'));
 const ExamUpdatesPage = React.lazy(() => import('../../modules/app-config/pages/ExamUpdatesPage'));
 const GuestLeadsPage = React.lazy(() => import('../../modules/guest-leads/pages/GuestLeadsPage'));
+const TestBatchesPage = React.lazy(() => import('../../modules/test-batches/pages/TestBatchesPage'));
+const TestBatchDetailPage = React.lazy(() => import('../../modules/test-batches/pages/TestBatchDetailPage'));
 
 
 // Loading fallback component
@@ -221,6 +223,22 @@ export const router = createBrowserRouter([
         element: (
           <React.Suspense fallback={<SuspenseFallback />}>
             <ExamUpdatesPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'test-batches',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <TestBatchesPage />
+          </React.Suspense>
+        ),
+      },
+      {
+        path: 'test-batches/:id',
+        element: (
+          <React.Suspense fallback={<SuspenseFallback />}>
+            <TestBatchDetailPage />
           </React.Suspense>
         ),
       },

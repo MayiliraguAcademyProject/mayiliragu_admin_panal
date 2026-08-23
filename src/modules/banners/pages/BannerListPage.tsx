@@ -8,7 +8,8 @@ import {
   Link as LinkIcon,
   AlertTriangle,
   Sparkles,
-  X
+  X,
+  FileText
 } from 'lucide-react';
 import {
   useBannersAdminList,
@@ -57,8 +58,8 @@ export default function BannerListPage() {
     setEditingBanner(null);
   };
 
-  const onSubmit = async (values: BannerFormValues, file: File | null) => {
-    console.log('[BannerListPage] 📥 onSubmit called!', { isEditing: !!editingBanner, values, file: file?.name });
+  const onSubmit = async (values: BannerFormValues, file: File | null, pdfFile: File | null) => {
+    console.log('[BannerListPage] 📥 onSubmit called!', { isEditing: !!editingBanner, values, file: file?.name, pdf: pdfFile?.name });
     try {
       if (editingBanner) {
         console.log('[BannerListPage] Updating banner:', editingBanner.id);
@@ -76,10 +77,13 @@ export default function BannerListPage() {
             planDescription: values.planDescription,
             validityDays: values.validityDays,
             curriculumJson: values.curriculumJson,
+            curriculumPdfUrl: values.curriculumPdfUrl,
+            curriculumPdfName: values.curriculumPdfName,
             order: values.order,
             isActive: values.isActive,
           },
           file: file || undefined,
+          pdf: pdfFile || undefined,
         });
         console.log('[BannerListPage] ✅ Banner update SUCCESS:', res);
         toast.success(res?.message || 'Banner updated successfully!');
@@ -97,9 +101,12 @@ export default function BannerListPage() {
           planDescription: values.planDescription,
           validityDays: values.validityDays,
           curriculumJson: values.curriculumJson,
+          curriculumPdfUrl: values.curriculumPdfUrl,
+          curriculumPdfName: values.curriculumPdfName,
           order: values.order,
           isActive: values.isActive,
           file: file || undefined,
+          pdf: pdfFile || undefined,
         });
         console.log('[BannerListPage] ✅ Banner creation SUCCESS:', res);
         toast.success(res?.message || 'Banner created successfully!');
@@ -258,6 +265,13 @@ export default function BannerListPage() {
                       )}
                     </span>
                   </div>
+
+                  {banner.curriculumPdfUrl && (
+                    <div className="mt-2.5 flex items-center space-x-1.5 text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-lg w-fit">
+                      <FileText className="w-3 h-3" />
+                      <span>Syllabus PDF Attached</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Active switch footer */}
