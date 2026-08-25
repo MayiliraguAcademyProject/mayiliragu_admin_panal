@@ -23,7 +23,7 @@ const state = vi.hoisted(() => {
       title: 'Polity Revision Batch',
       body: 'Join the evening revision batch.',
       status: 'PENDING',
-      targetGroup: 'BATCH',
+      targetGroup: 'COURSE',
       targetValue: 'course_1',
       scheduledAt: '2026-08-10T18:00:00.000Z',
       sentAt: null,
@@ -64,10 +64,10 @@ const state = vi.hoisted(() => {
         return Promise.resolve({ data: { status: 'success', data: campaigns } });
       }
       if (url.includes('/courses')) {
-        return Promise.resolve({ data: courses });
+        return Promise.resolve({ data: { status: 'success', data: { data: courses, meta: { total: courses.length } } } });
       }
       if (url.includes('/students')) {
-        return Promise.resolve({ data: students });
+        return Promise.resolve({ data: { status: 'success', data: students } });
       }
       return Promise.resolve({ data: {} });
     }),
@@ -87,6 +87,12 @@ const state = vi.hoisted(() => {
     reset,
     setCampaigns: (c: unknown[]) => {
       campaigns = c;
+    },
+    setCourses: (c: unknown[]) => {
+      courses = c;
+    },
+    setStudents: (s: unknown[]) => {
+      students = s;
     },
     setCampaignsPending: (v: boolean) => {
       campaignsPending = v;
@@ -133,7 +139,7 @@ describe('NotificationsPage', () => {
 
     expect(screen.getByText('Polity Revision Batch')).toBeTruthy();
     expect(screen.getByText('PENDING')).toBeTruthy();
-    expect(screen.getByText('batch')).toBeTruthy();
+    expect(screen.getByText('Course')).toBeTruthy();
 
     expect(screen.getByText('Failed Push Attempt')).toBeTruthy();
     expect(screen.getByText('FAILED')).toBeTruthy();
@@ -169,26 +175,26 @@ describe('NotificationsPage', () => {
     expect(await screen.findByText('Push notifications dispatched successfully!')).toBeTruthy();
   });
 
-  it('requires a batch target when targeting a batch', async () => {
+  it('requires a course target when targeting course-wise', async () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Batch-wise' }));
+    await user.click(screen.getByRole('button', { name: 'Course-wise' }));
     await user.type(
       screen.getByPlaceholderText('e.g. TNPSC Group 2 Mock Test Published!'),
-      'Batch Alert'
+      'Course Alert'
     );
     await user.type(screen.getByPlaceholderText('Compose message description here...'), 'Body text.');
     await user.click(screen.getByRole('button', { name: 'Broadcast Now' }));
 
-    expect(screen.getByText('Please select a target batch.')).toBeTruthy();
+    expect(screen.getByText('Please select a target course.')).toBeTruthy();
 
     await user.selectOptions(screen.getByRole('combobox'), 'course_2');
     await user.click(screen.getByRole('button', { name: 'Broadcast Now' }));
 
     expect(state.apiClientMock.post).toHaveBeenCalledWith(
       ApiConstants.notifications.sendImmediate,
-      { title: 'Batch Alert', body: 'Body text.', targetGroup: 'BATCH', targetValue: 'course_2' }
+      { title: 'Course Alert', body: 'Body text.', targetGroup: 'COURSE', targetValue: 'course_2' }
     );
   });
 
@@ -204,7 +210,7 @@ describe('NotificationsPage', () => {
     await user.type(screen.getByPlaceholderText('Compose message description here...'), 'Personal note.');
     await user.click(screen.getByRole('button', { name: 'Broadcast Now' }));
 
-    expect(screen.getByText('Please select a target individual.')).toBeTruthy();
+    expect(screen.getByText('Please select a target student.')).toBeTruthy();
     expect(state.apiClientMock.post).not.toHaveBeenCalled();
 
     await user.selectOptions(screen.getByRole('combobox'), 'student_2');
@@ -267,5 +273,14 @@ describe('NotificationsPage', () => {
     await waitFor(() => {
       expect(container.querySelector('.animate-spin')).toBeTruthy();
     });
+  });
+
+  it('displays empty state option in course dropdown when no courses are available', async () => {
+    state.setCourses([]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Course-wise' }));
+    expect(screen.getByText('No active courses available')).toBeTruthy();
   });
 });
