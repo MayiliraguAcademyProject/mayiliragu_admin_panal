@@ -51,7 +51,7 @@ export default function NotificationsPage() {
   // Form State
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [targetGroup, setTargetGroup] = useState<'ALL' | 'BATCH' | 'INDIVIDUAL'>('ALL');
+  const [targetGroup, setTargetGroup] = useState<'ALL' | 'COURSE' | 'INDIVIDUAL'>('ALL');
   const [targetValue, setTargetValue] = useState('');
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
@@ -85,11 +85,19 @@ export default function NotificationsPage() {
     setLoading(true);
     try {
       const response = await apiClient.get(ApiConstants.notifications.campaigns);
-      if (response.data?.status === 'success') {
-        setCampaigns(response.data.data);
+      const resData = response.data;
+      let list: Campaign[] = [];
+      if (Array.isArray(resData)) {
+        list = resData;
+      } else if (Array.isArray(resData?.data)) {
+        list = resData.data;
+      } else if (Array.isArray(resData?.data?.data)) {
+        list = resData.data.data;
       }
+      setCampaigns(list);
     } catch (error) {
       console.error('Failed to fetch campaigns:', error);
+      setCampaigns([]);
     } finally {
       setLoading(false);
     }
@@ -97,21 +105,43 @@ export default function NotificationsPage() {
 
   const fetchCourses = async () => {
     try {
-      const response = await apiClient.get(ApiConstants.courses.base);
-      const list = response.data?.data || (Array.isArray(response.data) ? response.data : []);
+      const response = await apiClient.get(ApiConstants.courses.base, { params: { limit: 50 } });
+      const resData = response.data;
+      let list: Course[] = [];
+      if (Array.isArray(resData)) {
+        list = resData;
+      } else if (Array.isArray(resData?.data)) {
+        list = resData.data;
+      } else if (Array.isArray(resData?.data?.data)) {
+        list = resData.data.data;
+      } else if (Array.isArray(resData?.courses)) {
+        list = resData.courses;
+      }
       setCourses(list);
     } catch (error) {
       console.error('Failed to fetch courses:', error);
+      setCourses([]);
     }
   };
 
   const fetchStudents = async () => {
     try {
       const response = await apiClient.get(ApiConstants.students.base);
-      const list = response.data?.data || (Array.isArray(response.data) ? response.data : []);
+      const resData = response.data;
+      let list: Student[] = [];
+      if (Array.isArray(resData)) {
+        list = resData;
+      } else if (Array.isArray(resData?.data)) {
+        list = resData.data;
+      } else if (Array.isArray(resData?.data?.data)) {
+        list = resData.data.data;
+      } else if (Array.isArray(resData?.students)) {
+        list = resData.students;
+      }
       setStudents(list);
     } catch (error) {
       console.error('Failed to fetch students:', error);
+      setStudents([]);
     }
   };
 
@@ -124,7 +154,9 @@ export default function NotificationsPage() {
     }
 
     if (targetGroup !== 'ALL' && !targetValue) {
-      const errText = `Please select a target ${targetGroup.toLowerCase()}.`;
+      const errText = targetGroup === 'COURSE'
+        ? 'Please select a target course.'
+        : 'Please select a target student.';
       toast.error(errText);
       return;
     }
@@ -241,7 +273,7 @@ export default function NotificationsPage() {
                 Target Audience Group
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {(['ALL', 'BATCH', 'INDIVIDUAL'] as const).map((group) => (
+                {(['ALL', 'COURSE', 'INDIVIDUAL'] as const).map((group) => (
                   <button
                     key={group}
                     type="button"
@@ -256,31 +288,35 @@ export default function NotificationsPage() {
                     }`}
                   >
                     {group === 'ALL' && <Users className="w-4 h-4" />}
-                    {group === 'BATCH' && <GraduationCap className="w-4 h-4" />}
+                    {group === 'COURSE' && <GraduationCap className="w-4 h-4" />}
                     {group === 'INDIVIDUAL' && <User className="w-4 h-4" />}
-                    <span>{group === 'ALL' ? 'All Students' : group === 'BATCH' ? 'Batch-wise' : 'Individual'}</span>
+                    <span>{group === 'ALL' ? 'All Students' : group === 'COURSE' ? 'Course-wise' : 'Individual'}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Target Value Input Dropdowns */}
-            {targetGroup === 'BATCH' && (
+            {targetGroup === 'COURSE' && (
               <div>
                 <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider mb-1.5">
-                  Select Target Course/Batch
+                  Select Target Course *
                 </label>
                 <select
                   value={targetValue}
                   onChange={(e) => setTargetValue(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm bg-cardBg text-text-primary"
                 >
-                  <option value="">-- Choose Course/Batch --</option>
-                  {courses.map((course) => (
-                    <option key={course.id} value={course.id}>
-                      {course.title}
-                    </option>
-                  ))}
+                  <option value="">-- Choose Course --</option>
+                  {courses.length === 0 ? (
+                    <option value="" disabled>No active courses available</option>
+                  ) : (
+                    (Array.isArray(courses) ? courses : []).map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.title}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             )}
@@ -296,7 +332,7 @@ export default function NotificationsPage() {
                   className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm bg-cardBg text-text-primary"
                 >
                   <option value="">-- Choose Student --</option>
-                  {students.map((student) => (
+                  {(Array.isArray(students) ? students : []).map((student) => (
                     <option key={student.id} value={student.id}>
                       {student.name} ({student.email})
                     </option>
@@ -372,7 +408,7 @@ export default function NotificationsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60 text-sm">
-                  {campaigns.map((camp) => (
+                  {(Array.isArray(campaigns) ? campaigns : []).map((camp) => (
                     <tr key={camp.id} className="hover:bg-background-end/40 transition-colors">
                       <td className="py-3.5 pr-2">
                         <p className="font-bold text-text-primary">{camp.title}</p>
@@ -380,7 +416,7 @@ export default function NotificationsPage() {
                       </td>
                       <td className="py-3.5 px-2">
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-secondary-container text-text-primary capitalize">
-                          {camp.targetGroup.toLowerCase()}
+                          {camp.targetGroup === 'COURSE' || camp.targetGroup === 'BATCH' ? 'Course' : camp.targetGroup.toLowerCase()}
                         </span>
                       </td>
                       <td className="py-3.5 px-2 text-xs text-text-secondary font-medium">
