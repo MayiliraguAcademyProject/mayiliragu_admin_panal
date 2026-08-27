@@ -31,6 +31,18 @@ export interface SectionRangeConfig {
 
 // Dynamic PDF.js ES module loader
 const loadPdfJS = async (): Promise<any> => {
+  if (typeof (Promise as any).withResolvers === 'undefined') {
+    (Promise as any).withResolvers = function <T>() {
+      let resolve!: (value: T | PromiseLike<T>) => void;
+      let reject!: (reason?: any) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+  }
+
   if ((window as any).pdfjsLib) {
     return (window as any).pdfjsLib;
   }
