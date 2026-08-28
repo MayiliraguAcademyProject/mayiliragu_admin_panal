@@ -79,7 +79,7 @@ export default function LessonModal({
               {editingLesson ? 'Edit Lesson' : 'Create New Lesson'}
             </h3>
             <p className="text-xs text-text-secondary mt-1">
-              Detailed unit (e.g. Fundamental Rights) that will contain video lectures.
+              Set the lesson title, description, and thumbnail image.
             </p>
           </div>
           <button 
@@ -92,6 +92,16 @@ export default function LessonModal({
         </div>
 
         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* Instructions Box */}
+          <div className="bg-[#F4F8FF] border border-[#D0E2FF] rounded-2xl p-4 space-y-1.5">
+            <h4 className="text-xs font-extrabold text-[#002D70] uppercase tracking-wider flex items-center gap-1.5">
+              Lesson Chapter / Lecture Set
+            </h4>
+            <p className="text-[11px] text-[#002D70]/80 leading-relaxed font-semibold">
+              A lesson organizes your course topic into chapters. Once created, you can add individual <strong>YouTube</strong> or <strong>Google Drive</strong> video lectures inside it.
+            </p>
+          </div>
+
           {/* Title */}
           <div className="space-y-1.5">
             <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
@@ -212,6 +222,67 @@ export default function LessonModal({
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* YouTube Video ID / URL */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
+                YouTube Video ID or URL
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. dQw4w9WgXcQ or https://youtu.be/..."
+                {...register('driveFileId')}
+                disabled={isSubmitting}
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
+                  errors.driveFileId ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
+                } text-text-primary bg-slate-50/20`}
+              />
+              {errors.driveFileId && (
+                <p className="text-[11px] text-error font-semibold pl-1">{errors.driveFileId.message}</p>
+              )}
+            </div>
+
+            {/* Duration */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
+                Duration (Minutes)
+              </label>
+              <input
+                type="number"
+                placeholder="e.g. 15"
+                {...register('durationMinutes', { valueAsNumber: true })}
+                disabled={isSubmitting}
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
+                  errors.durationMinutes ? 'border-error focus:ring-error focus:border-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
+                } text-text-primary bg-slate-50/20`}
+              />
+              {errors.durationMinutes && (
+                <p className="text-[11px] text-error font-semibold pl-1">{errors.durationMinutes.message}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Download Toggle */}
+          <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-border/60 rounded-2xl">
+            <div className="space-y-0.5">
+              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
+                Enable Offline Download
+              </label>
+              <p className="text-[10px] text-text-secondary font-medium">
+                Allows students to download this lesson and watch it offline.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                {...register('downloadEnabled')}
+                disabled={isSubmitting}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+            </label>
           </div>
         </div>
 

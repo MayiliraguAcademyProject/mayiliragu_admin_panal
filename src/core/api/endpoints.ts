@@ -13,6 +13,7 @@ import type {
   Student, 
   Enrollment, 
   Question, 
+  QuestionBatch,
   QuestionStats,
   Test,
   Banner,
@@ -678,26 +679,49 @@ export function useQuestionsList(filters: {
   type?: string;
   difficulty?: string;
   search?: string;
+  sourceBatch?: string;
+  topic?: string;
+  unusedOnly?: boolean;
 }) {
   return useQuery<Question[]>({
     queryKey: ['questions', filters],
     queryFn: async () => {
       const params: Record<string, string> = {};
-      if (filters.subject && filters.subject !== 'All Subjects') {
+      if (filters.subject && filters.subject !== 'All Subjects' && filters.subject !== 'all') {
         params.subject = filters.subject;
       }
-      if (filters.type && filters.type !== 'All Types') {
+      if (filters.type && filters.type !== 'All Types' && filters.type !== 'all') {
         params.type = filters.type;
       }
-      if (filters.difficulty && filters.difficulty !== 'Difficulty: All') {
+      if (filters.difficulty && filters.difficulty !== 'Difficulty: All' && filters.difficulty !== 'all') {
         params.difficulty = filters.difficulty;
       }
       if (filters.search) {
         params.search = filters.search;
       }
+      if (filters.sourceBatch && filters.sourceBatch !== 'All Batches' && filters.sourceBatch !== 'all') {
+        params.sourceBatch = filters.sourceBatch;
+      }
+      if (filters.topic && filters.topic !== 'all') {
+        params.topic = filters.topic;
+      }
+      if (filters.unusedOnly) {
+        params.unusedOnly = 'true';
+      }
       const response = await apiClient.get(ApiConstants.questions.base, { params });
       return response.data.data;
     },
+  });
+}
+
+export function useQuestionBatches() {
+  return useQuery<QuestionBatch[]>({
+    queryKey: ['questionBatches'],
+    queryFn: async () => {
+      const response = await apiClient.get('/questions/batches');
+      return response.data.data;
+    },
+    staleTime: 60 * 1000,
   });
 }
 
@@ -771,7 +795,7 @@ export function useDeleteAllQuestions() {
 // TESTS & TEST BUILDER ENDPOINTS
 // ==========================================
 
-export function useTestsList(filters?: { categoryId?: string; courseId?: string }) {
+export function useTestsList(filters?: { categoryId?: string; courseId?: string; testMode?: string }) {
   return useQuery<Test[]>({
     queryKey: ['tests', filters],
     queryFn: async () => {
@@ -862,9 +886,12 @@ export function useCreateBanner() {
       planDescription,
       validityDays,
       curriculumJson,
+      curriculumPdfUrl,
+      curriculumPdfName,
       order,
       isActive,
       file,
+      pdf,
     }: {
       title: string;
       imageUrl?: string;
@@ -877,9 +904,12 @@ export function useCreateBanner() {
       planDescription?: string | null;
       validityDays?: number | null;
       curriculumJson?: string | null;
+      curriculumPdfUrl?: string | null;
+      curriculumPdfName?: string | null;
       order: number;
       isActive: boolean;
       file?: File;
+      pdf?: File;
     }) => {
       const formData = new FormData();
       formData.append('title', title);
@@ -893,10 +923,15 @@ export function useCreateBanner() {
       if (planDescription) formData.append('planDescription', planDescription);
       if (validityDays !== undefined && validityDays !== null) formData.append('validityDays', String(validityDays));
       if (curriculumJson) formData.append('curriculumJson', curriculumJson);
+      if (curriculumPdfUrl) formData.append('curriculumPdfUrl', curriculumPdfUrl);
+      if (curriculumPdfName) formData.append('curriculumPdfName', curriculumPdfName);
       formData.append('order', String(order));
       formData.append('isActive', String(isActive));
       if (file) {
         formData.append('file', file);
+      }
+      if (pdf) {
+        formData.append('pdf', pdf);
       }
 
       const response = await apiClient.post(ApiConstants.banners.base, formData, {
@@ -913,7 +948,17 @@ export function useCreateBanner() {
 export function useUpdateBanner() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data, file }: { id: string; data: Partial<Banner>; file?: File }) => {
+    mutationFn: async ({
+      id,
+      data,
+      file,
+      pdf,
+    }: {
+      id: string;
+      data: Partial<Banner>;
+      file?: File;
+      pdf?: File;
+    }) => {
       const formData = new FormData();
       if (data.title !== undefined) formData.append('title', data.title);
       if (data.imageUrl !== undefined) formData.append('imageUrl', data.imageUrl);
@@ -926,10 +971,15 @@ export function useUpdateBanner() {
       if (data.planDescription !== undefined) formData.append('planDescription', data.planDescription || '');
       if (data.validityDays !== undefined) formData.append('validityDays', data.validityDays !== null ? String(data.validityDays) : '');
       if (data.curriculumJson !== undefined) formData.append('curriculumJson', data.curriculumJson || '');
+      if (data.curriculumPdfUrl !== undefined) formData.append('curriculumPdfUrl', data.curriculumPdfUrl || '');
+      if (data.curriculumPdfName !== undefined) formData.append('curriculumPdfName', data.curriculumPdfName || '');
       if (data.order !== undefined) formData.append('order', String(data.order));
       if (data.isActive !== undefined) formData.append('isActive', String(data.isActive));
       if (file) {
         formData.append('file', file);
+      }
+      if (pdf) {
+        formData.append('pdf', pdf);
       }
 
       const response = await apiClient.put(ApiConstants.banners.detail(id), formData, {
@@ -1130,11 +1180,14 @@ export async function exportQuestionsToExcel(filters: {
 export function useImportQuestions() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ file, testId }: { file: File; testId?: string }) => {
+    mutationFn: async ({ file, testId, batchName }: { file: File; testId?: string; batchName?: string }) => {
       const formData = new FormData();
       formData.append('file', file);
       if (testId) {
         formData.append('testId', testId);
+      }
+      if (batchName) {
+        formData.append('batchName', batchName);
       }
       const response = await apiClient.post(ApiConstants.questions.import, formData, {
         headers: {
@@ -1146,6 +1199,7 @@ export function useImportQuestions() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['questions'] });
       queryClient.invalidateQueries({ queryKey: ['questionStats'] });
+      queryClient.invalidateQueries({ queryKey: ['questionBatches'] });
     },
   });
 }

@@ -28,7 +28,8 @@ import {
   DollarSign,
   Video,
   MessageSquare,
-  FileText
+  FileText,
+  Layers
 } from 'lucide-react';
 import { useThemeStore } from '../../store/theme-store';
 
@@ -63,6 +64,7 @@ export default function MainLayoutShell() {
     { name: 'Push Notifications', path: '/notifications', icon: Bell },
     { name: 'Students', path: '/student-management', icon: Users },
     { name: 'Study Library', path: '/study-materials', icon: Library },
+    { name: 'Test Batches', path: '/test-batches', icon: Layers },
     { name: 'Testimonials', path: '/testimonials', icon: MessageSquare },
     { name: 'Tests & Question Bank', path: '/tests', icon: GraduationCap },
     { name: 'Video Downloads', path: '/video-downloads', icon: Download },

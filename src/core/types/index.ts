@@ -280,6 +280,14 @@ export interface Question {
   wordLimit?: number;
   explanation_image_url?: string | null;
   explanationImageUrl?: string | null;
+  source_batch?: string | null;
+  sourceBatch?: string | null;
+}
+
+export interface QuestionBatch {
+  name: string;
+  count: number;
+  latestUpload: string;
 }
 
 export interface QuestionStats {
@@ -296,8 +304,10 @@ export interface Test {
   duration: number;
   cutoff_marks: number;
   total_marks: number;
+  test_mode?: 'SUBJECT_WISE' | 'TEST_SERIES';
   is_sectioned?: boolean;
   sections_count?: number;
+  section_names?: string[];
   sections?: any[];
   course_id?: string;
   module_id?: string;
@@ -327,6 +337,8 @@ export interface Banner {
   planDescription?: string | null;
   validityDays?: number | null;
   curriculumJson?: string | null;
+  curriculumPdfUrl?: string | null;
+  curriculumPdfName?: string | null;
   isActive: boolean;
   order: number;
   createdAt: string;

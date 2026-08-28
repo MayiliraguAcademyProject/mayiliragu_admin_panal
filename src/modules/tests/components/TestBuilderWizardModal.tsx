@@ -15,9 +15,10 @@ import {
   Clock,
   Award,
   Sparkles,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
-import { useQuestionsList, useExamCategories } from '../../../core/api/endpoints';
+import { useQuestionsList, useQuestionBatches, useExamCategories } from '../../../core/api/endpoints';
 import type { Question, Test } from '../../../core/types';
 import { useToast } from '../../../shared/context';
 
@@ -27,6 +28,12 @@ interface TestBuilderWizardModalProps {
   onSubmit: (data: any) => Promise<void>;
   test?: Test;
   isLoading?: boolean;
+  preSelectedQuestions?: Question[];
+  prefilledTitle?: string;
+  prefilledSubjectId?: string;
+  prefilledCategoryId?: string;
+  prefilledBatchName?: string;
+  prefilledSections?: any[];
 }
 
 export default function TestBuilderWizardModal({
@@ -35,12 +42,19 @@ export default function TestBuilderWizardModal({
   onSubmit,
   test,
   isLoading = false,
+  preSelectedQuestions,
+  prefilledTitle,
+  prefilledSubjectId,
+  prefilledCategoryId,
+  prefilledBatchName,
+  prefilledSections,
 }: TestBuilderWizardModalProps) {
   const toast = useToast();
   const [internalSubmitting, setInternalSubmitting] = useState(false);
   const isSubmitting = internalSubmitting || isLoading;
   const [step, setStep] = useState(1);
   const { data: categories = [] } = useExamCategories();
+  const { data: questionBatches = [] } = useQuestionBatches();
 
   const subjects = useMemo(() => {
     return categories.flatMap((cat) => cat.subjects || []);
@@ -50,7 +64,10 @@ export default function TestBuilderWizardModal({
     return subjects.flatMap((sub) => sub.topics || []);
   }, [subjects]);
 
-  // Step 1: Metadata State
+  // Step 1: Test Mode State ('SUBJECT_WISE' | 'TEST_SERIES')
+  const [testMode, setTestMode] = useState<'SUBJECT_WISE' | 'TEST_SERIES'>('SUBJECT_WISE');
+
+  // Step 2: Metadata State
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [duration, setDuration] = useState<number | string>(60);
@@ -65,15 +82,17 @@ export default function TestBuilderWizardModal({
   const [isSectioned, setIsSectioned] = useState(false);
   const [sections, setSections] = useState<Array<{ id?: string; tempId?: string; name: string; order: number; duration: number; cutoff_marks: number; total_marks: number }>>([]);
 
-  // Step 2: Selected Questions State
+  // Step 3: Selected Questions State
   // Array of questions in order
   const [selectedQuestions, setSelectedQuestions] = useState<Question[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
 
-  // Step 2 Filters
+  // Step 3 Filters
   const [repoSubject, setRepoSubject] = useState('all');
   const [repoType, setRepoType] = useState('all');
   const [repoDifficulty, setRepoDifficulty] = useState('all');
+  const [repoSourceBatch, setRepoSourceBatch] = useState('all');
+  const [repoUnusedOnly, setRepoUnusedOnly] = useState(false);
   const [repoSearch, setRepoSearch] = useState('');
   const [randomCount, setRandomCount] = useState(5);
 
@@ -82,6 +101,8 @@ export default function TestBuilderWizardModal({
     subject: repoSubject !== 'all' ? repoSubject : undefined,
     type: repoType !== 'all' ? repoType : undefined,
     difficulty: repoDifficulty !== 'all' ? repoDifficulty : undefined,
+    sourceBatch: repoSourceBatch !== 'all' ? repoSourceBatch : undefined,
+    unusedOnly: repoUnusedOnly ? true : undefined,
   });
 
   // Client side search matching
@@ -107,9 +128,11 @@ export default function TestBuilderWizardModal({
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
-  // Load test if editing
+  // Load test if editing or pre-filled from upload
   useEffect(() => {
     if (test) {
+      const mode = test.test_mode || (test.is_sectioned ? 'TEST_SERIES' : 'SUBJECT_WISE');
+      setTestMode(mode);
       setTitle(test.title);
       setDescription(test.description || '');
       setDuration(test.duration);
@@ -121,8 +144,8 @@ export default function TestBuilderWizardModal({
       setIsPaid(test.is_paid || false);
       setTargetCategory(test.target_category || '');
       setScheduledAt(formatToDatetimeLocal(test.scheduled_at));
-      setIsSectioned(test.is_sectioned || false);
-      if (test.sections) {
+      setIsSectioned(mode === 'TEST_SERIES' ? true : (test.is_sectioned || false));
+      if (test.sections && test.sections.length > 0) {
         setSections(test.sections.map((s: any) => ({
           id: s.id,
           name: s.name,
@@ -131,6 +154,11 @@ export default function TestBuilderWizardModal({
           cutoff_marks: s.cutoff_marks,
           total_marks: s.total_marks
         })));
+      } else if (mode === 'TEST_SERIES') {
+        setSections([
+          { tempId: 'sec_1', name: 'Section 1', order: 0, duration: 20, cutoff_marks: 35, total_marks: 0 },
+          { tempId: 'sec_2', name: 'Section 2', order: 1, duration: 20, cutoff_marks: 35, total_marks: 0 }
+        ]);
       } else {
         setSections([]);
       }
@@ -139,8 +167,84 @@ export default function TestBuilderWizardModal({
         const sorted = [...test.questions].sort((a, b) => a.order - b.order);
         setSelectedQuestions(sorted);
       }
+      setStep(1);
+    } else if (preSelectedQuestions && preSelectedQuestions.length > 0) {
+      // 1-Click Fast-Track Flow from PDF Parser / Upload
+      const isMultiSubject = !prefilledSubjectId;
+      const initialMode = isMultiSubject ? 'TEST_SERIES' : 'SUBJECT_WISE';
+      setTestMode(initialMode);
+      setTitle(prefilledTitle || (isMultiSubject ? 'New Mock Test Series' : 'New Practice Test'));
+      setDescription(`Comprehensive test with ${preSelectedQuestions.length} questions from ${prefilledBatchName || 'uploaded questions'}.`);
+      setDuration(Math.max(10, Math.round(preSelectedQuestions.length * 1.5)));
+      setCutoffMarks(Math.max(1, Math.round(preSelectedQuestions.length * 0.4)));
+      setCategoryId(prefilledCategoryId || '');
+      setSubjectId(prefilledSubjectId || '');
+      setTopicId('');
+      setIsPublished(true);
+      setIsPaid(false);
+      setTargetCategory(prefilledCategoryId || '');
+      setScheduledAt('');
+      
+      if (prefilledSections && prefilledSections.length > 0) {
+        setIsSectioned(true);
+        setTestMode('TEST_SERIES');
+        const formattedSections = prefilledSections.map((s: any, idx: number) => ({
+          tempId: s.id || `sec_${idx + 1}`,
+          name: s.name || `Section ${idx + 1}`,
+          order: idx,
+          duration: Number(s.duration) || 20,
+          cutoff_marks: Number(s.cutoff_marks) || 35,
+          total_marks: Number(s.total_marks) || 0
+        }));
+        setSections(formattedSections);
+        const totalDuration = prefilledSections.reduce((sum: number, s: any) => sum + (Number(s.duration) || 0), 0);
+        if (totalDuration > 0) {
+          setDuration(totalDuration);
+        }
+
+        const mapped = preSelectedQuestions.map((q: any, qIdx: number) => {
+          const qNum = q.number || (qIdx + 1);
+          const matchingSec = prefilledSections.find((s: any) =>
+            (s.fromNumber && s.toNumber && qNum >= s.fromNumber && qNum <= s.toNumber) ||
+            (s.name && q.sectionName && s.name.trim().toLowerCase() === q.sectionName.trim().toLowerCase())
+          ) || formattedSections[0];
+          const matchedTempId = matchingSec.tempId || matchingSec.id || formattedSections[0].tempId;
+          return {
+            ...q,
+            section_id: matchedTempId,
+            section_temp_id: matchedTempId
+          };
+        });
+        setSelectedQuestions(mapped);
+      } else if (isMultiSubject) {
+        setIsSectioned(true);
+        const defaultSections = [
+          { tempId: 'sec_1', name: 'Section 1 (e.g. Quantitative / Aptitude)', order: 0, duration: Math.max(10, Math.round(preSelectedQuestions.length * 0.75)), cutoff_marks: 35, total_marks: 0 },
+          { tempId: 'sec_2', name: 'Section 2 (e.g. Reasoning / General Studies)', order: 1, duration: Math.max(10, Math.round(preSelectedQuestions.length * 0.75)), cutoff_marks: 35, total_marks: 0 }
+        ];
+        setSections(defaultSections);
+        const mapped = preSelectedQuestions.map((q) => ({
+          ...q,
+          section_id: defaultSections[0].tempId,
+          section_temp_id: defaultSections[0].tempId
+        }));
+        setSelectedQuestions(mapped);
+      } else {
+        setIsSectioned(false);
+        setSections([]);
+        setSelectedQuestions(preSelectedQuestions);
+      }
+
+      if (prefilledSubjectId) {
+        setRepoSubject(prefilledSubjectId);
+      }
+      if (prefilledBatchName) {
+        setRepoSourceBatch(prefilledBatchName);
+      }
+      setStep(1);
     } else {
       // Reset
+      setTestMode('SUBJECT_WISE');
       setTitle('');
       setDescription('');
       setDuration(60);
@@ -155,9 +259,12 @@ export default function TestBuilderWizardModal({
       setIsSectioned(false);
       setSections([]);
       setSelectedQuestions([]);
+      setRepoSubject('all');
+      setRepoSourceBatch('all');
+      setRepoUnusedOnly(false);
       setStep(1);
     }
-  }, [test, isOpen]);
+  }, [test, isOpen, preSelectedQuestions, prefilledTitle, prefilledSubjectId, prefilledCategoryId, prefilledBatchName]);
 
   // Keep duration in sync with sum of section durations if sectioned
   useEffect(() => {
@@ -243,13 +350,41 @@ export default function TestBuilderWizardModal({
   };
 
   const handleNext = () => {
-    if (step === 1 && !title.trim()) {
+    if (step === 1 && !testMode) {
+      toast.error('Please select a test type');
+      return;
+    }
+    if (step === 1) {
+      if (testMode === 'TEST_SERIES') {
+        setIsSectioned(true);
+        if (sections.length === 0) {
+          setSections([
+            { tempId: 'sec_1', name: 'Section 1 (e.g. Quantitative)', order: 0, duration: 20, cutoff_marks: 35, total_marks: 0 },
+            { tempId: 'sec_2', name: 'Section 2 (e.g. Reasoning)', order: 1, duration: 20, cutoff_marks: 35, total_marks: 0 }
+          ]);
+        }
+      } else {
+        setIsSectioned(false);
+        setSections([]);
+      }
+    }
+    if (step === 2 && !title.trim()) {
       toast.error('Test Title is required');
       return;
     }
-    if (step === 1 && isSectioned) {
-      if (sections.length === 0) {
-        toast.error('Please define at least one section for a Sectioned Test');
+    if (step === 2 && testMode === 'SUBJECT_WISE') {
+      if (!subjectId) {
+        toast.error('Subject is required for Subject-Wise tests');
+        return;
+      }
+      // Auto-scope Step 3 repository to the subject selected in Step 2
+      if (repoSubject === 'all' || !repoSubject) {
+        setRepoSubject(subjectId);
+      }
+    }
+    if (step === 2 && testMode === 'TEST_SERIES') {
+      if (sections.length < 2) {
+        toast.error('Test Series must have at least 2 sections');
         return;
       }
       const emptyName = sections.some(s => !s.name.trim());
@@ -258,11 +393,11 @@ export default function TestBuilderWizardModal({
         return;
       }
     }
-    if (step === 2 && selectedQuestions.length === 0) {
+    if (step === 3 && selectedQuestions.length === 0) {
       toast.error('Please select at least one question for this test');
       return;
     }
-    if (step === 2 && isSectioned) {
+    if (step === 3 && isSectioned) {
       // Check if any section has 0 questions
       const emptySection = sections.find(s => {
         const key = s.id || s.tempId || s.name;
@@ -285,8 +420,8 @@ export default function TestBuilderWizardModal({
     const questionsPayload = selectedQuestions.map((q, idx) => ({
       questionId: q.id,
       order: idx,
-      section_id: q.section_id || null,
-      section_temp_id: q.section_temp_id || null
+      section_id: testMode === 'TEST_SERIES' ? (q.section_id || null) : null,
+      section_temp_id: testMode === 'TEST_SERIES' ? (q.section_temp_id || null) : null
     }));
 
     const payload = {
@@ -295,17 +430,19 @@ export default function TestBuilderWizardModal({
       duration: Number(duration),
       cutoff_marks: Number(cutoffMarks),
       total_marks: totalMarks,
+      test_mode: testMode,
+      testMode: testMode,
       course_id: null,
       module_id: null,
-      category_id: categoryId || null,
-      subject_id: subjectId || null,
-      topic_id: topicId || null,
+      category_id: testMode === 'SUBJECT_WISE' ? (categoryId || null) : null,
+      subject_id: testMode === 'SUBJECT_WISE' ? (subjectId || null) : null,
+      topic_id: testMode === 'SUBJECT_WISE' ? (topicId || null) : null,
       is_published: isPublished,
       is_paid: isPaid,
-      target_category: targetCategory || null,
+      target_category: testMode === 'TEST_SERIES' ? (targetCategory || null) : null,
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-      is_sectioned: isSectioned,
-      sections: isSectioned ? sections.map((s, idx) => ({
+      is_sectioned: testMode === 'TEST_SERIES',
+      sections: testMode === 'TEST_SERIES' ? sections.map((s, idx) => ({
         id: s.id,
         tempId: s.tempId,
         name: s.name,
@@ -329,7 +466,7 @@ export default function TestBuilderWizardModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-6xl h-[88vh] bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="w-full max-w-5xl h-[88vh] bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
         
         {/* Header */}
         <div className="p-6 border-b border-border/45 flex items-center justify-between bg-slate-50/50">
@@ -350,31 +487,139 @@ export default function TestBuilderWizardModal({
         </div>
 
         {/* Wizard Steps indicator */}
-        <div className="flex border-b border-border/20 bg-slate-50/20 px-8 py-3 text-xs font-bold text-text-secondary">
+        <div className="flex border-b border-border/20 bg-slate-50/20 px-8 py-3 text-xs font-bold text-text-secondary overflow-x-auto">
           {[
-            { num: 1, label: 'Metadata & Scope', icon: Settings },
-            { num: 2, label: 'Question Bank Selector', icon: BookOpen },
-            { num: 3, label: 'Review & Publish', icon: CheckCircle }
+            { num: 1, label: 'Test Mode', icon: Sparkles },
+            { num: 2, label: 'Metadata & Scope', icon: Settings },
+            { num: 3, label: 'Question Bank Selector', icon: BookOpen },
+            { num: 4, label: 'Review & Publish', icon: CheckCircle }
           ].map((s) => (
             <div 
               key={s.num} 
-              className={`flex items-center space-x-2 mr-12 transition-colors ${
+              className={`flex items-center space-x-2 mr-8 transition-colors shrink-0 ${
                 step === s.num ? 'text-accent' : step > s.num ? 'text-emerald-600' : ''
               }`}
             >
               <s.icon className="w-4 h-4" />
               <span>Step {s.num}: {s.label}</span>
-              {s.num < 3 && <span className="text-gray-300 ml-4 font-normal">/</span>}
+              {s.num < 4 && <span className="text-gray-300 ml-4 font-normal">/</span>}
             </div>
           ))}
         </div>
 
+        {/* 1-Click Fast-Track Pre-fill Banner */}
+        {prefilledBatchName && selectedQuestions.length > 0 && (
+          <div className="mx-6 mt-3 px-4 py-2.5 bg-emerald-50/90 border border-emerald-200/80 rounded-2xl text-emerald-900 text-xs font-bold flex items-center justify-between shadow-xs">
+            <div className="flex items-center space-x-2.5">
+              <Sparkles className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>
+                Pre-filled from upload: <strong>{prefilledBatchName}</strong> ({selectedQuestions.length} Questions pre-selected in workspace)
+              </span>
+            </div>
+            <span className="text-[9px] bg-emerald-200/70 px-2 py-0.5 rounded-md text-emerald-950 font-black uppercase tracking-wider">
+              1-Click Fast Track
+            </span>
+          </div>
+        )}
+
         {/* Content Area */}
         <div className="flex-1 overflow-hidden min-h-0 flex flex-col p-6">
           
-          {/* STEP 1: METADATA & SCOPE */}
+          {/* STEP 1: TEST MODE SELECTION */}
           {step === 1 && (
-            <div className="flex-1 overflow-y-auto space-y-6 max-w-2xl mx-auto w-full py-4">
+            <div className="flex-1 overflow-y-auto space-y-6 max-w-3xl mx-auto w-full py-6 flex flex-col justify-center">
+              <div className="text-center space-y-2 mb-2">
+                <h3 className="text-base font-black text-text-primary uppercase tracking-wider">
+                  Select Test Architecture Mode
+                </h3>
+                <p className="text-xs text-text-secondary font-medium max-w-md mx-auto">
+                  Choose whether this assessment is an isolated Subject Practice Quiz or a Full Mock Exam Series.
+                </p>
+              </div>
+
+              {test && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-800 text-xs font-bold flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>Test mode is fixed for existing tests and cannot be changed after creation.</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Option 1: Subject-Wise Practice */}
+                <div
+                  onClick={() => {
+                    if (!test) {
+                      setTestMode('SUBJECT_WISE');
+                      setIsSectioned(false);
+                      setSections([]);
+                    }
+                  }}
+                  className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                    testMode === 'SUBJECT_WISE'
+                      ? 'border-accent bg-accent/5 shadow-md shadow-accent/10'
+                      : 'border-border/60 bg-white hover:border-border hover:bg-slate-50/50'
+                  } ${test ? 'cursor-not-allowed opacity-85' : ''}`}
+                >
+                  <div className="space-y-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                      <BookOpen className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-text-primary">Subject-Wise Practice Quiz</h4>
+                      <p className="text-[11px] text-text-secondary font-medium mt-1 leading-relaxed">
+                        Targeted drills focusing on a single subject and topic with progressive difficulty levels (Easy / Medium / Hard).
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/30 flex items-center justify-between text-[11px] font-extrabold text-text-secondary">
+                    <span className="text-[10px] uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Single Subject</span>
+                    {testMode === 'SUBJECT_WISE' && <span className="text-accent font-black">SELECTED ✓</span>}
+                  </div>
+                </div>
+
+                {/* Option 2: Test Series */}
+                <div
+                  onClick={() => {
+                    if (!test) {
+                      setTestMode('TEST_SERIES');
+                      setIsSectioned(true);
+                      if (sections.length === 0) {
+                        setSections([
+                          { tempId: 'sec_1', name: 'Section 1 (e.g. Quantitative)', order: 0, duration: 20, cutoff_marks: 35, total_marks: 0 },
+                          { tempId: 'sec_2', name: 'Section 2 (e.g. Reasoning)', order: 1, duration: 20, cutoff_marks: 35, total_marks: 0 }
+                        ]);
+                      }
+                    }
+                  }}
+                  className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                    testMode === 'TEST_SERIES'
+                      ? 'border-accent bg-accent/5 shadow-md shadow-accent/10'
+                      : 'border-border/60 bg-white hover:border-border hover:bg-slate-50/50'
+                  } ${test ? 'cursor-not-allowed opacity-85' : ''}`}
+                >
+                  <div className="space-y-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                      <Award className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-text-primary">Full Mock Test Series</h4>
+                      <p className="text-[11px] text-text-secondary font-medium mt-1 leading-relaxed">
+                        Multi-subject exam simulation (Quant + Reasoning + English + CA) with section-wise timers, sectional cutoffs, and overall rankings.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/30 flex items-center justify-between text-[11px] font-extrabold text-text-secondary">
+                    <span className="text-[10px] uppercase tracking-wider text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md">Multi-Section Exam</span>
+                    {testMode === 'TEST_SERIES' && <span className="text-accent font-black">SELECTED ✓</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: METADATA & SCOPE */}
+          {step === 2 && (
+            <div className="flex-1 overflow-y-auto space-y-6 max-w-3xl mx-auto w-full py-4">
               <div className="space-y-4">
                 
                 {/* Title */}
@@ -382,7 +627,7 @@ export default function TestBuilderWizardModal({
                   <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">Test Title</label>
                   <input
                     type="text"
-                    placeholder="e.g. UPSC Prelims - Indian Polity Quiz 1"
+                    placeholder={testMode === 'TEST_SERIES' ? 'e.g. IBPS PO Prelims Mock Test 1' : 'e.g. Quantitative Aptitude - Data Interpretation Drill 1'}
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     required
@@ -407,17 +652,18 @@ export default function TestBuilderWizardModal({
                   <div className="space-y-1.5">
                     <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider flex items-center">
                       <Clock className="w-3.5 h-3.5 mr-1 text-accent" />
-                      <span>Duration (Minutes)</span>
+                      <span>{testMode === 'TEST_SERIES' ? 'Total Duration (Sum of Sections)' : 'Duration (Minutes)'}</span>
                     </label>
                     <input
                       type="number"
                       value={duration}
+                      disabled={testMode === 'TEST_SERIES'}
                       onChange={(e) => {
                         const val = e.target.value;
                         setDuration(val === '' ? '' : Math.max(1, Number(val)));
                       }}
                       required
-                      className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
+                      className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20 disabled:bg-slate-100 disabled:text-text-secondary"
                     />
                   </div>
 
@@ -456,148 +702,92 @@ export default function TestBuilderWizardModal({
                   </p>
                 </div>
 
-                {/* Scope connections */}
-                <div className="border-t border-border/40 pt-4 space-y-4">
-                  <h4 className="text-xs font-extrabold text-text-primary uppercase tracking-wider flex items-center">
-                    <Sparkles className="w-3.5 h-3.5 mr-1 text-accent" />
-                    <span>Associate with Syllabus Connect</span>
-                  </h4>
+                {/* Subject-Wise Scope connections */}
+                {testMode === 'SUBJECT_WISE' && (
+                  <div className="border-t border-border/40 pt-4 space-y-4">
+                    <h4 className="text-xs font-extrabold text-text-primary uppercase tracking-wider flex items-center">
+                      <Sparkles className="w-3.5 h-3.5 mr-1 text-accent" />
+                      <span>Subject & Topic Assignment</span>
+                    </h4>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Category */}
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Exam Category & Targeting</label>
-                      <select
-                        value={categoryId}
-                        onChange={(e) => {
-                          setCategoryId(e.target.value);
-                          setTargetCategory(e.target.value);
-                          setSubjectId('');
-                          setTopicId('');
-                        }}
-                        className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
-                      >
-                        <option value="">None (General — Common for All Students)</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                      <p className="text-[10px] text-text-secondary font-medium">
-                        Targeted to students selecting this exam. General tests are common for all.
-                      </p>
-                    </div>
-
-                    {/* Subject */}
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Subject (Optional)</label>
-                      <select
-                        value={subjectId}
-                        onChange={(e) => {
-                          setSubjectId(e.target.value);
-                          setTopicId('');
-                        }}
-                        disabled={!categoryId}
-                        className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-secondary bg-slate-50/20 disabled:opacity-50"
-                      >
-                        <option value="">Select Subject</option>
-                        {subjects
-                          .filter((s) => s.categoryId === categoryId)
-                          .map((s) => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Category */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Exam Category</label>
+                        <select
+                          value={categoryId}
+                          onChange={(e) => {
+                            setCategoryId(e.target.value);
+                            setTargetCategory(e.target.value);
+                            setSubjectId('');
+                            setTopicId('');
+                          }}
+                          className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
+                        >
+                          <option value="">Select Category</option>
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
                           ))}
-                      </select>
-                    </div>
+                        </select>
+                      </div>
 
-                    {/* Topic */}
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Topic (Optional)</label>
-                      <select
-                        value={topicId}
-                        onChange={(e) => setTopicId(e.target.value)}
-                        disabled={!subjectId}
-                        className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-secondary bg-slate-50/20 disabled:opacity-50"
-                      >
-                        <option value="">Select Topic</option>
-                        {topics
-                          .filter((t) => t.subjectId === subjectId)
-                          .map((t) => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Test Access Control */}
-                <div className="border-t border-border/40 pt-4 space-y-4">
-                  <h4 className="text-xs font-extrabold text-text-primary uppercase tracking-wider flex items-center">
-                    <Sparkles className="w-3.5 h-3.5 mr-1 text-accent" />
-                    <span>Access Control & Monetization</span>
-                  </h4>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Paid Test Access Toggle */}
-                    <div className="space-y-1.5 col-span-2">
-                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">
-                        Test Pricing Tier
-                      </label>
-                      <div className="flex items-center space-x-3 p-3 bg-slate-50/40 rounded-xl border border-border/40">
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isPaid}
-                            onChange={(e) => setIsPaid(e.target.checked)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                      {/* Subject (Required for Subject-Wise) */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">
+                          Subject <span className="text-rose-500">*</span>
                         </label>
-                        <div>
-                          <p className="text-xs font-extrabold text-text-primary">
-                            {isPaid ? 'Paid Students Only' : 'Free Test (All Students)'}
-                          </p>
-                          <p className="text-[10px] text-text-secondary font-medium">
-                            {isPaid
-                              ? 'Only enrolled students with completed fee payments can attempt this test.'
-                              : 'All registered students can attempt this test.'}
-                          </p>
-                        </div>
+                        <select
+                          value={subjectId}
+                          onChange={(e) => {
+                            setSubjectId(e.target.value);
+                            setTopicId('');
+                          }}
+                          disabled={!categoryId}
+                          className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20 disabled:opacity-50"
+                        >
+                          <option value="">Select Subject</option>
+                          {subjects
+                            .filter((s) => s.categoryId === categoryId)
+                            .map((s) => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                        </select>
+                      </div>
+
+                      {/* Topic */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Topic (Optional)</label>
+                        <select
+                          value={topicId}
+                          onChange={(e) => setTopicId(e.target.value)}
+                          disabled={!subjectId}
+                          className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-secondary bg-slate-50/20 disabled:opacity-50"
+                        >
+                          <option value="">Select Topic</option>
+                          {topics
+                            .filter((t) => t.subjectId === subjectId)
+                            .map((t) => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Sectioned Test Toggle */}
-                <div className="flex items-center justify-between border-t border-border/40 pt-4">
-                  <div>
-                    <h5 className="text-xs font-extrabold text-text-primary uppercase flex items-center">
-                      <Sparkles className="w-3.5 h-3.5 mr-1 text-accent" />
-                      <span>Sectioned Test (e.g. Banking Format)</span>
-                    </h5>
-                    <p className="text-[10px] text-text-secondary font-medium">
-                      Divide the test into multiple timed sections (Reasoning, Quant, English, etc.).
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={isSectioned}
-                      onChange={(e) => {
-                        setIsSectioned(e.target.checked);
-                        if (e.target.checked && sections.length === 0) {
-                          setSections([{ tempId: 'sec_1', name: 'Section 1', order: 0, duration: 20, cutoff_marks: 35, total_marks: 0 }]);
-                        }
-                      }}
-                      className="sr-only peer" 
-                    />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
-                  </label>
-                </div>
-
-                {/* Section Manager UI */}
-                {isSectioned && (
-                  <div className="border border-border/40 rounded-2xl p-4 bg-slate-50/10 space-y-4">
+                {/* Test Series Sections Configuration */}
+                {testMode === 'TEST_SERIES' && (
+                  <div className="border-t border-border/40 pt-4 space-y-4">
                     <div className="flex items-center justify-between">
-                      <h5 className="text-[10px] font-extrabold text-text-primary uppercase tracking-wider">Test Sections</h5>
+                      <div>
+                        <h4 className="text-xs font-extrabold text-text-primary uppercase tracking-wider flex items-center">
+                          <Sparkles className="w-3.5 h-3.5 mr-1 text-accent" />
+                          <span>Test Series Sections Configuration</span>
+                        </h4>
+                        <p className="text-[10px] text-text-secondary font-medium">
+                          Define timed subject sections (Minimum 2 required). E.g., Quant, Reasoning, English.
+                        </p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
@@ -621,44 +811,84 @@ export default function TestBuilderWizardModal({
                       </button>
                     </div>
 
-                    <div className="space-y-3">
+                    {sections.length < 2 && (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-800 text-[11px] font-bold flex items-center space-x-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <span>Test Series must have at least 2 sections configured.</span>
+                      </div>
+                    )}
+
+                    {/* Table Header with clear labels */}
+                    <div className="flex items-center gap-3 px-3 py-1.5 bg-slate-100 dark:bg-slate-800/60 rounded-xl text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">
+                      <span className="w-6 text-center">#</span>
+                      <span className="flex-1">Section Name (Subject / Topic)</span>
+                      <span className="w-32 flex items-center space-x-1">
+                        <Clock className="w-3 h-3 text-blue-500" />
+                        <span>Timer (Mins)</span>
+                      </span>
+                      <span className="w-32 flex items-center space-x-1">
+                        <Award className="w-3 h-3 text-emerald-500" />
+                        <span>Cutoff Marks</span>
+                      </span>
+                      <span className="w-20 text-right pr-2">Reorder / Del</span>
+                    </div>
+
+                    <div className="space-y-2.5">
                       {sections.map((sec, idx) => (
-                        <div key={sec.id || sec.tempId || idx} className="flex items-center gap-3 p-3 border border-border/50 rounded-xl bg-cardBg text-xs">
-                          <span className="font-extrabold text-text-secondary w-4 text-center">{idx + 1}</span>
-                          <div className="flex-1 grid grid-cols-3 gap-2">
+                        <div key={sec.id || sec.tempId || idx} className="flex items-center gap-3 p-2.5 border border-border/60 rounded-xl bg-cardBg shadow-xs text-xs hover:border-accent/40 transition-colors">
+                          <span className="font-extrabold text-accent w-6 text-center text-xs">{idx + 1}</span>
+                          
+                          {/* Section Name */}
+                          <div className="flex-1">
                             <input
                               type="text"
                               value={sec.name}
-                              placeholder="Section Name"
+                              placeholder="e.g. Quantitative Aptitude"
                               onChange={(e) => {
                                 const newSecs = [...sections];
                                 newSecs[idx].name = e.target.value;
                                 setSections(newSecs);
                               }}
-                              className="px-2 py-1 bg-white border border-border/60 rounded-lg text-xs font-semibold text-text-primary outline-none focus:border-accent"
+                              className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-border/60 rounded-lg text-xs font-bold text-text-primary outline-none focus:border-accent"
                             />
+                          </div>
+
+                          {/* Duration (Time in Minutes) */}
+                          <div className="w-32 relative">
                             <input
                               type="number"
+                              min="1"
                               value={sec.duration}
-                              placeholder="Duration (min)"
+                              placeholder="20"
                               onChange={(e) => {
                                 const newSecs = [...sections];
                                 newSecs[idx].duration = Math.max(1, Number(e.target.value));
                                 setSections(newSecs);
                               }}
-                              className="px-2 py-1 bg-white border border-border/60 rounded-lg text-xs font-semibold text-text-primary outline-none focus:border-accent"
+                              className="w-full pl-2.5 pr-9 py-1.5 bg-slate-50 dark:bg-slate-900 border border-border/60 rounded-lg text-xs font-bold text-text-primary outline-none focus:border-accent"
                             />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-text-secondary pointer-events-none">
+                              mins
+                            </span>
+                          </div>
+
+                          {/* Cutoff Marks */}
+                          <div className="w-32 relative">
                             <input
                               type="number"
+                              min="0"
                               value={sec.cutoff_marks}
-                              placeholder="Cutoff (%)"
+                              placeholder="35"
                               onChange={(e) => {
                                 const newSecs = [...sections];
                                 newSecs[idx].cutoff_marks = Math.max(0, Number(e.target.value));
                                 setSections(newSecs);
                               }}
-                              className="px-2 py-1 bg-white border border-border/60 rounded-lg text-xs font-semibold text-text-primary outline-none focus:border-accent"
+                              className="w-full pl-2.5 pr-11 py-1.5 bg-slate-50 dark:bg-slate-900 border border-border/60 rounded-lg text-xs font-bold text-text-primary outline-none focus:border-accent"
                             />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-text-secondary pointer-events-none">
+                              marks
+                            </span>
                           </div>
                           
                           <div className="flex items-center space-x-1">
@@ -704,7 +934,7 @@ export default function TestBuilderWizardModal({
                                   setSections(newSecs);
                                 }
                               }}
-                              disabled={sections.length <= 1}
+                              disabled={sections.length <= 2}
                               className="p-1 text-text-secondary hover:text-rose-500 disabled:opacity-20 transition-colors"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -716,12 +946,50 @@ export default function TestBuilderWizardModal({
                   </div>
                 )}
 
+                {/* Test Access Control */}
+                <div className="border-t border-border/40 pt-4 space-y-4">
+                  <h4 className="text-xs font-extrabold text-text-primary uppercase tracking-wider flex items-center">
+                    <Sparkles className="w-3.5 h-3.5 mr-1 text-accent" />
+                    <span>Access Control & Monetization</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Paid Test Access Toggle */}
+                    <div className="space-y-1.5 col-span-2">
+                      <label className="block text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">
+                        Test Pricing Tier
+                      </label>
+                      <div className="flex items-center space-x-3 p-3 bg-slate-50/40 rounded-xl border border-border/40">
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isPaid}
+                            onChange={(e) => setIsPaid(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                        </label>
+                        <div>
+                          <p className="text-xs font-extrabold text-text-primary">
+                            {isPaid ? 'Paid Students Only' : 'Free Test (All Students)'}
+                          </p>
+                          <p className="text-[10px] text-text-secondary font-medium">
+                            {isPaid
+                              ? 'Only enrolled students with completed fee payments can attempt this test.'
+                              : 'All registered students can attempt this test.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
           )}
 
-          {/* STEP 2: SPLIT-PANE WORKSPACE SELECTOR */}
-          {step === 2 && (
+          {/* STEP 3: SPLIT-PANE WORKSPACE SELECTOR */}
+          {step === 3 && (
             <div className="flex-1 flex overflow-hidden min-h-0 gap-6">
               
               {/* Left repository list */}
@@ -754,7 +1022,7 @@ export default function TestBuilderWizardModal({
                   </div>
 
                   {/* Filter Toolbar */}
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-4 gap-1.5">
                     <select
                       value={repoSubject}
                       onChange={(e) => setRepoSubject(e.target.value)}
@@ -789,6 +1057,19 @@ export default function TestBuilderWizardModal({
                       <option value="medium">Medium</option>
                       <option value="hard">Hard</option>
                     </select>
+
+                    <select
+                      value={repoSourceBatch}
+                      onChange={(e) => setRepoSourceBatch(e.target.value)}
+                      className="px-2 py-1 bg-white border border-border/60 rounded-lg text-[10px] font-bold text-text-secondary outline-none focus:border-accent"
+                    >
+                      <option value="all">📁 All Batches</option>
+                      {questionBatches.map((b) => (
+                        <option key={b.name} value={b.name}>
+                          📄 {b.name} ({b.count} Qs)
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -802,6 +1083,17 @@ export default function TestBuilderWizardModal({
                         className="w-full pl-8 pr-3 py-1.5 bg-white border border-border/70 rounded-xl text-[10px] font-bold text-text-primary outline-none focus:border-accent"
                       />
                     </div>
+
+                    {/* Unused only toggle */}
+                    <label className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-white border border-border/70 rounded-xl text-[10px] font-extrabold text-text-secondary cursor-pointer hover:border-accent shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={repoUnusedOnly}
+                        onChange={(e) => setRepoUnusedOnly(e.target.checked)}
+                        className="rounded border-gray-300 text-accent focus:ring-0 w-3.5 h-3.5"
+                      />
+                      <span className="whitespace-nowrap">Unused Only</span>
+                    </label>
 
                     {/* Random auto-pick option */}
                     <div className="flex items-center space-x-1 border border-dashed border-accent/40 bg-accent/5 px-2 py-1 rounded-lg">
@@ -982,17 +1274,24 @@ export default function TestBuilderWizardModal({
             </div>
           )}
 
-          {/* STEP 3: REVIEW & PUBLISH */}
-          {step === 3 && (
+          {/* STEP 4: REVIEW & PUBLISH */}
+          {step === 4 && (
             <div className="flex-1 overflow-y-auto w-full py-4 px-2">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 
                 {/* Left Column: Spec Review */}
                 <div className="lg:col-span-5 space-y-6">
                   <div className="border border-border/65 rounded-3xl p-6 space-y-4 bg-slate-50/10 shadow-xs">
-                    <h4 className="text-xs font-black text-text-primary uppercase tracking-wider border-b border-border/40 pb-2">
-                      Test Specification Review
-                    </h4>
+                    <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                      <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">
+                        Test Specification Review
+                      </h4>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                        testMode === 'TEST_SERIES' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {testMode === 'TEST_SERIES' ? 'Full Mock Test Series' : 'Subject-Wise Practice'}
+                      </span>
+                    </div>
 
                     <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-xs font-medium text-text-secondary">
                       <div>
@@ -1098,8 +1397,8 @@ export default function TestBuilderWizardModal({
                           >
                             <ChevronLeft className="w-4 h-4" />
                           </button>
-                          <span className="text-[11px] font-black text-text-primary">
-                            Q. {previewIndex + 1} of {selectedQuestions.length}
+                          <span className="text-xs font-bold text-text-secondary">
+                            Question {previewIndex + 1} of {selectedQuestions.length}
                           </span>
                           <button
                             type="button"
@@ -1114,27 +1413,22 @@ export default function TestBuilderWizardModal({
                     </div>
 
                     {selectedQuestions.length === 0 ? (
-                      <div className="text-center py-12 text-xs font-bold text-text-secondary">
-                        No questions selected. Go back to Step 2 to add questions.
+                      <div className="py-12 text-center text-text-secondary text-xs">
+                        No questions selected to preview.
                       </div>
                     ) : (
                       (() => {
                         const q = selectedQuestions[previewIndex];
                         if (!q) return null;
-
                         return (
                           <div className="space-y-4">
-                            {/* Question metadata badge */}
-                            <div className="flex items-center space-x-2">
-                              <span className="px-2 py-0.5 rounded text-[9px] font-black bg-accent/10 text-accent uppercase border border-accent/20">
-                                {q.type?.replace('_', ' ')}
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-text-primary">
+                                Question {previewIndex + 1}
                               </span>
-                              <span className="px-2 py-0.5 rounded text-[9px] font-black bg-slate-100 text-slate-650 uppercase border border-slate-200">
-                                {q.difficulty}
-                              </span>
-                              {q.marks?.correct !== undefined && (
-                                <span className="px-2 py-0.5 rounded text-[9px] font-black bg-emerald-50 text-emerald-700 uppercase border border-emerald-200">
-                                  +{q.marks.correct} Marks
+                              {q.type && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary uppercase">
+                                  {q.type}
                                 </span>
                               )}
                             </div>
@@ -1313,7 +1607,7 @@ export default function TestBuilderWizardModal({
               Cancel
             </button>
 
-            {step < 3 ? (
+            {step < 4 ? (
               <button
                 type="button"
                 onClick={handleNext}
@@ -1332,7 +1626,7 @@ export default function TestBuilderWizardModal({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin text-white" />
-                    <span>{test ? 'Saving...' : 'Creating...'}</span>
+                    <span>{test ? 'Saving...' : 'Create & Publish'}</span>
                   </>
                 ) : (
                   <span>{test ? 'Save Changes' : 'Create & Publish'}</span>

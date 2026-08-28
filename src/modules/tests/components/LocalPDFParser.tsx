@@ -1,11 +1,48 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Upload, FileText, AlertCircle, RefreshCw, Download, CheckCircle, Trash2 } from 'lucide-react';
-import { apiClient, useExamCategories } from '../../../core/api/endpoints';
+import { 
+  Upload, 
+  FileText, 
+  AlertCircle, 
+  RefreshCw, 
+  Download, 
+  CheckCircle, 
+  Trash2, 
+  Sparkles,
+  Layers,
+  Plus,
+  Zap
+} from 'lucide-react';
+import { apiClient, useExamCategories, useQuestionBatches } from '../../../core/api/endpoints';
 import { useToast } from '../../../shared/context';
 import { extractErrorMessage } from '../../../shared/utils';
+import TestBuilderWizardModal from './TestBuilderWizardModal';
+
+export interface SectionRangeConfig {
+  id: string;
+  name: string;
+  fromNumber: number;
+  toNumber: number;
+  categoryId: string;
+  subjectId: string;
+  topicId: string;
+  duration: number;
+  cutoffMarks: number;
+}
 
 // Dynamic PDF.js ES module loader
 const loadPdfJS = async (): Promise<any> => {
+  if (typeof (Promise as any).withResolvers === 'undefined') {
+    (Promise as any).withResolvers = function <T>() {
+      let resolve!: (value: T | PromiseLike<T>) => void;
+      let reject!: (reason?: any) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+  }
+
   if ((window as any).pdfjsLib) {
     return (window as any).pdfjsLib;
   }
@@ -38,13 +75,38 @@ interface LocalPDFParserProps {
 export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
   const toast = useToast();
   const { data: categories = [] } = useExamCategories();
+  const { data: existingBatches = [] } = useQuestionBatches();
+
+  const allSubjects = useMemo(() => {
+    return categories.flatMap((cat) => (cat.subjects || []).map((s) => ({ ...s, categoryId: cat.id })));
+  }, [categories]);
+
+  const allTopics = useMemo(() => {
+    return allSubjects.flatMap((sub) => (sub.topics || []).map((t) => ({ ...t, subjectId: sub.id })));
+  }, [allSubjects]);
 
   // State management
   const [file, setFile] = useState<File | null>(null);
   const [ansKeyFile, setAnsKeyFile] = useState<File | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState('');
+  const selectedSubject = '';
+  const selectedTopic = '';
+  const [customBatchName, setCustomBatchName] = useState('');
+
+  // Multi-section range configuration state
+  const [sectionsConfig, setSectionsConfig] = useState<SectionRangeConfig[]>([
+    {
+      id: 'sec_1',
+      name: 'Section 1',
+      fromNumber: 1,
+      toNumber: 1,
+      categoryId: '',
+      subjectId: '',
+      topicId: '',
+      duration: 20,
+      cutoffMarks: 35,
+    }
+  ]);
 
   const [parsingProgress, setParsingProgress] = useState(0);
   const [parsingStatusText, setParsingStatusText] = useState('');
@@ -58,9 +120,12 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
   const [tamilRatio, setTamilRatio] = useState(0);
   const [ocrTextHolder, setOcrTextHolder] = useState('');
 
-  // Save states
+  // Save & Test Builder states
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState(0);
+  const [isCreatingTest, setIsCreatingTest] = useState(false);
+  const [isTestWizardOpen, setIsTestWizardOpen] = useState(false);
+  const [savedQuestionsForTest, setSavedQuestionsForTest] = useState<any[]>([]);
 
   // Search & Filter preview
   const [filterIssuesOnly, setFilterIssuesOnly] = useState(false);
@@ -182,20 +247,20 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       const totalNonWhitespace = nonWhitespaceChars.length;
       if (totalNonWhitespace > 0) {
         let tamilCharCount = 0;
+        let corruptedCharCount = 0;
         for (let i = 0; i < nonWhitespaceChars.length; i++) {
           const code = nonWhitespaceChars.charCodeAt(i);
-          if (code >= 0x0B80 && code <= 0x0BFF) {
+          if (code >= 0x0b80 && code <= 0x0bff) {
             tamilCharCount++;
+          } else if (code === 0xfffd || (code >= 0xe000 && code <= 0xf8ff)) {
+            corruptedCharCount++;
           }
         }
         localTamilRatio = (tamilCharCount / totalNonWhitespace) * 100;
-      }
+        const corruptedRatio = (corruptedCharCount / totalNonWhitespace) * 100;
 
-      const hasQPrefix = fullText.match(/\bQ\d+\./) !== null;
-      const isBanking = hasQPrefix;
-
-      if (!isBanking && totalNonWhitespace >= 200) {
-        if (localTamilRatio < 0.5) {
+        // Only flag as corrupted if there is a significant amount of unmapped/replacement glyphs
+        if (corruptedRatio > 5.0) {
           status = 'UNICODE_CORRUPTED';
         }
       }
@@ -213,13 +278,47 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
   const parseAnswerKey = (rawText: string) => {
     answerKeyMapRef.current.clear();
     const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    addLog(`Parsing answer key lines (${lines.length} lines)...`);
+    addLog(`Scanning document text for answer keys (${lines.length} lines)...`);
 
-    const pattern1 = /(\d+)\.\s*\(([a-eA-E])\)/g;  
-    const pattern2 = /(\d+)\)\s*([a-eA-E])\b/g;    
-    const pattern3 = /(\d+)\s*[-–]\s*([a-eA-E])\b/g; 
-    const pattern4 = /^(\d+)\s+([a-eA-E])\s*$/;    
+    // Pattern A: S1. Ans.(a) or 1. Ans: (B) or Q1. Ans. A or 1. Ans. D or 1. Answer: A
+    const patternDetailedAns = /(?:S|Q)?(\d{1,3})\s*[\.:\-]?\s*Ans(?:wer)?\.?\s*[:\-\.]?\s*[\(\[]?\s*([a-eA-E])\s*[\)\]]?/gi;
+    
+    // Pattern B: 1. (a) or 1. (A) or 1.(a) or 1[b]
+    const patternParen = /(?:Q\.?)?(\d{1,3})\s*[\.:\-]?\s*[\(\[]\s*([a-eA-E])\s*[\)\]]/g;
+    
+    // Pattern C: 1) A or 1) a
+    const patternBracket = /(?:Q\.?)?(\d{1,3})\)\s*([a-eA-E])\b/g;
+    
+    // Pattern D: 1 - A or 1 - (A) or 1: A or 1: (a) or 1–A
+    const patternDash = /(?:Q\.?)?(\d{1,3})\s*[-–—:]\s*[\(\[]?\s*([a-eA-E])\s*[\)\]]?/g;
+    
+    // Pattern E: 1. A or 1. B or Q1. A
+    const patternDot = /(?:Q\.?)?(\d{1,3})\s*\.\s*([a-eA-E])\b/g;
 
+    // Pattern F: Tamil விடை e.g. 1. விடை: A or விடை (B)
+    const patternTamil = /(\d{1,3})\s*[\.:\-]?\s*(?:விடை|விடைக்குறிப்பு)\s*[:\-\.]?\s*[\(\[]?\s*([a-eA-E])\s*[\)\]]?/gi;
+
+    let match;
+
+    // 1. Scan entire text with detailed answer pattern
+    while ((match = patternDetailedAns.exec(rawText)) !== null) {
+      const qNum = parseInt(match[1]);
+      const opt = match[2].toUpperCase();
+      if (qNum >= 1 && qNum <= 300) {
+        answerKeyMapRef.current.set(qNum, opt);
+      }
+    }
+
+    // 2. Scan entire text with Tamil answer pattern
+    while ((match = patternTamil.exec(rawText)) !== null) {
+      const qNum = parseInt(match[1]);
+      const opt = match[2].toUpperCase();
+      if (qNum >= 1 && qNum <= 300) {
+        answerKeyMapRef.current.set(qNum, opt);
+      }
+    }
+
+    // 3. Line by line parsing for tables, lists, and checkmarks
     let currentQNum: number | null = null;
     const questionRegex = /^\s*Q?(\d+)\.\s*(.*)$/i;
 
@@ -231,6 +330,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
         currentQNum = parseInt(qMatch[1]);
       }
 
+      // Checkmark in answer key / question lines
       const hasCheckmark = line.includes('✓') || line.includes('✔') || line.includes('☑');
       if (hasCheckmark && currentQNum !== null) {
         let parts = [line];
@@ -252,6 +352,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
         }
       }
 
+      // Grid / Table key parsing (e.g. 1 2 3 4 5 followed by A B C D E)
       const numTokens = line.split(/\s+/);
       if (numTokens.every(t => /^\d+$/.test(t)) && numTokens.length >= 3 && i + 1 < lines.length) {
         const nextLineTokens = lines[i + 1].split(/\s+/);
@@ -261,47 +362,47 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
             const option = nextLineTokens[k].toUpperCase();
             answerKeyMapRef.current.set(qNum, option);
           }
-          i++; 
+          i++;
           continue;
         }
       }
 
-      let matched = false;
-      let match;
-
-      pattern1.lastIndex = 0;
-      pattern2.lastIndex = 0;
-      pattern3.lastIndex = 0;
-
-      while ((match = pattern1.exec(line)) !== null) {
-        answerKeyMapRef.current.set(parseInt(match[1]), match[2].toUpperCase());
-        matched = true;
+      // Try patterns on each line
+      patternParen.lastIndex = 0;
+      while ((match = patternParen.exec(line)) !== null) {
+        const qNum = parseInt(match[1]);
+        if (qNum >= 1 && qNum <= 300) answerKeyMapRef.current.set(qNum, match[2].toUpperCase());
       }
 
-      if (!matched) {
-        while ((match = pattern2.exec(line)) !== null) {
-          answerKeyMapRef.current.set(parseInt(match[1]), match[2].toUpperCase());
-          matched = true;
-        }
+      patternBracket.lastIndex = 0;
+      while ((match = patternBracket.exec(line)) !== null) {
+        const qNum = parseInt(match[1]);
+        if (qNum >= 1 && qNum <= 300) answerKeyMapRef.current.set(qNum, match[2].toUpperCase());
       }
 
-      if (!matched) {
-        while ((match = pattern3.exec(line)) !== null) {
-          answerKeyMapRef.current.set(parseInt(match[1]), match[2].toUpperCase());
-          matched = true;
-        }
+      patternDash.lastIndex = 0;
+      while ((match = patternDash.exec(line)) !== null) {
+        const qNum = parseInt(match[1]);
+        if (qNum >= 1 && qNum <= 300) answerKeyMapRef.current.set(qNum, match[2].toUpperCase());
       }
 
-      if (!matched) {
-        const singleMatch = line.match(pattern4);
-        if (singleMatch) {
-          answerKeyMapRef.current.set(parseInt(singleMatch[1]), singleMatch[2].toUpperCase());
-          matched = true;
-        }
+      patternDot.lastIndex = 0;
+      while ((match = patternDot.exec(line)) !== null) {
+        const qNum = parseInt(match[1]);
+        if (qNum >= 1 && qNum <= 300) answerKeyMapRef.current.set(qNum, match[2].toUpperCase());
+      }
+
+      // Standalone single-number line followed by option e.g. "1 A" or "1 [A]"
+      const singleMatch = line.match(/^(\d{1,3})\s+[\(\[]?([a-eA-E])[\)\]]?$/);
+      if (singleMatch) {
+        const qNum = parseInt(singleMatch[1]);
+        if (qNum >= 1 && qNum <= 300) answerKeyMapRef.current.set(qNum, singleMatch[2].toUpperCase());
       }
     }
 
-    addLog(`Answer key parsing complete: mapped ${answerKeyMapRef.current.size} questions.`, 'success');
+    if (answerKeyMapRef.current.size > 0) {
+      addLog(`Answer key parsing complete: mapped ${answerKeyMapRef.current.size} answers.`, 'success');
+    }
   };
 
   // Bilingual splitter & repair
@@ -426,7 +527,10 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       addLog(`Detected Format: TNPSC (1. prefix)`);
     }
 
-    let text = rawText.replace(/[✓✔☑]/g, ' ');
+    // Automatically parse all answer keys from document
+    parseAnswerKey(rawText);
+
+    let text = rawText;
 
     text = text.split('\n').filter(line => {
       const t = line.trim();
@@ -465,6 +569,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     let activeDirections = '';
     let activeDirectionsRange: any = null;
 
+    const sectionHeaderRegex = /^(Blood Relations|Direction Sense|Seating Arrangement|Syllogism|Analogy|Odd One Out|Alphabet Series|Letter\/Number Coding|Mathematical Operations|Inequality|Ranking & Order|Missing Number|Statement & Conclusion|Data Sufficiency|Quantitative Aptitude|Reasoning Ability|English Language|General Awareness|Computer Aptitude|Current Affairs|General Studies|Topics:.*|Reasoning Practice.*)$/i;
+
     addLog(`Tokenized into ${lines.length} lines. Starting parser loop...`);
 
     for (let i = 0; i < lines.length; i++) {
@@ -475,6 +581,10 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
         break;
       }
 
+      if (sectionHeaderRegex.test(line)) {
+        continue;
+      }
+
       if (line.includes('விடைகளுடன்') || line.includes('தேர்வு') || line.includes('டி.என்.பி.எஸ்.சி')) {
         continue;
       }
@@ -482,6 +592,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       if (sectionMarkerRegex.test(line)) continue;
 
       if (!isBanking) {
+        const expectedNextNum = currentQuestion ? currentQuestion.number + 1 : 1;
         const inlineQMatch = line.match(/^(.+)\s+(\d{1,3})\.\s+(.+)$/);
         if (inlineQMatch) {
           const beforeNum = inlineQMatch[1].trimEnd();
@@ -491,11 +602,12 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
           const lastCharCode = lastChar.charCodeAt(0);
           
           const isTamilChar = lastCharCode >= 0x0B80 && lastCharCode <= 0x0BFF;
-          const isBadChar = /[\d%\/]/.test(lastChar) || isTamilChar;
-          if (qNum >= 1 && qNum <= 100 && !isBadChar) {
+          const isBadChar = /[\d%\/=+\-*:,]/.test(lastChar) || isTamilChar;
+          // ONLY split if qNum is the sequential next question AND we were already capturing options for the current question
+          if (qNum === expectedNextNum && currentQuestion && currentQuestion.lastActiveOption !== null && !isBadChar) {
             line = beforeNum.trim();
             lines.splice(i + 1, 0, `${inlineQMatch[2]}. ${afterNum}`);
-            addLog(`Splitting inline question out of text line at position ${beforeNum.length}`);
+            addLog(`Splitting inline question ${qNum} out of text line at position ${beforeNum.length}`);
           }
         }
       }
@@ -556,6 +668,11 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
           const label = isBanking ? singleOpt[1].toUpperCase() : (singleOpt[1] || singleOpt[2]).toUpperCase();
           let optText = isBanking ? singleOpt[2].trim() : singleOpt[3].trim();
 
+          const isLineCheck = line.includes('✓') || line.includes('✔') || line.includes('☑');
+          if (isLineCheck) {
+            currentQuestion.correctOption = label;
+          }
+
           const moreOptMatch = isBanking
             ? optText.match(/\s+([B-E])\)\s/)
             : optText.match(/\s+(?:([B-E])\)|\(([b-eA-E])\))\s/);
@@ -569,21 +686,16 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
               if (m) {
                 const lbl = isBanking ? m[1].toUpperCase() : (m[1] || m[2]).toUpperCase();
                 const val = isBanking ? m[2].trim() : m[3].trim();
-                if (val.length > 0) {
-                  currentQuestion.options[lbl] = val;
-                  currentQuestion.lastActiveOption = lbl;
-                } else {
-                  currentQuestion.options[lbl] = '';
-                  currentQuestion.lastActiveOption = lbl;
+                const isPartCheck = part.includes('✓') || part.includes('✔') || part.includes('☑');
+                if (isPartCheck) {
+                  currentQuestion.correctOption = lbl;
                 }
+                currentQuestion.options[lbl] = val;
+                currentQuestion.lastActiveOption = lbl;
               }
             }
           } else {
-            if (optText.length > 0) {
-              currentQuestion.options[label] = optText;
-            } else {
-              currentQuestion.options[label] = '';
-            }
+            currentQuestion.options[label] = optText;
             currentQuestion.lastActiveOption = label;
           }
           continue;
@@ -666,7 +778,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       const optD = q.options['D'] || '';
       const optE = q.options['E'] || '';
 
-      const correct = answerKeyMapRef.current.get(q.number) || answersMap[q.number] || '';
+      const correct = q.correctOption || answerKeyMapRef.current.get(q.number) || answersMap[q.number] || '';
       const hasIssue = !optA || !optB;
       const missingAnswer = !correct;
 
@@ -722,10 +834,47 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       examCategory: catToUse
     }));
 
+    // Rich Console Output for Easy Debugging
+    console.group('📄 [PDF PARSER RESULT]');
+    console.log(`%cTotal questions detected: ${finalizedList.length}`, 'color: #10b981; font-weight: bold; font-size: 14px;');
+    console.table(finalizedList.map(q => ({
+      '#': q.number,
+      'Question': q.questionEn.length > 50 ? q.questionEn.substring(0, 50) + '...' : q.questionEn,
+      'A': q.optionA,
+      'B': q.optionB,
+      'C': q.optionC,
+      'D': q.optionD,
+      'E': q.optionE,
+      'Answer': q.correctOption || '⚠ Missing',
+      'Status': q.hasIssue ? '❌ Issue' : '✅ OK'
+    })));
+    console.log('Full Parsed Objects:', finalizedList);
+    console.groupEnd();
+
+    console.group('🔑 [PARSED ANSWER KEYS]');
+    console.log(`Total answer keys mapped: ${answerKeyMapRef.current.size}`);
+    const ansObj: Record<string, string> = {};
+    answerKeyMapRef.current.forEach((val, key) => { ansObj[`Q${key}`] = val; });
+    console.log(ansObj);
+    console.groupEnd();
+
     setParsedQuestions(finalizedList);
+    if (finalizedList.length > 0) {
+      setSectionsConfig(prev => {
+        if (prev.length === 1 && prev[0].toNumber <= 1) {
+          return [{
+            ...prev[0],
+            toNumber: finalizedList.length,
+            duration: Math.max(10, Math.round(finalizedList.length * 1.5)),
+            cutoffMarks: Math.max(1, Math.round(finalizedList.length * 0.4)),
+          }];
+        }
+        return prev;
+      });
+    }
     setIsParsing(false);
     setSelectedQuestionIndex(0);
-    addLog("All components parsed and rendered successfully!", 'success');
+    addLog(`All ${finalizedList.length} questions parsed and rendered successfully!`, 'success');
   };
 
   const handleFileDrop = async (e: React.DragEvent, type: 'questions' | 'key') => {
@@ -749,6 +898,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     setIsParsing(true);
     setParsingProgress(0);
     setParsingStatusText('Reading PDF text...');
+    const cleanName = questionsFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').trim();
+    setCustomBatchName(cleanName);
 
     try {
       const arrayBuffer = await questionsFile.arrayBuffer();
@@ -807,9 +958,9 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
           type: q.type,
           question_text_en: q.questionEn,
           question_text_ta: q.questionTa || null,
-          subject_id: q.subjectId || null,
-          topic_id: q.topicId || null,
-          exam_category: q.examCategory,
+          subject_id: q.subjectId || selectedSubject || null,
+          topic_id: q.topicId || selectedTopic || null,
+          exam_category: q.examCategory || selectedCategory,
           difficulty: 'MEDIUM',
           explanation_en: '',
           explanation_ta: '',
@@ -820,6 +971,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
             negative_enabled: q.negativeEnabled === 'TRUE'
           },
           tags: [],
+          source_batch: customBatchName.trim() || file?.name || 'Manual Upload',
           is_published: true,
           options: optionsList,
           correct_option_id: q.correctOption || null,
@@ -842,6 +994,83 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       toast.error(`Save failed: ${msg}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // 1-Click Fast-Track: Save questions and directly launch Test Builder Wizard
+  const handleSaveAndCreateTest = async () => {
+    if (parsedQuestions.length === 0) return;
+    setIsSaving(true);
+    setIsCreatingTest(true);
+    setSaveProgress(0);
+
+    try {
+      addLog(`Preparing bulk payload of ${parsedQuestions.length} questions for Test Assessment...`);
+      const payload = parsedQuestions.map(q => {
+        const optionsList = [
+          { id: 'A', text_en: q.optionA, text_ta: q.optionATa },
+          { id: 'B', text_en: q.optionB, text_ta: q.optionBTa },
+          { id: 'C', text_en: q.optionC, text_ta: q.optionCTa },
+          { id: 'D', text_en: q.optionD, text_ta: q.optionDTa },
+          { id: 'E', text_en: q.optionE, text_ta: q.optionETa }
+        ].filter(o => o.text_en || o.text_ta);
+
+        return {
+          type: q.type,
+          question_text_en: q.questionEn,
+          question_text_ta: q.questionTa || null,
+          subject_id: q.subjectId || selectedSubject || null,
+          topic_id: q.topicId || selectedTopic || null,
+          exam_category: q.examCategory || selectedCategory,
+          difficulty: 'MEDIUM',
+          explanation_en: '',
+          explanation_ta: '',
+          marks: {
+            correct: 1,
+            wrong: q.negativeMarks || 0,
+            partial: 0,
+            negative_enabled: q.negativeEnabled === 'TRUE'
+          },
+          tags: [],
+          source_batch: customBatchName.trim() || file?.name || 'Manual Upload',
+          is_published: true,
+          options: optionsList,
+          correct_option_id: q.correctOption || null,
+          format: q.format || 'STANDARD',
+          shared_context_en: q.sharedContext || null
+        };
+      });
+
+      addLog(`Uploading questions to database...`);
+      setSaveProgress(50);
+      const res = await apiClient.post('/questions/bulk', payload);
+      setSaveProgress(100);
+
+      const createdQuestions = res.data.data || [];
+      addLog(`SUCCESS! Saved ${createdQuestions.length} questions. Opening Test Builder...`, 'success');
+      toast.success(`Saved ${createdQuestions.length} questions. Opening Test Builder...`);
+
+      setSavedQuestionsForTest(createdQuestions);
+      setIsTestWizardOpen(true);
+    } catch (err: any) {
+      const msg = extractErrorMessage(err);
+      addLog(`Failed to save and launch test: ${msg}`, 'error');
+      toast.error(`Save failed: ${msg}`);
+    } finally {
+      setIsSaving(false);
+      setIsCreatingTest(false);
+    }
+  };
+
+  const handleTestBuilderSubmit = async (testPayload: any) => {
+    try {
+      await apiClient.post('/tests', testPayload);
+      toast.success('Test Assessment created and published successfully!');
+      setIsTestWizardOpen(false);
+      onSuccess();
+    } catch (err: any) {
+      toast.error(extractErrorMessage(err));
+      throw err;
     }
   };
 
@@ -890,6 +1119,67 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     }
   };
 
+  const handleAddSection = () => {
+    const lastSection = sectionsConfig[sectionsConfig.length - 1];
+    const nextFrom = lastSection ? lastSection.toNumber + 1 : 1;
+    const nextTo = Math.max(nextFrom, parsedQuestions.length || (nextFrom + 24));
+    
+    const newSection: SectionRangeConfig = {
+      id: `sec_${Date.now()}`,
+      name: `Section ${sectionsConfig.length + 1}`,
+      fromNumber: nextFrom,
+      toNumber: nextTo,
+      categoryId: selectedCategory || (lastSection?.categoryId || ''),
+      subjectId: '',
+      topicId: '',
+      duration: 20,
+      cutoffMarks: 35,
+    };
+    setSectionsConfig(prev => [...prev, newSection]);
+  };
+
+  const handleRemoveSection = (index: number) => {
+    if (sectionsConfig.length <= 1) return;
+    setSectionsConfig(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateSection = (index: number, field: keyof SectionRangeConfig, val: any) => {
+    setSectionsConfig(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: val };
+      if (field === 'categoryId') {
+        updated[index].subjectId = '';
+        updated[index].topicId = '';
+      }
+      if (field === 'subjectId') {
+        updated[index].topicId = '';
+      }
+      return updated;
+    });
+  };
+
+  const handleApplyTaxonomyToQuestions = () => {
+    if (parsedQuestions.length === 0) {
+      toast.error('No parsed questions to tag.');
+      return;
+    }
+    
+    setParsedQuestions(prev => prev.map(q => {
+      const matchingSection = sectionsConfig.find(s => q.number >= s.fromNumber && q.number <= s.toNumber);
+      if (!matchingSection) return q;
+
+      return {
+        ...q,
+        sectionName: matchingSection.name,
+        examCategory: matchingSection.categoryId || q.examCategory || selectedCategory,
+        subjectId: matchingSection.subjectId || q.subjectId || selectedSubject,
+        topicId: matchingSection.topicId || q.topicId || selectedTopic,
+      };
+    }));
+
+    toast.success(`Applied taxonomy across ${sectionsConfig.length} section(s) to ${parsedQuestions.length} questions.`);
+  };
+
   const handleCellBlur = (idx: number, field: string, value: string) => {
     setParsedQuestions((prev) => {
       const copy = [...prev];
@@ -903,6 +1193,12 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
         hasIssue: !optA || !optB,
         missingAnswer: !correct
       };
+      if (field === 'subjectId') {
+        const subjectTopics = allTopics.filter(t => t.subjectId === value);
+        if (!subjectTopics.some(t => t.id === copy[idx].topicId)) {
+          copy[idx].topicId = '';
+        }
+      }
       return copy;
     });
   };
@@ -919,20 +1215,16 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     }
   };
 
-  const activeCategory = categories.find((c) => c.id === selectedCategory);
-  const subjectsList = activeCategory?.subjects || [];
-  const activeSubject = subjectsList.find((s) => s.id === selectedSubject);
-  const topicsList = activeSubject?.topics || [];
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="w-full space-y-6">
+      <div className="w-full">
         {/* Dropzone Questions */}
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => handleFileDrop(e, 'questions')}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-border/85 hover:border-accent rounded-3xl p-6 text-center cursor-pointer transition-colors bg-cardBg"
+          className="w-full border-2 border-dashed border-border/85 hover:border-accent rounded-3xl p-8 text-center cursor-pointer transition-colors bg-cardBg shadow-xs"
         >
           <input
             ref={fileInputRef}
@@ -1016,63 +1308,225 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
         </div>
       )}
 
-      {/* Database Taxonomy Selector card */}
+      {/* Section & Taxonomy Range Manager Card */}
       {parsedQuestions.length > 0 && (
-        <div className="bg-cardBg border border-border/45 rounded-2xl p-4 space-y-3">
-          <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider">Database Taxonomy Mapping</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Category</label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedCategory(val);
-                  setSelectedSubject('');
-                  setSelectedTopic('');
-                  setParsedQuestions((prev) => prev.map(q => ({ ...q, examCategory: val })));
-                }}
-                className="w-full bg-slate-50 border border-border/50 rounded-xl px-3 py-2 text-xs font-bold text-text-secondary outline-none focus:border-accent"
-              >
-                <option value="">Select Category</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+        <div className="bg-cardBg border border-border/45 rounded-3xl p-5 space-y-4 shadow-sm">
+          <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-border/40">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-black text-text-primary uppercase tracking-wider">
+                  Sections & Taxonomy Configuration
+                </h3>
+                <p className="text-[10px] font-semibold text-text-secondary">
+                  Define timed sections with subject & topic taxonomy for mock test series
+                </p>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Subject</label>
-              <select
-                value={selectedSubject}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedSubject(val);
-                  setSelectedTopic('');
-                  setParsedQuestions((prev) => prev.map(q => ({ ...q, subjectId: val })));
-                }}
-                disabled={!selectedCategory}
-                className="w-full bg-slate-50 border border-border/50 rounded-xl px-3 py-2 text-xs font-bold text-text-secondary outline-none focus:border-accent disabled:opacity-50"
-              >
-                <option value="">Select Subject</option>
-                {subjectsList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
+            <div className="flex items-center space-x-3">
+              {/* Batch Name Input Field */}
+              <div className="flex items-center space-x-2 bg-slate-50 dark:bg-slate-800/60 border border-border/50 rounded-xl px-3 py-1.5">
+                <span className="text-[10px] font-black uppercase text-text-secondary">Batch:</span>
+                <input
+                  type="text"
+                  list="pdf-batch-suggestions"
+                  value={customBatchName}
+                  onChange={(e) => setCustomBatchName(e.target.value)}
+                  placeholder="e.g. TNPSC Mock 1"
+                  className="bg-transparent border-none outline-none text-xs font-bold text-text-primary w-40"
+                />
+                <datalist id="pdf-batch-suggestions">
+                  {existingBatches.map((b) => (
+                    <option key={b.name} value={b.name}>
+                      {b.name} ({b.count} questions)
+                    </option>
+                  ))}
+                </datalist>
+              </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Topic</label>
-              <select
-                value={selectedTopic}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedTopic(val);
-                  setParsedQuestions((prev) => prev.map(q => ({ ...q, topicId: val })));
-                }}
-                disabled={!selectedSubject}
-                className="w-full bg-slate-50 border border-border/50 rounded-xl px-3 py-2 text-xs font-bold text-text-secondary outline-none focus:border-accent disabled:opacity-50"
+              {/* Apply Taxonomy to Questions Button */}
+              <button
+                type="button"
+                onClick={handleApplyTaxonomyToQuestions}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-xs transition-all cursor-pointer"
+                title="Tag all parsed questions with these section subjects & topics"
               >
-                <option value="">Select Topic</option>
-                {topicsList.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+                <Zap className="w-3.5 h-3.5 text-amber-300" />
+                <span>Apply Taxonomy to Questions</span>
+              </button>
             </div>
+          </div>
+
+          {/* Section Rows Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="text-[10px] font-black text-text-secondary uppercase tracking-wider border-b border-border/40 pb-2">
+                  <th className="py-2 px-2 w-8 text-center">#</th>
+                  <th className="py-2 px-2 min-w-[180px]">Section Name</th>
+                  <th className="py-2 px-2 min-w-[150px]">Question Range</th>
+                  <th className="py-2 px-2 min-w-[140px]">Exam Category</th>
+                  <th className="py-2 px-2 min-w-[160px]">Subject</th>
+                  <th className="py-2 px-2 min-w-[160px]">Topic</th>
+                  <th className="py-2 px-2 w-24">⏱️ Time (min)</th>
+                  <th className="py-2 px-2 w-24">🎯 Cutoff</th>
+                  <th className="py-2 px-2 w-10 text-center"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/20">
+                {sectionsConfig.map((sec, sIdx) => {
+                  const secCategorySubjects = sec.categoryId 
+                    ? allSubjects.filter(s => s.categoryId === sec.categoryId)
+                    : allSubjects;
+                  const secSubjectTopics = sec.subjectId
+                    ? allTopics.filter(t => t.subjectId === sec.subjectId)
+                    : [];
+                  const qCount = Math.max(0, sec.toNumber - sec.fromNumber + 1);
+
+                  return (
+                    <tr key={sec.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 text-xs">
+                      <td className="py-2.5 px-2 text-center font-black text-text-secondary">
+                        {sIdx + 1}
+                      </td>
+
+                      <td className="py-2.5 px-2">
+                        <input
+                          type="text"
+                          value={sec.name}
+                          onChange={(e) => handleUpdateSection(sIdx, 'name', e.target.value)}
+                          placeholder={`Section ${sIdx + 1} Name`}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-border/50 rounded-xl px-2.5 py-1.5 text-xs font-bold text-text-primary outline-none focus:border-accent"
+                        />
+                      </td>
+
+                      <td className="py-2.5 px-2">
+                        <div className="flex items-center space-x-1.5">
+                          <input
+                            type="number"
+                            min={1}
+                            max={parsedQuestions.length || 999}
+                            value={sec.fromNumber}
+                            onChange={(e) => handleUpdateSection(sIdx, 'fromNumber', parseInt(e.target.value) || 1)}
+                            className="w-14 bg-slate-50 dark:bg-slate-800 border border-border/50 rounded-xl px-2 py-1.5 text-xs font-bold text-center text-text-primary outline-none focus:border-accent"
+                          />
+                          <span className="text-[10px] font-bold text-text-secondary">to</span>
+                          <input
+                            type="number"
+                            min={sec.fromNumber}
+                            max={parsedQuestions.length || 999}
+                            value={sec.toNumber}
+                            onChange={(e) => handleUpdateSection(sIdx, 'toNumber', parseInt(e.target.value) || sec.fromNumber)}
+                            className="w-14 bg-slate-50 dark:bg-slate-800 border border-border/50 rounded-xl px-2 py-1.5 text-xs font-bold text-center text-text-primary outline-none focus:border-accent"
+                          />
+                          <span className="px-1.5 py-0.5 rounded-md bg-accent/10 text-accent font-black text-[9px]">
+                            {qCount} Qs
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="py-2.5 px-2">
+                        <select
+                          value={sec.categoryId}
+                          onChange={(e) => handleUpdateSection(sIdx, 'categoryId', e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-border/50 rounded-xl px-2 py-1.5 text-xs font-bold text-text-secondary outline-none focus:border-accent"
+                        >
+                          <option value="">(Select Category)</option>
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </td>
+
+                      <td className="py-2.5 px-2">
+                        <select
+                          value={sec.subjectId}
+                          onChange={(e) => handleUpdateSection(sIdx, 'subjectId', e.target.value)}
+                          disabled={!sec.categoryId && categories.length > 0}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-border/50 rounded-xl px-2 py-1.5 text-xs font-bold text-text-secondary outline-none focus:border-accent disabled:opacity-40"
+                        >
+                          <option value="">(Select Subject)</option>
+                          {secCategorySubjects.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </td>
+
+                      <td className="py-2.5 px-2">
+                        <select
+                          value={sec.topicId}
+                          onChange={(e) => handleUpdateSection(sIdx, 'topicId', e.target.value)}
+                          disabled={!sec.subjectId}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-border/50 rounded-xl px-2 py-1.5 text-xs font-bold text-text-secondary outline-none focus:border-accent disabled:opacity-40"
+                        >
+                          <option value="">(All / Optional Topic)</option>
+                          {secSubjectTopics.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </td>
+
+                      <td className="py-2.5 px-2">
+                        <div className="flex items-center space-x-1">
+                          <input
+                            type="number"
+                            min={1}
+                            value={sec.duration}
+                            onChange={(e) => handleUpdateSection(sIdx, 'duration', parseInt(e.target.value) || 1)}
+                            className="w-14 bg-slate-50 dark:bg-slate-800 border border-border/50 rounded-xl px-2 py-1.5 text-xs font-bold text-center text-text-primary outline-none focus:border-accent"
+                          />
+                          <span className="text-[9px] font-semibold text-text-secondary">min</span>
+                        </div>
+                      </td>
+
+                      <td className="py-2.5 px-2">
+                        <div className="flex items-center space-x-1">
+                          <input
+                            type="number"
+                            min={0}
+                            value={sec.cutoffMarks}
+                            onChange={(e) => handleUpdateSection(sIdx, 'cutoffMarks', parseInt(e.target.value) || 0)}
+                            className="w-14 bg-slate-50 dark:bg-slate-800 border border-border/50 rounded-xl px-2 py-1.5 text-xs font-bold text-center text-text-primary outline-none focus:border-accent"
+                          />
+                          <span className="text-[9px] font-semibold text-text-secondary">marks</span>
+                        </div>
+                      </td>
+
+                      <td className="py-2.5 px-2 text-center">
+                        {sectionsConfig.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSection(sIdx)}
+                            className="p-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                            title="Remove section"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Table Footer actions */}
+          <div className="flex items-center justify-between pt-2 border-t border-border/30">
+            <button
+              type="button"
+              onClick={handleAddSection}
+              className="px-3 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent font-black rounded-xl text-xs flex items-center space-x-1.5 transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Section</span>
+            </button>
+
+            <span className="text-[10px] font-bold text-text-secondary">
+              {parsedQuestions.length} total questions partitioned across {sectionsConfig.length} section(s)
+            </span>
           </div>
         </div>
       )}
@@ -1158,17 +1612,37 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
               <button
                 onClick={handleSaveToDatabase}
                 disabled={isSaving}
-                className="px-4 py-1.5 bg-accent hover:bg-accent/90 text-white font-bold rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-accent/15 transition-all"
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs flex items-center space-x-1.5 shadow-md transition-all cursor-pointer"
+                title="Save questions to question bank only"
               >
-                {isSaving ? (
+                {isSaving && !isCreatingTest ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     <span>Saving ({saveProgress}%)</span>
                   </>
                 ) : (
                   <>
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>Upload to Database</span>
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Save to Question Bank</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleSaveAndCreateTest}
+                disabled={isSaving}
+                className="px-4.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 transition-all cursor-pointer border border-blue-400/30"
+                title="1-Click: Save questions and immediately launch test builder with these questions pre-selected"
+              >
+                {isCreatingTest ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Preparing Test ({saveProgress}%)</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                    <span>Save & Create Test</span>
                   </>
                 )}
               </button>
@@ -1177,11 +1651,14 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
 
           <div className="grid grid-cols-12 gap-4">
             <div className={`${isSimulatorOpen ? 'col-span-12 lg:col-span-8' : 'col-span-12'} w-full overflow-x-auto overflow-y-auto max-h-[500px] border border-border/50 rounded-2xl bg-cardBg`}>
-              <table className="w-full text-left border-collapse min-w-[2200px]">
+              <table className="w-full text-left border-collapse min-w-[2400px]">
                 <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.1)]">
                   <tr className="text-[10px] font-bold text-text-secondary uppercase">
                     <th className="py-2.5 px-3 w-12 text-center bg-slate-50 dark:bg-slate-900">#</th>
-                    <th className="py-2.5 px-3 w-40 bg-slate-50 dark:bg-slate-900">Format</th>
+                    <th className="py-2.5 px-3 w-36 min-w-[140px] bg-slate-50 dark:bg-slate-900">Section</th>
+                    <th className="py-2.5 px-3 w-40 min-w-[150px] bg-slate-50 dark:bg-slate-900">Subject</th>
+                    <th className="py-2.5 px-3 w-40 min-w-[150px] bg-slate-50 dark:bg-slate-900">Topic</th>
+                    <th className="py-2.5 px-3 w-36 bg-slate-50 dark:bg-slate-900">Format</th>
                     {hasComprehension && <th className="py-2.5 px-3 w-96 min-w-[380px] bg-slate-50 dark:bg-slate-900">Comprehension</th>}
                     <th className="py-2.5 px-3 w-96 min-w-[380px] bg-slate-50 dark:bg-slate-900">Question EN</th>
                     {hasQuestionTa && <th className="py-2.5 px-3 w-96 min-w-[380px] bg-slate-50 dark:bg-slate-900">Question TA</th>}
@@ -1218,7 +1695,42 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
                             className="bg-transparent border-none outline-none w-full text-xs text-center font-bold text-text-secondary py-1"
                           />
                         </td>
-                        <td className="py-5 px-3 w-40">
+                        <td className="py-5 px-3 w-36 min-w-[140px]" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={q.sectionName || ''}
+                            placeholder="Section Name"
+                            title={`Section: ${q.sectionName || 'None'}`}
+                            onChange={(e) => handleCellBlur(originalIdx, 'sectionName', e.target.value)}
+                            className="w-full bg-slate-50/70 dark:bg-slate-800/60 border border-border/40 rounded-lg px-2 py-1 text-[11px] font-bold text-text-primary outline-none focus:border-accent"
+                          />
+                        </td>
+                        <td className="py-5 px-3 w-40 min-w-[150px]" onClick={(e) => e.stopPropagation()}>
+                          <select
+                            value={q.subjectId || ''}
+                            onChange={(e) => handleCellBlur(originalIdx, 'subjectId', e.target.value)}
+                            className="w-full bg-slate-50/70 dark:bg-slate-800/60 border border-border/40 rounded-lg px-2 py-1 text-[11px] font-bold text-text-secondary outline-none focus:border-accent"
+                          >
+                            <option value="">(No Subject)</option>
+                            {(q.examCategory ? allSubjects.filter(s => s.categoryId === q.examCategory) : allSubjects).map(s => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-5 px-3 w-40 min-w-[150px]" onClick={(e) => e.stopPropagation()}>
+                          <select
+                            value={q.topicId || ''}
+                            onChange={(e) => handleCellBlur(originalIdx, 'topicId', e.target.value)}
+                            disabled={!q.subjectId}
+                            className="w-full bg-slate-50/70 dark:bg-slate-800/60 border border-border/40 rounded-lg px-2 py-1 text-[11px] font-bold text-text-secondary outline-none focus:border-accent disabled:opacity-40"
+                          >
+                            <option value="">(No Topic)</option>
+                            {allTopics.filter(t => t.subjectId === q.subjectId).map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-5 px-3 w-36">
                           <input
                             type="text"
                             value={q.format}
@@ -1412,6 +1924,35 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
             )}
           </div>
         </div>
+      )}
+
+      {/* 1-Click Test Builder Wizard Modal */}
+      {isTestWizardOpen && (
+        <TestBuilderWizardModal
+          isOpen={isTestWizardOpen}
+          onClose={() => {
+            setIsTestWizardOpen(false);
+            onSuccess();
+          }}
+          onSubmit={handleTestBuilderSubmit}
+          preSelectedQuestions={savedQuestionsForTest}
+          prefilledTitle={customBatchName.trim() || (file ? file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ') : 'New Practice Test')}
+          prefilledSubjectId={selectedSubject}
+          prefilledCategoryId={selectedCategory}
+          prefilledBatchName={customBatchName.trim() || file?.name || 'Uploaded Batch'}
+          prefilledSections={sectionsConfig.map((sec, idx) => ({
+            id: sec.id,
+            name: sec.name || `Section ${idx + 1}`,
+            order: idx,
+            duration: Number(sec.duration) || 20,
+            cutoff_marks: Number(sec.cutoffMarks) || 35,
+            total_marks: parsedQuestions.filter(q => q.number >= sec.fromNumber && q.number <= sec.toNumber).length,
+            fromNumber: sec.fromNumber,
+            toNumber: sec.toNumber,
+            subjectId: sec.subjectId,
+            topicId: sec.topicId,
+          }))}
+        />
       )}
     </div>
   );
