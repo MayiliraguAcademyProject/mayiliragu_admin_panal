@@ -275,128 +275,107 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
   };
 
   // 2. Parse Answer Key
-  const parseAnswerKey = (rawText: string) => {
+  const parseAnswerKey = (rawText: string, currentSections: SectionRangeConfig[] = []) => {
     answerKeyMapRef.current.clear();
     const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     addLog(`Scanning document text for answer keys (${lines.length} lines)...`);
 
-    // Pattern A: S1. Ans.(a) or 1. Ans: (B) or Q1. Ans. A or 1. Ans. D or 1. Answer: A
-    const patternDetailedAns = /(?:S|Q)?(\d{1,3})\s*[\.:\-]?\s*Ans(?:wer)?\.?\s*[:\-\.]?\s*[\(\[]?\s*([a-eA-E])\s*[\)\]]?/gi;
-    
-    // Pattern B: 1. (a) or 1. (A) or 1.(a) or 1[b]
-    const patternParen = /(?:Q\.?)?(\d{1,3})\s*[\.:\-]?\s*[\(\[]\s*([a-eA-E])\s*[\)\]]/g;
-    
-    // Pattern C: 1) A or 1) a
-    const patternBracket = /(?:Q\.?)?(\d{1,3})\)\s*([a-eA-E])\b/g;
-    
-    // Pattern D: 1 - A or 1 - (A) or 1: A or 1: (a) or 1–A
-    const patternDash = /(?:Q\.?)?(\d{1,3})\s*[-–—:]\s*[\(\[]?\s*([a-eA-E])\s*[\)\]]?/g;
-    
-    // Pattern E: 1. A or 1. B or Q1. A
-    const patternDot = /(?:Q\.?)?(\d{1,3})\s*\.\s*([a-eA-E])\b/g;
+    const sectionHeaderPattern = /^(?:SECTION|PART|PAPER|MODULE)\s+([A-Z0-9]+)(?:\s*[-–—:]\s*(.*))?$/i;
+    const normalizeSec = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-    // Pattern F: Tamil விடை e.g. 1. விடை: A or விடை (B)
-    const patternTamil = /(\d{1,3})\s*[\.:\-]?\s*(?:விடை|விடைக்குறிப்பு)\s*[:\-\.]?\s*[\(\[]?\s*([a-eA-E])\s*[\)\]]?/gi;
-
-    let match;
-
-    // 1. Scan entire text with detailed answer pattern
-    while ((match = patternDetailedAns.exec(rawText)) !== null) {
-      const qNum = parseInt(match[1]);
-      const opt = match[2].toUpperCase();
-      if (qNum >= 1 && qNum <= 300) {
-        answerKeyMapRef.current.set(qNum, opt);
-      }
-    }
-
-    // 2. Scan entire text with Tamil answer pattern
-    while ((match = patternTamil.exec(rawText)) !== null) {
-      const qNum = parseInt(match[1]);
-      const opt = match[2].toUpperCase();
-      if (qNum >= 1 && qNum <= 300) {
-        answerKeyMapRef.current.set(qNum, opt);
-      }
-    }
-
-    // 3. Line by line parsing for tables, lists, and checkmarks
-    let currentQNum: number | null = null;
-    const questionRegex = /^\s*Q?(\d+)\.\s*(.*)$/i;
+    let currentAnsSection = '';
+    let ansSectionOffset = 0;
+    let lastLocalQNum = 0;
+    let fallbackSecIdx = 0;
+    const hasMultipleSections = currentSections.length > 1;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      const qMatch = line.match(questionRegex);
-      if (qMatch) {
-        currentQNum = parseInt(qMatch[1]);
-      }
-
-      // Checkmark in answer key / question lines
-      const hasCheckmark = line.includes('✓') || line.includes('✔') || line.includes('☑');
-      if (hasCheckmark && currentQNum !== null) {
-        let parts = [line];
-        if (line.includes('A)') && line.includes('B)')) {
-          parts = line.split(/(?=[A-E]\))/);
-        } else if (line.includes('(a)') && line.includes('(b)')) {
-          parts = line.split(/(?=\([a-e]\))/);
-        }
-
-        for (const part of parts) {
-          const partHasCheck = part.includes('✓') || part.includes('✔') || part.includes('☑');
-          if (partHasCheck) {
-            const mOpt = part.trim().match(/^\s*([A-E])\)/) || part.trim().match(/^\s*\(([a-e])\)/i);
-            if (mOpt) {
-              const optLetter = mOpt[1].toUpperCase();
-              answerKeyMapRef.current.set(currentQNum, optLetter);
-            }
+      const secMatch = line.match(sectionHeaderPattern);
+      if (secMatch) {
+        currentAnsSection = line.trim();
+        const secTag = secMatch[1].toUpperCase();
+        if (currentSections.length > 0) {
+          const matchedConfig = currentSections.find(s => {
+            const sMatch = s.name.match(sectionHeaderPattern);
+            if (sMatch && sMatch[1].toUpperCase() === secTag) return true;
+            return normalizeSec(s.name) === normalizeSec(currentAnsSection);
+          });
+          if (matchedConfig) {
+            ansSectionOffset = matchedConfig.fromNumber - 1;
           }
         }
+        lastLocalQNum = 0;
+        continue;
       }
 
-      // Grid / Table key parsing (e.g. 1 2 3 4 5 followed by A B C D E)
+      // 1. Grid / Table key parsing (e.g. 1 2 3 4 5 followed by A B C D E)
       const numTokens = line.split(/\s+/);
       if (numTokens.every(t => /^\d+$/.test(t)) && numTokens.length >= 3 && i + 1 < lines.length) {
         const nextLineTokens = lines[i + 1].split(/\s+/);
         if (nextLineTokens.every(t => /^[a-eA-E]$/.test(t)) && nextLineTokens.length === numTokens.length) {
           for (let k = 0; k < numTokens.length; k++) {
-            const qNum = parseInt(numTokens[k]);
+            const localQNum = parseInt(numTokens[k]);
             const option = nextLineTokens[k].toUpperCase();
-            answerKeyMapRef.current.set(qNum, option);
+            if (hasMultipleSections && localQNum < lastLocalQNum && localQNum === 1) {
+              fallbackSecIdx++;
+              if (fallbackSecIdx < currentSections.length) {
+                ansSectionOffset = currentSections[fallbackSecIdx].fromNumber - 1;
+              }
+            }
+            lastLocalQNum = localQNum;
+            const globalQNum = localQNum + ansSectionOffset;
+            answerKeyMapRef.current.set(globalQNum, option);
           }
           i++;
           continue;
         }
       }
 
-      // Try patterns on each line
-      patternParen.lastIndex = 0;
-      while ((match = patternParen.exec(line)) !== null) {
-        const qNum = parseInt(match[1]);
-        if (qNum >= 1 && qNum <= 300) answerKeyMapRef.current.set(qNum, match[2].toUpperCase());
+      // 2. Token based answer key matching e.g. "1-B 2-C 3-B" or "1. B" or "1) C" or "1: A" or "1(B)" or "S1. Ans.(B)"
+      const ansTokenRegex = /(?:S|Q)?(\d{1,3})\s*[\.:\-–—\)]\s*(?:Ans(?:wer)?\.?\s*[:\-\.]?\s*)?[\(\[]?\s*([a-eA-E])\s*[\)\]]?/gi;
+      let tokenMatch;
+      let matchedInLine = false;
+      while ((tokenMatch = ansTokenRegex.exec(line)) !== null) {
+        const localQNum = parseInt(tokenMatch[1]);
+        const opt = tokenMatch[2].toUpperCase();
+        if (localQNum >= 1 && localQNum <= 300) {
+          matchedInLine = true;
+          if (hasMultipleSections && localQNum < lastLocalQNum && localQNum === 1) {
+            fallbackSecIdx++;
+            if (fallbackSecIdx < currentSections.length) {
+              ansSectionOffset = currentSections[fallbackSecIdx].fromNumber - 1;
+            }
+          }
+          lastLocalQNum = localQNum;
+          const globalQNum = localQNum + ansSectionOffset;
+          answerKeyMapRef.current.set(globalQNum, opt);
+        }
       }
 
-      patternBracket.lastIndex = 0;
-      while ((match = patternBracket.exec(line)) !== null) {
-        const qNum = parseInt(match[1]);
-        if (qNum >= 1 && qNum <= 300) answerKeyMapRef.current.set(qNum, match[2].toUpperCase());
+      if (matchedInLine) continue;
+
+      // 3. Tamil answer pattern e.g. 1. விடை: A
+      const patternTamil = /(\d{1,3})\s*[\.:\-]?\s*(?:விடை|விடைக்குறிப்பு)\s*[:\-\.]?\s*[\(\[]?\s*([a-eA-E])\s*[\)\]]?/gi;
+      let tMatch;
+      while ((tMatch = patternTamil.exec(line)) !== null) {
+        const localQNum = parseInt(tMatch[1]);
+        const opt = tMatch[2].toUpperCase();
+        if (localQNum >= 1 && localQNum <= 300) {
+          const globalQNum = localQNum + ansSectionOffset;
+          answerKeyMapRef.current.set(globalQNum, opt);
+        }
       }
 
-      patternDash.lastIndex = 0;
-      while ((match = patternDash.exec(line)) !== null) {
-        const qNum = parseInt(match[1]);
-        if (qNum >= 1 && qNum <= 300) answerKeyMapRef.current.set(qNum, match[2].toUpperCase());
-      }
-
-      patternDot.lastIndex = 0;
-      while ((match = patternDot.exec(line)) !== null) {
-        const qNum = parseInt(match[1]);
-        if (qNum >= 1 && qNum <= 300) answerKeyMapRef.current.set(qNum, match[2].toUpperCase());
-      }
-
-      // Standalone single-number line followed by option e.g. "1 A" or "1 [A]"
+      // 4. Standalone single-number line followed by option e.g. "1 A" or "1 [A]"
       const singleMatch = line.match(/^(\d{1,3})\s+[\(\[]?([a-eA-E])[\)\]]?$/);
       if (singleMatch) {
-        const qNum = parseInt(singleMatch[1]);
-        if (qNum >= 1 && qNum <= 300) answerKeyMapRef.current.set(qNum, singleMatch[2].toUpperCase());
+        const localQNum = parseInt(singleMatch[1]);
+        if (localQNum >= 1 && localQNum <= 300) {
+          const globalQNum = localQNum + ansSectionOffset;
+          answerKeyMapRef.current.set(globalQNum, singleMatch[2].toUpperCase());
+        }
       }
     }
 
@@ -527,16 +506,13 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       addLog(`Detected Format: TNPSC (1. prefix)`);
     }
 
-    // Automatically parse all answer keys from document
-    parseAnswerKey(rawText);
-
     let text = rawText;
 
     text = text.split('\n').filter(line => {
       const t = line.trim();
       if (!t) return false;
       if (t.match(/^--\s*\d+\s+of\s+\d+\s*--$/i)) return false; 
-      if (t.includes('www.Mayiliragu') || t.includes('Mayiliragu') && t.length < 20) return false;
+      if (t.includes('www.Mayiliragu') || (t.includes('Mayiliragu') && t.length < 20)) return false;
       if (t.includes('Adda247 App') || t.includes('Memory Based Paper')) return false;
       if (t.includes('Join us TNPSC')) return false;
       if (t.match(/^TEST\s*[–\-]\s*\d+$/i)) return false;
@@ -559,6 +535,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     const directionsRegex = /^\s*Direc\s*tion\s*s?\s*\(\s*(\d+)\s*-\s*(\d+)\s*\):?\s*(.*)$/i;
     const solutionsBoundary = /^(S1\.\s*Ans\.|Answers\s*&\s*Explanations|Detailed\s*Solutions|Solutions\s*\(|^Solutions$|Answer\s*Key|விடை\s+வட்டங்கள்|விடைகள்|Ans\.?\s*$)/i;
 
+    const sectionHeaderPattern = /^(?:SECTION|PART|PAPER|MODULE)\s+([A-Z0-9]+)(?:\s*[-–—:]\s*(.*))?$/i;
+
     const lines: string[] = [];
     for (let i = 0; i < rawLines.length; i++) {
       lines.push(rawLines[i]);
@@ -568,6 +546,10 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     let currentQuestion: any = null;
     let activeDirections = '';
     let activeDirectionsRange: any = null;
+
+    let currentSectionName = 'Section 1';
+    let sectionCount = 0;
+    let lastSeenSectionQNum = 0;
 
     const sectionHeaderRegex = /^(Blood Relations|Direction Sense|Seating Arrangement|Syllogism|Analogy|Odd One Out|Alphabet Series|Letter\/Number Coding|Mathematical Operations|Inequality|Ranking & Order|Missing Number|Statement & Conclusion|Data Sufficiency|Quantitative Aptitude|Reasoning Ability|English Language|General Awareness|Computer Aptitude|Current Affairs|General Studies|Topics:.*|Reasoning Practice.*)$/i;
 
@@ -581,6 +563,13 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
         break;
       }
 
+      const secMatch = line.match(sectionHeaderPattern);
+      if (secMatch) {
+        currentSectionName = line.trim();
+        lastSeenSectionQNum = 0;
+        continue;
+      }
+
       if (sectionHeaderRegex.test(line)) {
         continue;
       }
@@ -592,7 +581,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       if (sectionMarkerRegex.test(line)) continue;
 
       if (!isBanking) {
-        const expectedNextNum = currentQuestion ? currentQuestion.number + 1 : 1;
+        const expectedNextNum = currentQuestion ? currentQuestion.rawNumber + 1 : 1;
         const inlineQMatch = line.match(/^(.+)\s+(\d{1,3})\.\s+(.+)$/);
         if (inlineQMatch) {
           const beforeNum = inlineQMatch[1].trimEnd();
@@ -620,7 +609,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
         let nextIdx = i + 1;
         while (nextIdx < lines.length) {
           const nl = lines[nextIdx].trim();
-          if (questionRegex.test(nl) || directionsRegex.test(nl)) break;
+          if (questionRegex.test(nl) || directionsRegex.test(nl) || sectionHeaderPattern.test(nl) || solutionsBoundary.test(nl)) break;
           activeDirections += ' ' + nl;
           nextIdx++;
         }
@@ -631,7 +620,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       const qMatch = line.match(questionRegex);
       if (qMatch) {
         const qNum = parseInt(qMatch[1]);
-        if (qNum >= 1 && qNum <= 200) {
+        if (qNum >= 1 && qNum <= 300) {
           if (currentQuestion) {
             const lastText = currentQuestion.text.trim();
             if (lastText.endsWith(' ' + qNum) || lastText.endsWith(' ' + qNum + '.')) {
@@ -639,20 +628,23 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
               continue;
             }
             questions.push(currentQuestion);
+            currentQuestion = null;
           }
 
-          const existingIdx = questions.findIndex(q => q.number === qNum);
-          if (existingIdx !== -1) {
-            currentQuestion = null; 
-            continue;
+          if (qNum <= lastSeenSectionQNum && qNum === 1) {
+            if (!currentSectionName.includes(`Section ${sectionCount + 1}`)) {
+              sectionCount++;
+            }
           }
+          lastSeenSectionQNum = qNum;
 
           let sharedContext = '';
           if (activeDirectionsRange && qNum >= activeDirectionsRange.start && qNum <= activeDirectionsRange.end) {
             sharedContext = activeDirections;
           }
           currentQuestion = {
-            number: qNum,
+            rawNumber: qNum,
+            sectionName: currentSectionName,
             text: qMatch[2].trim(),
             sharedContext,
             options: {} as Record<string, string>,
@@ -747,7 +739,45 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       }
     }
 
-    addLog(`Base parse complete: ${questions.length} questions constructed. Processing keys...`);
+    // Assign sequential global numbers (1..N) to all parsed questions
+    questions.forEach((q, idx) => {
+      q.number = idx + 1;
+    });
+
+    // Detect section partitions
+    const sectionMap = new Map<string, any[]>();
+    questions.forEach(q => {
+      const sName = q.sectionName || 'Section 1';
+      if (!sectionMap.has(sName)) {
+        sectionMap.set(sName, []);
+      }
+      sectionMap.get(sName)!.push(q);
+    });
+
+    const newSectionsConfig: SectionRangeConfig[] = [];
+    let secIdx = 1;
+    for (const [sName, qList] of sectionMap.entries()) {
+      const fromNum = qList[0].number;
+      const toNum = qList[qList.length - 1].number;
+      const count = qList.length;
+      newSectionsConfig.push({
+        id: `sec_${secIdx}`,
+        name: sName,
+        fromNumber: fromNum,
+        toNumber: toNum,
+        categoryId: '',
+        subjectId: '',
+        topicId: '',
+        duration: Math.max(10, Math.round(count * 1.0)),
+        cutoffMarks: Math.max(1, Math.round(count * 0.4)),
+      });
+      secIdx++;
+    }
+
+    addLog(`Base parse complete: ${questions.length} questions constructed across ${newSectionsConfig.length} section(s). Processing keys...`);
+
+    // Automatically parse answer keys from document with section awareness
+    parseAnswerKey(rawText, newSectionsConfig);
 
     const answersMap: Record<number, string> = {};
     const answerRegex = /(?:S)?(\d+)\.\s*Ans\.\s*\(([a-eA-E])\)/gi;
@@ -756,14 +786,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       answersMap[parseInt(ansMatch[1])] = ansMatch[2].toUpperCase();
     }
 
-    const seenNums = new Set();
-    const uniqueQuestions = questions.filter(q => {
-      if (seenNums.has(q.number)) return false;
-      seenNums.add(q.number);
-      return true;
-    });
-
-    const mappedQuestions = uniqueQuestions.map(q => {
+    const mappedQuestions = questions.map(q => {
       if ((!q.options['A'] || !q.options['B']) && q.sharedContext) {
         const parts = q.sharedContext.split(/(?=\([a-e]\))/i);
         for (const part of parts) {
@@ -798,6 +821,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
 
       return {
         number: q.number,
+        sectionName: q.sectionName,
         type: 'SINGLE_CHOICE',
         questionEn: splitQ.en,
         questionTa: splitQ.ta,
@@ -839,6 +863,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     console.log(`%cTotal questions detected: ${finalizedList.length}`, 'color: #10b981; font-weight: bold; font-size: 14px;');
     console.table(finalizedList.map(q => ({
       '#': q.number,
+      'Section': q.sectionName,
       'Question': q.questionEn.length > 50 ? q.questionEn.substring(0, 50) + '...' : q.questionEn,
       'A': q.optionA,
       'B': q.optionB,
@@ -859,18 +884,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     console.groupEnd();
 
     setParsedQuestions(finalizedList);
-    if (finalizedList.length > 0) {
-      setSectionsConfig(prev => {
-        if (prev.length === 1 && prev[0].toNumber <= 1) {
-          return [{
-            ...prev[0],
-            toNumber: finalizedList.length,
-            duration: Math.max(10, Math.round(finalizedList.length * 1.5)),
-            cutoffMarks: Math.max(1, Math.round(finalizedList.length * 0.4)),
-          }];
-        }
-        return prev;
-      });
+    if (newSectionsConfig.length > 0) {
+      setSectionsConfig(newSectionsConfig);
     }
     setIsParsing(false);
     setSelectedQuestionIndex(0);
@@ -1654,7 +1669,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
               <table className="w-full text-left border-collapse min-w-[2400px]">
                 <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.1)]">
                   <tr className="text-[10px] font-bold text-text-secondary uppercase">
-                    <th className="py-2.5 px-3 w-12 text-center bg-slate-50 dark:bg-slate-900">#</th>
+                    <th className="py-2.5 px-3 w-20 min-w-[80px] text-center bg-slate-50 dark:bg-slate-900">#</th>
                     <th className="py-2.5 px-3 w-36 min-w-[140px] bg-slate-50 dark:bg-slate-900">Section</th>
                     <th className="py-2.5 px-3 w-40 min-w-[150px] bg-slate-50 dark:bg-slate-900">Subject</th>
                     <th className="py-2.5 px-3 w-40 min-w-[150px] bg-slate-50 dark:bg-slate-900">Topic</th>
@@ -1686,14 +1701,16 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
                           q.hasIssue ? 'bg-amber-500/5' : ''
                         } ${isSelected ? 'bg-accent/5 border-l-4 border-l-accent' : ''}`}
                       >
-                        <td className="py-5 px-3 w-12 text-center text-text-secondary font-bold">
-                          <input
-                            type="number"
-                            value={q.number}
-                            title={`Question number: ${q.number}`}
-                            onChange={(e) => handleCellBlur(originalIdx, 'number', e.target.value)}
-                            className="bg-transparent border-none outline-none w-full text-xs text-center font-bold text-text-secondary py-1"
-                          />
+                        <td className="py-5 px-3 w-20 min-w-[80px] text-center text-text-secondary font-bold" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center">
+                            <input
+                              type="number"
+                              value={q.number}
+                              title={`Question number: ${q.number}`}
+                              onChange={(e) => handleCellBlur(originalIdx, 'number', e.target.value)}
+                              className="w-14 bg-slate-50/70 dark:bg-slate-800/60 border border-border/40 rounded-lg px-2 py-1 text-xs text-center font-bold text-text-primary outline-none focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          </div>
                         </td>
                         <td className="py-5 px-3 w-36 min-w-[140px]" onClick={(e) => e.stopPropagation()}>
                           <input
