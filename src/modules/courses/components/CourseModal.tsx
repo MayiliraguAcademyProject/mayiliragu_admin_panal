@@ -101,10 +101,12 @@ export default function CourseModal({
       setFileError('Please select a thumbnail image to upload');
       return;
     }
+    const isActive = values.isActive !== false;
     const formattedValues: CourseFormValues = {
       ...values,
-      startDate: values.startDate ? new Date(values.startDate).toISOString() : null,
-      endDate: values.endDate ? new Date(values.endDate).toISOString() : null,
+      isActive,
+      startDate: isActive && values.startDate ? new Date(values.startDate).toISOString() : null,
+      endDate: isActive && values.endDate ? new Date(values.endDate).toISOString() : null,
     };
     await onSubmit(formattedValues, selectedFile);
   };
@@ -189,7 +191,7 @@ export default function CourseModal({
               </p>
             </div>
 
-            {/* Course Status Toggle (ON / OFF) */}
+            {/* Course Status Toggle (Active / Inactive) */}
             <div className="p-3.5 rounded-2xl border border-border/80 bg-slate-50/30 flex items-center justify-between">
               <div className="space-y-0.5 pr-4">
                 <div className="flex items-center space-x-2">
@@ -199,11 +201,11 @@ export default function CourseModal({
                   <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
                     isActiveValue !== false ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
                   }`}>
-                    {isActiveValue !== false ? 'Active (ON)' : 'Inactive (OFF)'}
+                    {isActiveValue !== false ? 'Active' : 'Inactive'}
                   </span>
                 </div>
                 <p className="text-[11px] text-text-secondary font-medium">
-                  When enabled, course is visible and accessible to students based on schedule dates.
+                  When active, this course is visible and accessible to students. Turn off to archive or temporarily disable.
                 </p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -217,55 +219,57 @@ export default function CourseModal({
               </label>
             </div>
 
-            {/* Course Availability Schedule */}
-            <div className="space-y-3 p-4 rounded-2xl border border-border/80 bg-slate-50/20">
-              <div>
-                <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
-                  Availability Schedule (Optional)
-                </label>
-                <p className="text-[11px] text-text-secondary font-medium mt-0.5">
-                  Set release and expiration dates. Leave blank for immediate and indefinite access.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Start Date & Time */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-text-secondary uppercase">
-                    Start Date & Time
+            {/* Course Availability Schedule (only shown when Active) */}
+            {isActiveValue !== false && (
+              <div className="space-y-3 p-4 rounded-2xl border border-border/80 bg-slate-50/20 animate-fade-in">
+                <div>
+                  <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider">
+                    Availability Schedule (Optional)
                   </label>
-                  <input
-                    type="datetime-local"
-                    {...register('startDate')}
-                    disabled={isSubmitting}
-                    className={`w-full px-3 py-2 rounded-xl border text-xs font-medium outline-none transition-all ${
-                      errors.startDate ? 'border-error focus:ring-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
-                    } text-text-primary bg-cardBg`}
-                  />
-                  {errors.startDate && (
-                    <p className="text-[10px] text-error font-semibold pl-1">{errors.startDate.message}</p>
-                  )}
+                  <p className="text-[11px] text-text-secondary font-medium mt-0.5">
+                    Set release and expiration dates. Leave blank for immediate and indefinite access.
+                  </p>
                 </div>
 
-                {/* End Date & Time */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-text-secondary uppercase">
-                    End Date & Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    {...register('endDate')}
-                    disabled={isSubmitting}
-                    className={`w-full px-3 py-2 rounded-xl border text-xs font-medium outline-none transition-all ${
-                      errors.endDate ? 'border-error focus:ring-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
-                    } text-text-primary bg-cardBg`}
-                  />
-                  {errors.endDate && (
-                    <p className="text-[10px] text-error font-semibold pl-1">{errors.endDate.message}</p>
-                  )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Start Date & Time */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase">
+                      Start Date & Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      {...register('startDate')}
+                      disabled={isSubmitting}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs font-medium outline-none transition-all ${
+                        errors.startDate ? 'border-error focus:ring-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
+                      } text-text-primary bg-cardBg`}
+                    />
+                    {errors.startDate && (
+                      <p className="text-[10px] text-error font-semibold pl-1">{errors.startDate.message}</p>
+                    )}
+                  </div>
+
+                  {/* End Date & Time */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase">
+                      End Date & Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      {...register('endDate')}
+                      disabled={isSubmitting}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs font-medium outline-none transition-all ${
+                        errors.endDate ? 'border-error focus:ring-error bg-red-50/10' : 'border-border focus:ring-accent focus:border-accent'
+                      } text-text-primary bg-cardBg`}
+                    />
+                    {errors.endDate && (
+                      <p className="text-[10px] text-error font-semibold pl-1">{errors.endDate.message}</p>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Demo Course Access Toggle */}
             <div className="p-3.5 rounded-2xl border border-border/80 bg-slate-50/30 flex items-center justify-between">

@@ -115,20 +115,6 @@ export default function CourseListPage() {
     );
   }
 
-  const handleToggleStatus = async (course: any, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const nextStatus = course.isActive === false ? true : false;
-      const res = await updateCourseMutation.mutateAsync({
-        id: course.id,
-        data: { isActive: nextStatus },
-      });
-      toast.success(res?.message || `Course ${nextStatus ? 'activated' : 'deactivated'} successfully!`);
-    } catch (err) {
-      console.error(err);
-      toast.error(extractErrorMessage(err));
-    }
-  };
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '';
@@ -258,20 +244,8 @@ export default function CourseListPage() {
                     {/* Hover controls container */}
                     <div 
                       className="flex items-center space-x-1"
-                      onClick={(e) => e.stopPropagation()} // Stop navigation trigger
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      {/* Quick Active Toggle button */}
-                      <button
-                        onClick={(e) => handleToggleStatus(course, e)}
-                        className={`text-[10px] font-extrabold px-2 py-1 rounded-lg border transition-colors ${
-                          course.isActive !== false
-                            ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                        }`}
-                        title={course.isActive !== false ? 'Click to Deactivate' : 'Click to Activate'}
-                      >
-                        {course.isActive !== false ? 'Turn Off' : 'Turn On'}
-                      </button>
                       <button
                         onClick={() => handleOpenEditDialog(course)}
                         className="p-1.5 rounded-lg hover:bg-slate-100 text-text-secondary hover:text-accent transition-colors"

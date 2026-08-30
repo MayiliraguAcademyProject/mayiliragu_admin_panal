@@ -82,6 +82,7 @@ export default function TestBatchesPage() {
   const [targetCategory, setTargetCategory] = useState('TNPSC');
   const [order, setOrder] = useState('0');
   const [isEnabled, setIsEnabled] = useState(true);
+  const [isAvailableForGuest, setIsAvailableForGuest] = useState(false);
 
   // API Hooks
   const { data: batches = [], isLoading, refetch, isRefetching } = useTestBatchesList();
@@ -111,6 +112,7 @@ export default function TestBatchesPage() {
     setTargetCategory('TNPSC');
     setOrder(String(batches.length + 1));
     setIsEnabled(true);
+    setIsAvailableForGuest(false);
     setIsModalOpen(true);
   };
 
@@ -122,6 +124,7 @@ export default function TestBatchesPage() {
     setTargetCategory(batch.targetCategory);
     setOrder(String(batch.order));
     setIsEnabled(batch.isEnabled);
+    setIsAvailableForGuest(batch.isAvailableForGuest ?? false);
     setIsModalOpen(true);
   };
 
@@ -141,6 +144,7 @@ export default function TestBatchesPage() {
           targetCategory: targetCategory.trim(),
           order: parseInt(order, 10) || 0,
           isEnabled,
+          isAvailableForGuest,
         });
         toast.success('Test batch updated successfully!');
       } else {
@@ -150,6 +154,7 @@ export default function TestBatchesPage() {
           targetCategory: targetCategory.trim(),
           order: parseInt(order, 10) || 0,
           isEnabled,
+          isAvailableForGuest,
         });
         toast.success('Test batch created successfully!');
         if (created?.id) {
@@ -382,10 +387,19 @@ export default function TestBatchesPage() {
                   {/* Header: Title & Badges */}
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
                           {batch.targetCategory}
                         </span>
+                        {batch.isAvailableForGuest ? (
+                          <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-teal-500/10 text-teal-600 border border-teal-500/20">
+                            Guest Accessible
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
+                            TNPSC Only
+                          </span>
+                        )}
                         {batch.isEnabled ? (
                           <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> Active
@@ -500,13 +514,22 @@ export default function TestBatchesPage() {
                   <Layers className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-base font-bold text-text-primary truncate max-w-xs">
                       {activeBatchDetail.title}
                     </h3>
                     <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
                       {activeBatchDetail.targetCategory}
                     </span>
+                    {activeBatchDetail.isAvailableForGuest ? (
+                      <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-teal-500/10 text-teal-600 border border-teal-500/20">
+                        Guest Accessible
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
+                        TNPSC Only
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-text-secondary truncate max-w-xs mt-0.5">
                     {activeBatchDetail.description || 'Test Batch Management'}
@@ -1002,17 +1025,37 @@ export default function TestBatchesPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
-                <input
-                  type="checkbox"
-                  id="batchEnabled"
-                  checked={isEnabled}
-                  onChange={(e) => setIsEnabled(e.target.checked)}
-                  className="w-4 h-4 rounded text-primary focus:ring-primary border-border"
-                />
-                <label htmlFor="batchEnabled" className="text-sm font-medium text-text-primary select-none cursor-pointer">
-                  Enable Batch (Visible to assigned TNPSC students)
-                </label>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="batchEnabled"
+                    checked={isEnabled}
+                    onChange={(e) => setIsEnabled(e.target.checked)}
+                    className="w-4 h-4 rounded text-primary focus:ring-primary border-border"
+                  />
+                  <label htmlFor="batchEnabled" className="text-sm font-medium text-text-primary select-none cursor-pointer">
+                    Enable Batch (Active status)
+                  </label>
+                </div>
+
+                <div className="flex items-start gap-3 bg-secondary/50 p-3 rounded-xl border border-border/60">
+                  <input
+                    type="checkbox"
+                    id="batchGuestEnabled"
+                    checked={isAvailableForGuest}
+                    onChange={(e) => setIsAvailableForGuest(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded text-teal-600 focus:ring-teal-500 border-border"
+                  />
+                  <div>
+                    <label htmlFor="batchGuestEnabled" className="text-sm font-bold text-text-primary select-none cursor-pointer">
+                      Available for Guest Users
+                    </label>
+                    <p className="text-xs text-text-secondary mt-0.5">
+                      When enabled, this test batch is visible as an open preview to guest users and all exam students. If disabled, it is strictly restricted to enrolled TNPSC students.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/80">

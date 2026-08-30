@@ -34,6 +34,7 @@ export interface TestBatch {
   omrPdfName?: string | null;
   order: number;
   isEnabled: boolean;
+  isAvailableForGuest?: boolean;
   createdAt: string;
   updatedAt: string;
   totalCategories?: number;
