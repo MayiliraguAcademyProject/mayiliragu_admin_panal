@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../../../core/api/client';
 import { ApiConstants } from '../../../core/constants';
-import { 
-  Bell, 
-  Send, 
-  Calendar, 
-  Users, 
-  User, 
-  Clock, 
+import {
+  Bell,
+  Send,
+  Calendar,
+  Users,
+  User,
+  Clock,
   FileText,
-  GraduationCap
+  GraduationCap,
+  Edit2,
+  Trash2,
+  X,
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 import RefreshButton from '../../../shared/components/RefreshButton';
+import ConfirmModal from '../../../shared/components/ConfirmModal';
 import { useToast } from '../../../shared/context';
 import { extractErrorMessage } from '../../../shared/utils';
 
@@ -63,6 +69,21 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [isRefetching, setIsRefetching] = useState(false);
+
+  // Edit Campaign State
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editBody, setEditBody] = useState('');
+  const [editTargetGroup, setEditTargetGroup] = useState<'ALL' | 'COURSE' | 'INDIVIDUAL'>('ALL');
+  const [editTargetValue, setEditTargetValue] = useState('');
+  const [editScheduledAt, setEditScheduledAt] = useState('');
+  const [editSubmitLoading, setEditSubmitLoading] = useState(false);
+
+  // Delete Campaign State
+  const [deletingCampaign, setDeletingCampaign] = useState<Campaign | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const handleRefresh = async () => {
     setIsRefetching(true);
@@ -189,8 +210,8 @@ export default function NotificationsPage() {
       }
 
       if (response.data?.status === 'success') {
-        const succMsg = isScheduled 
-          ? 'Campaign scheduled successfully!' 
+        const succMsg = isScheduled
+          ? 'Campaign scheduled successfully!'
           : 'Push notifications dispatched successfully!';
         toast.success(succMsg);
         // Reset form
@@ -208,6 +229,100 @@ export default function NotificationsPage() {
       toast.error(extractErrorMessage(error));
     } finally {
       setSubmitLoading(false);
+    }
+  };
+
+  const handleOpenEdit = (camp: Campaign) => {
+    setEditingCampaign(camp);
+    setEditTitle(camp.title || '');
+    setEditBody(camp.body || '');
+    setEditTargetGroup((camp.targetGroup as any) || 'ALL');
+    setEditTargetValue(camp.targetValue || '');
+
+    if (camp.scheduledAt) {
+      const date = new Date(camp.scheduledAt);
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const formatted = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      setEditScheduledAt(formatted);
+    } else {
+      setEditScheduledAt('');
+    }
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent, sendNow: boolean = false) => {
+    e.preventDefault();
+    if (!editingCampaign) return;
+
+    if (!editTitle.trim() || !editBody.trim()) {
+      toast.error('Title and Message Body are required.');
+      return;
+    }
+
+    if (editingCampaign.status === 'PENDING' && editTargetGroup !== 'ALL' && !editTargetValue) {
+      toast.error(editTargetGroup === 'COURSE' ? 'Please select a target course.' : 'Please select a target student.');
+      return;
+    }
+
+    if (editingCampaign.status === 'PENDING' && !sendNow && !editScheduledAt) {
+      toast.error('Please select a scheduled date and time.');
+      return;
+    }
+
+    setEditSubmitLoading(true);
+    try {
+      const payload: any = {
+        title: editTitle.trim(),
+        body: editBody.trim(),
+      };
+
+      if (editingCampaign.status === 'PENDING') {
+        payload.targetGroup = editTargetGroup;
+        payload.targetValue = editTargetGroup === 'ALL' ? null : editTargetValue;
+        payload.scheduledAt = editScheduledAt ? new Date(editScheduledAt).toISOString() : undefined;
+        payload.sendNow = sendNow;
+      }
+
+      const response = await apiClient.put(
+        ApiConstants.notifications.campaignDetail(editingCampaign.id),
+        payload
+      );
+
+      if (response.data?.status === 'success') {
+        toast.success(sendNow ? 'Campaign dispatched immediately!' : 'Campaign updated successfully!');
+        setIsEditModalOpen(false);
+        setEditingCampaign(null);
+        fetchCampaigns();
+      } else {
+        toast.error(response.data?.message || 'Failed to update campaign');
+      }
+    } catch (error: any) {
+      toast.error(extractErrorMessage(error));
+    } finally {
+      setEditSubmitLoading(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingCampaign) return;
+    setDeleteLoading(true);
+    try {
+      const response = await apiClient.delete(
+        ApiConstants.notifications.campaignDetail(deletingCampaign.id)
+      );
+
+      if (response.data?.status === 'success') {
+        toast.success('Campaign deleted successfully!');
+        setIsDeleteModalOpen(false);
+        setDeletingCampaign(null);
+        fetchCampaigns();
+      } else {
+        toast.error(response.data?.message || 'Failed to delete campaign');
+      }
+    } catch (error: any) {
+      toast.error(extractErrorMessage(error));
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -281,11 +396,10 @@ export default function NotificationsPage() {
                       setTargetGroup(group);
                       setTargetValue('');
                     }}
-                    className={`py-2 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center space-y-1 ${
-                      targetGroup === group
+                    className={`py-2 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center space-y-1 ${targetGroup === group
                         ? 'bg-accent/10 border-accent text-accent'
                         : 'border-border/95 text-text-secondary hover:bg-background-end/40'
-                    }`}
+                      }`}
                   >
                     {group === 'ALL' && <Users className="w-4 h-4" />}
                     {group === 'COURSE' && <GraduationCap className="w-4 h-4" />}
@@ -404,34 +518,57 @@ export default function NotificationsPage() {
                     <th className="pb-3 pr-2">Campaign Details</th>
                     <th className="pb-3 px-2">Target</th>
                     <th className="pb-3 px-2">Scheduled / Sent At</th>
-                    <th className="pb-3 pl-2 text-right">Status</th>
+                    <th className="pb-3 px-2">Status</th>
+                    <th className="pb-3 pl-2 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60 text-sm">
                   {(Array.isArray(campaigns) ? campaigns : []).map((camp) => (
                     <tr key={camp.id} className="hover:bg-background-end/40 transition-colors">
-                      <td className="py-3.5 pr-2">
-                        <p className="font-bold text-text-primary">{camp.title}</p>
+                      <td className="py-3.5 pr-2 max-w-xs">
+                        <p className="font-bold text-text-primary truncate">{camp.title}</p>
                         <p className="text-xs text-text-secondary line-clamp-1 mt-0.5">{camp.body}</p>
                       </td>
-                      <td className="py-3.5 px-2">
+                      <td className="py-3.5 px-2 whitespace-nowrap">
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-secondary-container text-text-primary capitalize">
                           {camp.targetGroup === 'COURSE' || camp.targetGroup === 'BATCH' ? 'Course' : camp.targetGroup.toLowerCase()}
                         </span>
                       </td>
-                      <td className="py-3.5 px-2 text-xs text-text-secondary font-medium">
+                      <td className="py-3.5 px-2 text-xs text-text-secondary font-medium whitespace-nowrap">
                         {new Date(camp.scheduledAt).toLocaleString()}
                       </td>
-                      <td className="py-3.5 pl-2 text-right">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center space-x-1 ${
-                          camp.status === 'SENT' 
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-250' 
+                      <td className="py-3.5 px-2 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center space-x-1 ${camp.status === 'SENT'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-250 dark:bg-emerald-950/40 dark:text-emerald-300'
                             : camp.status === 'FAILED'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-250'
-                            : 'bg-amber-50 text-amber-700 border border-amber-250'
-                        }`}>
+                              ? 'bg-rose-50 text-rose-700 border border-rose-250 dark:bg-rose-950/40 dark:text-rose-300'
+                              : 'bg-amber-50 text-amber-700 border border-amber-250 dark:bg-amber-950/40 dark:text-amber-300'
+                          }`}>
                           <span>{camp.status}</span>
                         </span>
+                      </td>
+                      <td className="py-3.5 pl-2 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(camp)}
+                            title="Edit Campaign"
+                            className="p-1.5 rounded-lg text-text-secondary hover:text-accent hover:bg-secondary transition-colors cursor-pointer"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeletingCampaign(camp);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            title="Delete Campaign"
+                            className="p-1.5 rounded-lg text-text-secondary hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -441,6 +578,260 @@ export default function NotificationsPage() {
           )}
         </div>
       </div>
+
+      {/* Edit Campaign Modal */}
+      {isEditModalOpen && editingCampaign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg bg-cardBg border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-border/80 flex items-center justify-between bg-secondary/30">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-accent/10 text-accent flex items-center justify-center">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">
+                    Edit Notification Campaign
+                  </h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${editingCampaign.status === 'SENT'
+                        ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                        : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                      }`}>
+                      {editingCampaign.status}
+                    </span>
+                    <span className="text-xs text-text-secondary">
+                      {editingCampaign.status === 'PENDING' ? 'Scheduled Broadcast' : 'Delivered Announcement'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingCampaign(null);
+                }}
+                className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-secondary transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={(e) => handleEditSubmit(e, false)} className="p-6 space-y-4">
+              {/* Notice for SENT vs PENDING */}
+              {editingCampaign.status === 'SENT' ? (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                    This notification has already been broadcasted. Editing will update the announcement text in students' <strong>In-App Notification Center</strong>.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    This notification is scheduled. You can update the content, target audience, reschedule the time, or send it immediately.
+                  </p>
+                </div>
+              )}
+
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+                  Notification Title <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Notification title..."
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-background-end rounded-xl border border-border/80 text-sm focus:outline-none focus:border-accent text-text-primary"
+                />
+              </div>
+
+              {/* Body */}
+              <div>
+                <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+                  Message Body <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  placeholder="Notification body..."
+                  value={editBody}
+                  onChange={(e) => setEditBody(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-background-end rounded-xl border border-border/80 text-sm focus:outline-none focus:border-accent text-text-primary resize-none"
+                />
+              </div>
+
+              {/* Target Audience (only editable if PENDING) */}
+              {editingCampaign.status === 'PENDING' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
+                      Target Audience
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditTargetGroup('ALL');
+                          setEditTargetValue('');
+                        }}
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center space-y-1 transition-all ${editTargetGroup === 'ALL'
+                            ? 'bg-accent/10 border-accent text-accent'
+                            : 'border-border/80 text-text-secondary hover:border-border'
+                          }`}
+                      >
+                        <Users className="w-4 h-4" />
+                        <span>All Students</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditTargetGroup('COURSE');
+                          setEditTargetValue('');
+                        }}
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center space-y-1 transition-all ${editTargetGroup === 'COURSE'
+                            ? 'bg-accent/10 border-accent text-accent'
+                            : 'border-border/80 text-text-secondary hover:border-border'
+                          }`}
+                      >
+                        <GraduationCap className="w-4 h-4" />
+                        <span>Course</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditTargetGroup('INDIVIDUAL');
+                          setEditTargetValue('');
+                        }}
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center space-y-1 transition-all ${editTargetGroup === 'INDIVIDUAL'
+                            ? 'bg-accent/10 border-accent text-accent'
+                            : 'border-border/80 text-text-secondary hover:border-border'
+                          }`}
+                      >
+                        <User className="w-4 h-4" />
+                        <span>Single Student</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {editTargetGroup === 'COURSE' && (
+                    <div className="animate-fade-in">
+                      <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+                        Select Course
+                      </label>
+                      <select
+                        value={editTargetValue}
+                        onChange={(e) => setEditTargetValue(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-background-end rounded-xl border border-border/80 text-sm focus:outline-none focus:border-accent text-text-primary"
+                      >
+                        <option value="">-- Choose a course --</option>
+                        {courses.map((course) => (
+                          <option key={course.id} value={course.id}>
+                            {course.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {editTargetGroup === 'INDIVIDUAL' && (
+                    <div className="animate-fade-in">
+                      <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+                        Select Student
+                      </label>
+                      <select
+                        value={editTargetValue}
+                        onChange={(e) => setEditTargetValue(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-background-end rounded-xl border border-border/80 text-sm focus:outline-none focus:border-accent text-text-primary"
+                      >
+                        <option value="">-- Choose a student --</option>
+                        {students.map((student) => (
+                          <option key={student.id} value={student.id}>
+                            {student.name} ({student.email})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Reschedule Date & Time */}
+                  <div>
+                    <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+                      Scheduled Date & Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={editScheduledAt}
+                      onChange={(e) => setEditScheduledAt(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-background-end rounded-xl border border-border/80 text-sm focus:outline-none focus:border-accent text-text-primary"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Modal Footer Actions */}
+              <div className="flex items-center justify-between pt-4 border-t border-border/80">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingCampaign(null);
+                  }}
+                  className="px-4 py-2.5 text-xs font-bold text-text-secondary hover:text-text-primary hover:bg-secondary rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {editingCampaign.status === 'PENDING' && (
+                    <button
+                      type="button"
+                      disabled={editSubmitLoading}
+                      onClick={(e) => handleEditSubmit(e, true)}
+                      className="px-4 py-2.5 bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20 text-xs font-bold rounded-xl transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Send Now</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={editSubmitLoading}
+                    className="px-5 py-2.5 bg-accent text-white hover:bg-accent-onContainer text-xs font-bold rounded-xl shadow-md shadow-accent/20 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {editSubmitLoading ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Campaign Modal */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingCampaign(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Notification Campaign"
+        message={`Are you sure you want to delete "${deletingCampaign?.title || 'this campaign'}"? This action cannot be undone.`}
+        confirmText="Delete Campaign"
+        isLoading={deleteLoading}
+        type="danger"
+      />
     </div>
   );
 }

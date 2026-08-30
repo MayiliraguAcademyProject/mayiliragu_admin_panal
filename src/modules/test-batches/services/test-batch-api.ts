@@ -42,6 +42,7 @@ export function useCreateTestBatch() {
       targetCategory?: string;
       order?: number;
       isEnabled?: boolean;
+      isAvailableForGuest?: boolean;
     }) => {
       const response = await apiClient.post<{ status: string; data: TestBatch }>('/test-batches', data);
       return response.data.data;
@@ -65,6 +66,7 @@ export function useUpdateTestBatch() {
       targetCategory?: string;
       order?: number;
       isEnabled?: boolean;
+      isAvailableForGuest?: boolean;
     }) => {
       const response = await apiClient.put<{ status: string; data: TestBatch }>(`/test-batches/${id}`, data);
       return response.data.data;

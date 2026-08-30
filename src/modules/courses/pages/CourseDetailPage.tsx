@@ -477,6 +477,32 @@ export default function CourseDetailPage() {
             {course.description}
           </p>
           <div className="flex flex-wrap items-center gap-3 pt-2">
+            {/* Active Status Badge */}
+            <span className={`text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full ${
+              course.isActive !== false
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : 'bg-rose-50 text-rose-700 border border-rose-200'
+            }`}>
+              {course.isActive !== false ? 'Active' : 'Inactive'}
+            </span>
+
+            {/* Availability Status Tag */}
+            {course.availabilityStatus === 'upcoming' && (
+              <span className="text-[10px] font-black tracking-widest text-blue-700 uppercase bg-blue-50 border border-blue-200 px-3 py-1 rounded-full">
+                Upcoming {course.timeRemainingText ? `(${course.timeRemainingText})` : ''}
+              </span>
+            )}
+            {course.availabilityStatus === 'closing_soon' && (
+              <span className="text-[10px] font-black tracking-widest text-amber-700 uppercase bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                Closing Soon {course.timeRemainingText ? `(${course.timeRemainingText})` : ''}
+              </span>
+            )}
+            {course.availabilityStatus === 'expired' && (
+              <span className="text-[10px] font-black tracking-widest text-slate-600 uppercase bg-slate-100 border border-slate-300 px-3 py-1 rounded-full">
+                Expired
+              </span>
+            )}
+
             <span className="text-[10px] font-black tracking-widest text-[#008A7C] uppercase bg-[#008A7C]/5 border border-[#008A7C]/10 px-3 py-1 rounded-full">
               {sortedModules.length} Modules
             </span>
@@ -489,6 +515,30 @@ export default function CourseDetailPage() {
             <span className="text-[10px] font-black tracking-widest text-amber-600 uppercase bg-amber-50 border border-amber-100 px-3 py-1 rounded-full">
               {totalVideosCount} Videos
             </span>
+
+            {/* Quick Status Toggle Button */}
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const nextStatus = course.isActive === false ? true : false;
+                  await updateCourseMutation.mutateAsync({
+                    id: courseId,
+                    data: { isActive: nextStatus },
+                  });
+                  toast.success(`Course ${nextStatus ? 'activated' : 'deactivated'} successfully!`);
+                } catch (err) {
+                  toast.error(extractErrorMessage(err));
+                }
+              }}
+              className={`text-xs font-bold px-3 py-1 rounded-xl border transition-colors ${
+                course.isActive !== false
+                  ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+              }`}
+            >
+              {course.isActive !== false ? 'Turn Off' : 'Turn On'}
+            </button>
 
             {/* Lock Mode Selector Toggle */}
             <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200 ml-auto">
@@ -518,6 +568,20 @@ export default function CourseDetailPage() {
               </button>
             </div>
           </div>
+
+          {/* Availability Dates Banner if set */}
+          {(course.startDate || course.endDate) && (
+            <div className="flex items-center space-x-4 pt-1 text-xs text-text-secondary font-semibold">
+              <div className="flex items-center space-x-1.5">
+                <Clock className="w-4 h-4 text-accent" />
+                <span>
+                  Schedule: {course.startDate ? new Date(course.startDate).toLocaleString() : 'Immediate'} 
+                  {' — '} 
+                  {course.endDate ? new Date(course.endDate).toLocaleString() : 'Indefinite'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
