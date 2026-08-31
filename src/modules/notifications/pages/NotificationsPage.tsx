@@ -12,9 +12,8 @@ import {
   GraduationCap,
   Edit2,
   Trash2,
-  X,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
   Paperclip,
   X
 } from 'lucide-react';
