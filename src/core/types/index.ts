@@ -67,6 +67,13 @@ export interface Course {
   thumbnail: string;
   lockMode?: 'free' | 'sequential';
   isDemo?: boolean;
+  isActive?: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+  availabilityStatus?: 'active' | 'upcoming' | 'closing_soon' | 'expired' | 'inactive';
+  timeRemainingSeconds?: number;
+  timeRemainingText?: string;
+  isAvailableForStudy?: boolean;
   totalLessons?: number;
   totalVideos?: number;
   modules?: Module[];

@@ -253,11 +253,20 @@ export default function TestBatchDetailPage() {
               <Calendar className="w-6 h-6 text-white" />
             </div>
             <div>
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-2xl font-bold text-text-primary">{batch.title}</h1>
                 <span className="px-2.5 py-0.5 text-xs font-bold rounded-md bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
                   {batch.targetCategory}
                 </span>
+                {batch.isAvailableForGuest ? (
+                  <span className="px-2.5 py-0.5 text-xs font-semibold rounded-md bg-teal-500/10 text-teal-600 border border-teal-500/20">
+                    Guest Accessible
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 text-xs font-medium rounded-md bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
+                    TNPSC Only
+                  </span>
+                )}
                 {batch.isEnabled ? (
                   <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3" /> Active

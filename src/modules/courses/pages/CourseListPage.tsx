@@ -115,9 +115,21 @@ export default function CourseListPage() {
     );
   }
 
+
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   return (
     <div className="p-6 sm:p-8 space-y-6 animate-fade-in relative">
-      
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -156,7 +168,7 @@ export default function CourseListPage() {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="h-44 bg-cardBg border border-border/40 rounded-3xl animate-pulse" />
+            <div key={idx} className="h-48 bg-cardBg border border-border/40 rounded-3xl animate-pulse" />
           ))}
         </div>
       ) : filteredCourses.length === 0 ? (
@@ -172,7 +184,9 @@ export default function CourseListPage() {
           {filteredCourses.map((course: any) => (
             <div
               key={course.id}
-              className="bg-cardBg border border-border/70 rounded-3xl shadow-sm hover:shadow-xl hover:scale-[1.005] hover:border-accent/30 transition-all duration-300 flex overflow-hidden group h-48 cursor-pointer relative"
+              className={`bg-cardBg border ${
+                course.isActive === false ? 'border-rose-200/80 bg-rose-50/10' : 'border-border/70'
+              } rounded-3xl shadow-sm hover:shadow-xl hover:scale-[1.005] hover:border-accent/30 transition-all duration-300 flex overflow-hidden group min-h-[13rem] cursor-pointer relative`}
               onClick={() => navigate(`/courses/${course.id}`)}
             >
               {/* Course Thumbnail */}
@@ -189,12 +203,37 @@ export default function CourseListPage() {
 
               {/* Course details */}
               <div className="w-2/3 p-5 flex flex-col justify-between">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-1.5">
-                      <span className="text-[10px] font-black tracking-widest text-accent uppercase bg-accent/5 px-2.5 py-1 rounded-full">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-1 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-black tracking-widest text-accent uppercase bg-accent/5 px-2 py-0.5 rounded-full">
                         Course
                       </span>
+                      {/* Active Status Badge */}
+                      <span className={`text-[10px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full ${
+                        course.isActive !== false
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200'
+                      }`}>
+                        {course.isActive !== false ? 'Active' : 'Inactive'}
+                      </span>
+
+                      {/* Availability Tag */}
+                      {course.availabilityStatus === 'upcoming' && (
+                        <span className="text-[10px] font-black tracking-widest text-blue-700 uppercase bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                          Upcoming
+                        </span>
+                      )}
+                      {course.availabilityStatus === 'closing_soon' && (
+                        <span className="text-[10px] font-black tracking-widest text-amber-700 uppercase bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                          Closing Soon
+                        </span>
+                      )}
+                      {course.availabilityStatus === 'expired' && (
+                        <span className="text-[10px] font-black tracking-widest text-slate-600 uppercase bg-slate-100 border border-slate-300 px-2 py-0.5 rounded-full">
+                          Expired
+                        </span>
+                      )}
                       {course.isDemo && (
                         <span className="text-[10px] font-black tracking-widest text-orange-600 uppercase bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
                           Demo
@@ -205,7 +244,7 @@ export default function CourseListPage() {
                     {/* Hover controls container */}
                     <div 
                       className="flex items-center space-x-1"
-                      onClick={(e) => e.stopPropagation()} // Stop navigation trigger
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <button
                         onClick={() => handleOpenEditDialog(course)}
@@ -235,6 +274,25 @@ export default function CourseListPage() {
                   <p className="text-xs text-text-secondary leading-relaxed line-clamp-2">
                     {course.description}
                   </p>
+
+                  {/* Schedule dates if configured */}
+                  {(course.startDate || course.endDate) && (
+                    <div className="text-[10px] text-text-secondary font-medium pt-0.5 space-y-0.5">
+                      {course.startDate && (
+                        <div>
+                          <span className="font-bold text-text-primary">Start:</span> {formatDate(course.startDate)}
+                        </div>
+                      )}
+                      {course.endDate && (
+                        <div>
+                          <span className="font-bold text-text-primary">End:</span> {formatDate(course.endDate)}
+                          {course.timeRemainingText && (
+                            <span className="ml-1.5 font-bold text-accent">({course.timeRemainingText})</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-border/40 text-[11px] text-text-secondary font-semibold">

@@ -128,7 +128,7 @@ export function useCourseDetail(courseId: string) {
 export function useCreateCourse() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { title: string; description: string; thumbnail?: string; lockMode?: string; isDemo?: boolean; file?: File }) => {
+    mutationFn: async (data: { title: string; description: string; thumbnail?: string; lockMode?: string; isDemo?: boolean; isActive?: boolean; startDate?: string | null; endDate?: string | null; file?: File }) => {
       const formData = new FormData();
       formData.append('title', data.title);
       formData.append('description', data.description);
@@ -137,6 +137,15 @@ export function useCreateCourse() {
       }
       if (data.isDemo !== undefined) {
         formData.append('isDemo', String(data.isDemo));
+      }
+      if (data.isActive !== undefined) {
+        formData.append('isActive', String(data.isActive));
+      }
+      if (data.startDate !== undefined && data.startDate !== null) {
+        formData.append('startDate', data.startDate || '');
+      }
+      if (data.endDate !== undefined && data.endDate !== null) {
+        formData.append('endDate', data.endDate || '');
       }
       if (data.thumbnail) {
         formData.append('thumbnail', data.thumbnail);
@@ -166,6 +175,9 @@ export function useUpdateCourse() {
       if (data.thumbnail !== undefined) formData.append('thumbnail', data.thumbnail || '');
       if (data.lockMode !== undefined) formData.append('lockMode', data.lockMode);
       if (data.isDemo !== undefined) formData.append('isDemo', String(data.isDemo));
+      if (data.isActive !== undefined) formData.append('isActive', String(data.isActive));
+      if (data.startDate !== undefined) formData.append('startDate', data.startDate || '');
+      if (data.endDate !== undefined) formData.append('endDate', data.endDate || '');
       if (file) {
         formData.append('file', file);
       }
