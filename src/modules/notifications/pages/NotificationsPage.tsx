@@ -9,7 +9,9 @@ import {
   User, 
   Clock, 
   FileText,
-  GraduationCap
+  GraduationCap,
+  Paperclip,
+  X
 } from 'lucide-react';
 import RefreshButton from '../../../shared/components/RefreshButton';
 import { useToast } from '../../../shared/context';
@@ -27,6 +29,7 @@ interface Campaign {
   id: string;
   title: string;
   body: string;
+  pdfUrl?: string | null;
   status: string; // PENDING, SENT, FAILED
   targetGroup: string; // ALL, BATCH, INDIVIDUAL
   targetValue?: string | null;
@@ -51,10 +54,12 @@ export default function NotificationsPage() {
   // Form State
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [targetGroup, setTargetGroup] = useState<'ALL' | 'COURSE' | 'INDIVIDUAL'>('ALL');
   const [targetValue, setTargetValue] = useState('');
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Data State
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -171,20 +176,27 @@ export default function NotificationsPage() {
 
     try {
       let response;
+      const formData = new FormData();
+      formData.append('title', title.trim());
+      formData.append('body', body.trim());
+      formData.append('targetGroup', targetGroup);
+      if (targetGroup !== 'ALL' && targetValue) {
+        formData.append('targetValue', targetValue);
+      }
+      if (isScheduled && scheduledAt) {
+        formData.append('scheduledAt', new Date(scheduledAt).toISOString());
+      }
+      if (pdfFile) {
+        formData.append('pdf', pdfFile);
+      }
+
       if (isScheduled) {
-        response = await apiClient.post(ApiConstants.notifications.campaigns, {
-          title,
-          body,
-          targetGroup,
-          targetValue: targetGroup === 'ALL' ? null : targetValue,
-          scheduledAt: new Date(scheduledAt).toISOString(),
+        response = await apiClient.post(ApiConstants.notifications.campaigns, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
         });
       } else {
-        response = await apiClient.post(ApiConstants.notifications.sendImmediate, {
-          title,
-          body,
-          targetGroup,
-          targetValue: targetGroup === 'ALL' ? null : targetValue,
+        response = await apiClient.post(ApiConstants.notifications.sendImmediate, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
         });
       }
 
@@ -196,6 +208,8 @@ export default function NotificationsPage() {
         // Reset form
         setTitle('');
         setBody('');
+        setPdfFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
         setTargetValue('');
         setIsScheduled(false);
         setScheduledAt('');
@@ -265,6 +279,68 @@ export default function NotificationsPage() {
                 placeholder="Compose message description here..."
                 className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm text-text-primary bg-cardBg"
               />
+            </div>
+
+            {/* Optional PDF File Attachment */}
+            <div>
+              <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider mb-1.5">
+                Attach PDF Document (Optional, Max 20MB)
+              </label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".pdf,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (file.size > 20 * 1024 * 1024) {
+                      toast.error('PDF file size must not exceed 20MB.');
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                      return;
+                    }
+                    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+                      toast.error('Only PDF documents are allowed.');
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                      return;
+                    }
+                    setPdfFile(file);
+                  }
+                }}
+              />
+
+              {!pdfFile ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-2.5 px-4 rounded-xl border border-dashed border-border/90 hover:border-accent hover:bg-accent/5 text-text-secondary hover:text-accent text-xs font-bold transition-all flex items-center justify-center space-x-2"
+                >
+                  <Paperclip className="w-4 h-4" />
+                  <span>Choose PDF Document to Attach</span>
+                </button>
+              ) : (
+                <div className="flex items-center justify-between p-2.5 bg-accent/10 border border-accent/30 rounded-xl">
+                  <div className="flex items-center space-x-2 truncate">
+                    <FileText className="w-4 h-4 text-accent shrink-0" />
+                    <span className="text-xs font-bold text-text-primary truncate">
+                      {pdfFile.name}
+                    </span>
+                    <span className="text-[10px] text-text-secondary shrink-0">
+                      ({(pdfFile.size / (1024 * 1024)).toFixed(2)} MB)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPdfFile(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    className="p-1 hover:bg-accent/20 rounded-lg text-text-secondary hover:text-rose-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Targeting Option Selection */}
@@ -413,6 +489,17 @@ export default function NotificationsPage() {
                       <td className="py-3.5 pr-2">
                         <p className="font-bold text-text-primary">{camp.title}</p>
                         <p className="text-xs text-text-secondary line-clamp-1 mt-0.5">{camp.body}</p>
+                        {camp.pdfUrl && (
+                          <a
+                            href={camp.pdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center space-x-1 text-[11px] font-bold text-accent hover:underline mt-1.5 bg-accent/10 px-2 py-0.5 rounded-md"
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            <span>View Attached PDF</span>
+                          </a>
+                        )}
                       </td>
                       <td className="py-3.5 px-2">
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-secondary-container text-text-primary capitalize">
