@@ -4,6 +4,10 @@ import {
   useStudentEnrollments, 
   useEnrollStudent, 
   useRevokeEnrollment,
+  useStudentTestBatchEnrollments,
+  useEnrollStudentTestBatch,
+  useRevokeTestBatchEnrollment,
+  useAdminTestBatchesList,
   useCreateStudent,
   useUpdateStudent,
   useDeleteStudent,
@@ -51,6 +55,7 @@ import { getAvailableCourses } from '../../../core/utils';
 import StudentFormModal from '../components/StudentFormModal';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
 import EnrollModal from '../components/EnrollModal';
+import EnrollTestBatchModal from '../components/EnrollTestBatchModal';
 import PaymentModal from '../components/PaymentModal';
 import CounselingModal from '../components/CounselingModal';
 import ExamAppModal from '../components/ExamAppModal';
@@ -69,12 +74,19 @@ export default function StudentManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   
-  // Enroll dialog states
+  // Course Enroll dialog states
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
   const [courseSearchQuery, setCourseSearchQuery] = useState('');
   const [isRevokingId, setIsRevokingId] = useState<string | null>(null);
   const [enrollmentToRevoke, setEnrollmentToRevoke] = useState<{ id: string; title: string } | null>(null);
   const [isEnrollingId, setIsEnrollingId] = useState<string | null>(null);
+
+  // Test Batch Enroll dialog states
+  const [isTestBatchModalOpen, setIsTestBatchModalOpen] = useState(false);
+  const [batchSearchQuery, setBatchSearchQuery] = useState('');
+  const [isRevokingBatchId, setIsRevokingBatchId] = useState<string | null>(null);
+  const [batchToRevoke, setBatchToRevoke] = useState<{ id: string; title: string; batchId?: string } | null>(null);
+  const [isEnrollingBatchId, setIsEnrollingBatchId] = useState<string | null>(null);
   
   // Student Form & Delete States
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -93,7 +105,9 @@ export default function StudentManagementPage() {
   // Queries
   const { data: students = [], isLoading: isStudentsLoading, isError: isStudentsError, refetch: refetchStudents, isRefetching: isRefetchingStudents } = useStudentsList();
   const { data: enrollments = [], isLoading: isEnrollmentsLoading } = useStudentEnrollments(selectedStudent?.id ?? '');
+  const { data: batchEnrollments = [], isLoading: isBatchEnrollmentsLoading } = useStudentTestBatchEnrollments(selectedStudent?.id ?? '');
   const { data: coursesData } = useCoursesList(1, 50);
+  const { data: adminBatchesData = [] } = useAdminTestBatchesList();
   const { data: examCategories = [], isLoading: isCategoriesLoading } = useExamCategories();
 
   // Profile Query
@@ -102,6 +116,8 @@ export default function StudentManagementPage() {
   // Mutations
   const enrollMutation = useEnrollStudent();
   const revokeMutation = useRevokeEnrollment(selectedStudent?.id ?? '');
+  const enrollBatchMutation = useEnrollStudentTestBatch();
+  const revokeBatchMutation = useRevokeTestBatchEnrollment(selectedStudent?.id ?? '');
   const createStudentMutation = useCreateStudent();
   const updateStudentMutation = useUpdateStudent();
   const deleteStudentMutation = useDeleteStudent();
@@ -201,6 +217,26 @@ export default function StudentManagementPage() {
     );
   }, [coursesData, enrolledCourseIds, courseSearchQuery]);
 
+  // Enrolled test batch IDs for filtering
+  const enrolledBatchIds = useMemo(() => {
+    return new Set<string>(batchEnrollments.map((e: any) => e.batchId));
+  }, [batchEnrollments]);
+
+  // Filter test batches available for enrollment (all non-deleted batches)
+  const availableBatches = useMemo(() => {
+    const rawList = Array.isArray(adminBatchesData)
+      ? adminBatchesData
+      : ((adminBatchesData as any)?.data && Array.isArray((adminBatchesData as any).data) ? (adminBatchesData as any).data : []);
+    const filtered = rawList.filter((b: any) => !enrolledBatchIds.has(b.id) && !b.isDeleted);
+    if (!batchSearchQuery) return filtered;
+    const query = batchSearchQuery.toLowerCase();
+    return filtered.filter((b: any) =>
+      b.title?.toLowerCase().includes(query) ||
+      b.targetCategory?.toLowerCase().includes(query) ||
+      b.description?.toLowerCase().includes(query)
+    );
+  }, [adminBatchesData, enrolledBatchIds, batchSearchQuery]);
+
   const handleEnroll = async (courseId: string) => {
     if (!selectedStudent) return;
     setIsEnrollingId(courseId);
@@ -209,10 +245,12 @@ export default function StudentManagementPage() {
         studentId: selectedStudent.id,
         courseId,
       });
+      toast.success('Course enrolled successfully');
       setIsEnrollDialogOpen(false);
       setCourseSearchQuery('');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to enroll student:', err);
+      toast.error(extractErrorMessage(err) || 'Failed to enroll course');
     } finally {
       setIsEnrollingId(null);
     }
@@ -227,11 +265,55 @@ export default function StudentManagementPage() {
     setIsRevokingId(enrollmentToRevoke.id);
     try {
       await revokeMutation.mutateAsync(enrollmentToRevoke.id);
-    } catch (err) {
+      toast.success('Course enrollment revoked');
+    } catch (err: any) {
       console.error('Failed to revoke enrollment:', err);
+      toast.error(extractErrorMessage(err) || 'Failed to revoke course enrollment');
     } finally {
       setIsRevokingId(null);
       setEnrollmentToRevoke(null);
+    }
+  };
+
+  const handleEnrollBatch = async (batchId: string) => {
+    if (!selectedStudent) return;
+    setIsEnrollingBatchId(batchId);
+    try {
+      await enrollBatchMutation.mutateAsync({
+        studentId: selectedStudent.id,
+        batchId,
+      });
+      toast.success('Test batch enrolled successfully');
+      setIsTestBatchModalOpen(false);
+      setBatchSearchQuery('');
+    } catch (err: any) {
+      console.error('Failed to enroll student in test batch:', err);
+      toast.error(extractErrorMessage(err) || 'Failed to enroll test batch');
+    } finally {
+      setIsEnrollingBatchId(null);
+    }
+  };
+
+  const handleRevokeBatch = (enrollmentId: string, batchTitle: string, batchId?: string) => {
+    setBatchToRevoke({ id: enrollmentId, title: batchTitle, batchId });
+  };
+
+  const handleConfirmRevokeBatch = async () => {
+    if (!batchToRevoke || !selectedStudent) return;
+    setIsRevokingBatchId(batchToRevoke.id);
+    try {
+      await revokeBatchMutation.mutateAsync({
+        enrollmentId: batchToRevoke.id,
+        batchId: batchToRevoke.batchId,
+        studentId: selectedStudent.id,
+      });
+      toast.success('Test batch enrollment revoked');
+    } catch (err: any) {
+      console.error('Failed to revoke test batch enrollment:', err);
+      toast.error(extractErrorMessage(err) || 'Failed to revoke test batch enrollment');
+    } finally {
+      setIsRevokingBatchId(null);
+      setBatchToRevoke(null);
     }
   };
 
@@ -1228,6 +1310,78 @@ export default function StudentManagementPage() {
                           </div>
                         )}
                       </div>
+
+                      {/* Test Batch Enrollments Sub Section (Near Course Enroll) */}
+                      <div className="bg-cardBg border border-border/50 rounded-3xl p-6 shadow-xs space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <h4 className="text-sm font-extrabold text-text-primary uppercase tracking-wider flex items-center space-x-2">
+                            <GraduationCap className="w-4 h-4 text-accent" />
+                            <span>Active test batch enrollments</span>
+                          </h4>
+                          <button
+                            type="button"
+                            onClick={() => setIsTestBatchModalOpen(true)}
+                            className="flex items-center space-x-1.5 bg-accent/10 hover:bg-accent/20 text-accent font-bold py-1.5 px-3.5 rounded-xl text-xs transition-colors cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Enroll in Test Batch</span>
+                          </button>
+                        </div>
+
+                        {isBatchEnrollmentsLoading ? (
+                          <div className="space-y-2">
+                            {Array.from({ length: 2 }).map((_, idx) => (
+                              <div key={idx} className="h-14 bg-slate-50 border border-border/30 rounded-2xl animate-pulse" />
+                            ))}
+                          </div>
+                        ) : batchEnrollments.length === 0 ? (
+                          <p className="text-xs text-text-secondary py-6 text-center font-semibold">
+                            No test batch enrollments found. Click "Enroll in Test Batch" to grant access to a mock test series.
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {batchEnrollments.map((enr: any) => (
+                              <div
+                                key={enr.id}
+                                className="bg-cardBg border border-border/60 rounded-2xl p-4 flex items-center justify-between shadow-xs hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                              >
+                                <div className="flex items-center space-x-3 min-w-0">
+                                  <div className="w-12 h-12 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0 text-accent font-black text-xs">
+                                    {enr.batch?.targetCategory?.slice(0, 3)?.toUpperCase() || 'EXM'}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <h5 className="font-extrabold text-sm text-text-primary tracking-tight truncate">
+                                      {enr.batch?.title || 'Test Batch'}
+                                    </h5>
+                                    <div className="flex items-center space-x-2 mt-0.5">
+                                      <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                                        {enr.batch?.targetCategory || 'TNPSC'}
+                                      </span>
+                                      <span className="text-[10px] text-text-secondary font-medium">
+                                        Enrolled {new Date(enr.enrolledAt || enr.createdAt).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRevokeBatch(enr.id, enr.batch?.title || 'Test Batch', enr.batchId)}
+                                  disabled={isRevokingBatchId === enr.id}
+                                  className="p-2 rounded-xl hover:bg-red-50 text-text-secondary hover:text-red-650 transition-colors disabled:opacity-50 cursor-pointer"
+                                  title="Revoke Test Batch Enrollment"
+                                >
+                                  {isRevokingBatchId === enr.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+                                  ) : (
+                                    <Trash2 className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -1915,6 +2069,45 @@ export default function StudentManagementPage() {
         confirmText="Revoke"
         type="danger"
         isLoading={revokeMutation.isPending || isRevokingId !== null}
+      />
+
+      <EnrollModal
+        isOpen={isEnrollDialogOpen}
+        onClose={() => {
+          setIsEnrollDialogOpen(false);
+          setCourseSearchQuery('');
+        }}
+        selectedStudent={selectedStudent}
+        courseSearchQuery={courseSearchQuery}
+        setCourseSearchQuery={setCourseSearchQuery}
+        availableCourses={availableCourses}
+        onEnroll={handleEnroll}
+        isEnrollingId={isEnrollingId}
+      />
+
+      <EnrollTestBatchModal
+        isOpen={isTestBatchModalOpen}
+        onClose={() => {
+          setIsTestBatchModalOpen(false);
+          setBatchSearchQuery('');
+        }}
+        selectedStudent={selectedStudent}
+        batchSearchQuery={batchSearchQuery}
+        setBatchSearchQuery={setBatchSearchQuery}
+        availableBatches={availableBatches}
+        onEnroll={handleEnrollBatch}
+        isEnrollingId={isEnrollingBatchId}
+      />
+
+      <ConfirmModal
+        isOpen={batchToRevoke !== null}
+        onClose={() => setBatchToRevoke(null)}
+        onConfirm={handleConfirmRevokeBatch}
+        title="Revoke Test Batch Enrollment"
+        message={`Are you sure you want to revoke enrollment for test batch "${batchToRevoke?.title}"?`}
+        confirmText="Revoke"
+        type="danger"
+        isLoading={revokeBatchMutation.isPending || isRevokingBatchId !== null}
       />
 
       <ResetDeviceModal

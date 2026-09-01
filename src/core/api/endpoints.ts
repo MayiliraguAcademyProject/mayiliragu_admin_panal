@@ -551,6 +551,70 @@ export function useRevokeEnrollment(studentId: string) {
   });
 }
 
+// ==========================================
+// STUDENT TEST BATCH ENROLLMENTS HOOKS
+// ==========================================
+
+export function useStudentTestBatchEnrollments(studentId: string) {
+  return useQuery({
+    queryKey: ['studentTestBatchEnrollments', studentId],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.testBatches.studentEnrollments(studentId));
+      return response.data.data;
+    },
+    enabled: Boolean(studentId),
+  });
+}
+
+export function useEnrollStudentTestBatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ studentId, batchId }: { studentId: string; batchId: string }) => {
+      const response = await apiClient.post(ApiConstants.testBatches.enroll, { studentId, batchId });
+      return response.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['studentTestBatchEnrollments', variables.studentId] });
+      queryClient.invalidateQueries({ queryKey: ['test-batches', 'enrollments', variables.batchId] });
+    },
+  });
+}
+
+export function useRevokeTestBatchEnrollment(studentId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ enrollmentId, batchId, studentId: sId }: { enrollmentId?: string; batchId?: string; studentId?: string }) => {
+      if (enrollmentId) {
+        const response = await apiClient.delete(ApiConstants.testBatches.revoke(enrollmentId));
+        return response.data;
+      } else if (batchId && (sId || studentId)) {
+        const response = await apiClient.delete(ApiConstants.testBatches.removeBatchEnrollment(batchId, sId || studentId!));
+        return response.data;
+      }
+      throw new Error('Either enrollmentId or batchId and studentId must be provided');
+    },
+    onSuccess: (_, variables) => {
+      if (studentId || variables.studentId) {
+        queryClient.invalidateQueries({ queryKey: ['studentTestBatchEnrollments', studentId || variables.studentId] });
+      }
+      if (variables.batchId) {
+        queryClient.invalidateQueries({ queryKey: ['test-batches', 'enrollments', variables.batchId] });
+      }
+    },
+  });
+}
+
+export function useAdminTestBatchesList() {
+  return useQuery({
+    queryKey: ['adminTestBatchesList'],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.testBatches.base);
+      return response.data.data;
+    },
+  });
+}
+
+
 export function useCreateStudent() {
   const queryClient = useQueryClient();
   return useMutation({

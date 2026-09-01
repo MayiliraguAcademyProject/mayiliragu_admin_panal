@@ -132,4 +132,14 @@ export const ApiConstants = {
     base: '/payment-requests',
     detail: (id: string) => `/payment-requests/${id}`,
   },
+  testBatches: {
+    base: '/test-batches',
+    detail: (id: string) => `/test-batches/${id}`,
+    studentEnrollments: (studentId: string) => `/test-batches/students/${studentId}/enrollments`,
+    enroll: '/test-batches/enroll',
+    revoke: (id: string) => `/test-batches/enrollments/${id}`,
+    batchEnroll: (batchId: string) => `/test-batches/${batchId}/enrollments`,
+    batchEnrollments: (batchId: string) => `/test-batches/${batchId}/enrollments`,
+    removeBatchEnrollment: (batchId: string, studentId: string) => `/test-batches/${batchId}/enrollments/${studentId}`,
+  },
 } as const;
