@@ -1,137 +1,189 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  Calendar,
-  FileText,
+  Clock,
   FileSpreadsheet,
-  Upload,
+  FileText,
   Plus,
   Trash2,
-  Edit2,
   ExternalLink,
   ChevronDown,
   ChevronUp,
-  CheckCircle2,
-  AlertCircle,
+  FolderPlus,
   BookOpen,
-  Sparkles
+  Edit2,
+  Users,
+  Key,
+  AlertTriangle,
+  Lock,
+  Unlock,
+  X,
+  Search,
+  Home,
+  ChevronRight,
 } from 'lucide-react';
+import RefreshButton from '../../../shared/components/RefreshButton';
 import {
   useTestBatchDetail,
-  useUploadSchedulePdf,
-  useRemoveSchedulePdf,
-  useUploadOmrPdf,
-  useRemoveOmrPdf,
   useCreateCategory,
   useUpdateCategory,
-  useToggleCategoryStatus,
   useDeleteCategory,
   useUploadQuestionPaper,
   useDeleteQuestionPaper,
+  useUpdateQuestionPaper,
+  useUploadAnswerKey,
+  useRemoveAnswerKey,
+  useBatchEnrollments,
+  useEnrollStudent,
+  useRemoveEnrollment,
+  useBatchOmrSubmissions,
+  useDeleteOmrSubmission,
+  useDeleteStudentBatchOmrSubmissions,
 } from '../services/test-batch-api';
-import type { TestBatchQuestionCategory } from '../types';
-import { useToast } from '../../../shared/context';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '../../../core/api/client';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
-import RefreshButton from '../../../shared/components/RefreshButton';
+import { useToast } from '../../../shared/context';
+import type { TestBatchQuestionCategory, TestBatchQuestionPaper, TestBatchOmrSubmissionItem } from '../types';
 
 export default function TestBatchDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [activeTab, setActiveTab] = useState<'schedule' | 'questions' | 'omr'>('schedule');
+  // Active Tab: 'papers' | 'enrollments' | 'omr'
+  const [activeTab, setActiveTab] = useState<'papers' | 'enrollments' | 'omr'>('papers');
+
+  // Main Batch Detail Query
+  const {
+    data: batch,
+    isLoading,
+    isError,
+    refetch: refetchBatch,
+    isRefetching: isRefetchingBatch,
+  } = useTestBatchDetail(id);
+
+  // Enrollments Query
+  const {
+    data: enrollments = [],
+    isLoading: isEnrollmentsLoading,
+    refetch: refetchEnrollments,
+    isRefetching: isRefetchingEnrollments,
+  } = useBatchEnrollments(id);
+
+  // OMR Submissions Query
+  const {
+    data: omrSubmissions = [],
+    isLoading: isOmrLoading,
+    refetch: refetchOmr,
+    isRefetching: isRefetchingOmr,
+  } = useBatchOmrSubmissions(id);
+
+  const isRefetching = isRefetchingBatch || isRefetchingEnrollments || isRefetchingOmr;
+
+  const handleRefreshAll = async () => {
+    try {
+      await Promise.all([refetchBatch(), refetchEnrollments(), refetchOmr()]);
+      toast.success('Test batch refreshed successfully');
+    } catch {
+      toast.error('Failed to refresh data');
+    }
+  };
+
+  // All Students for Single Enrollment
+  const { data: rawStudentsData } = useQuery({
+    queryKey: ['students-list-for-batch-enroll'],
+    queryFn: async () => {
+      const res = await apiClient.get('/enrollments/students?limit=100');
+      return res.data?.data;
+    },
+    enabled: activeTab === 'enrollments' || activeTab === 'omr',
+  });
+
+  const students = useMemo<Array<{ id: string; name?: string; fullName?: string; email: string }>>(() => {
+    if (!rawStudentsData) return [];
+    if (Array.isArray(rawStudentsData)) return rawStudentsData;
+    if (Array.isArray(rawStudentsData.data)) return rawStudentsData.data;
+    if (Array.isArray(rawStudentsData.students)) return rawStudentsData.students;
+    return [];
+  }, [rawStudentsData]);
 
   // Category Modal State
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<TestBatchQuestionCategory | null>(null);
   const [categoryName, setCategoryName] = useState('');
   const [categorySyllabus, setCategorySyllabus] = useState('');
-  const [categoryOrder, setCategoryOrder] = useState('0');
   const [categoryEnabled, setCategoryEnabled] = useState(true);
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
-  // Question Paper Upload Modal State
+  // Paper Modal State
   const [isPaperModalOpen, setIsPaperModalOpen] = useState(false);
-  const [targetCategoryId, setTargetCategoryId] = useState<string | null>(null);
+  const [selectedCategoryIdForPaper, setSelectedCategoryIdForPaper] = useState<string | null>(null);
   const [paperTitle, setPaperTitle] = useState('');
   const [paperFile, setPaperFile] = useState<File | null>(null);
 
-  // Delete Modals State
+  // Expanded Categories Map
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  // Single Student Enrollment State
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+
+  // Student-specific OMR Cleanup State
+  const [isStudentCleanupModalOpen, setIsStudentCleanupModalOpen] = useState(false);
+  const [selectedStudentForOmrCleanup, setSelectedStudentForOmrCleanup] = useState('');
+  const [cleanupConfirmText, setCleanupConfirmText] = useState('');
+
+  // Individual OMR Submission to Delete
+  const [submissionToDelete, setSubmissionToDelete] = useState<TestBatchOmrSubmissionItem | null>(null);
+
+  // Deletion Confirmation States
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [paperToDelete, setPaperToDelete] = useState<string | null>(null);
-  const [isDeletingSchedule, setIsDeletingSchedule] = useState(false);
-  const [isDeletingOmr, setIsDeletingOmr] = useState(false);
 
-  // API Hooks
-  const { data: batch, isLoading, refetch, isRefetching } = useTestBatchDetail(id);
-  const uploadScheduleMutation = useUploadSchedulePdf();
-  const removeScheduleMutation = useRemoveSchedulePdf();
-  const uploadOmrMutation = useUploadOmrPdf();
-  const removeOmrMutation = useRemoveOmrPdf();
+  // Mutations
   const createCategoryMutation = useCreateCategory();
   const updateCategoryMutation = useUpdateCategory();
-  const toggleCategoryStatusMutation = useToggleCategoryStatus();
   const deleteCategoryMutation = useDeleteCategory();
+
   const uploadPaperMutation = useUploadQuestionPaper();
   const deletePaperMutation = useDeleteQuestionPaper();
+  const updatePaperMutation = useUpdateQuestionPaper();
+  const uploadAnswerKeyMutation = useUploadAnswerKey();
+  const removeAnswerKeyMutation = useRemoveAnswerKey();
 
-  // Schedule upload handler
-  const handleScheduleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.type !== 'application/pdf') {
-      toast.error('Only PDF files are allowed');
-      return;
-    }
+  const enrollStudentMutation = useEnrollStudent();
+  const removeEnrollmentMutation = useRemoveEnrollment();
+  const deleteOmrSubmissionMutation = useDeleteOmrSubmission();
+  const deleteStudentBatchOmrMutation = useDeleteStudentBatchOmrSubmissions();
 
-    try {
-      await uploadScheduleMutation.mutateAsync({ id, file });
-      toast.success('Schedule PDF uploaded successfully!');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to upload schedule PDF');
-    }
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [categoryId]: !prev[categoryId],
+    }));
   };
 
-  // OMR upload handler
-  const handleOmrFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.type !== 'application/pdf') {
-      toast.error('Only PDF files are allowed');
-      return;
-    }
-
-    try {
-      await uploadOmrMutation.mutateAsync({ id, file });
-      toast.success('Sample OMR PDF uploaded successfully!');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to upload OMR PDF');
-    }
+  const handleOpenCreateCategory = () => {
+    setEditingCategory(null);
+    setCategoryName('');
+    setCategorySyllabus('');
+    setCategoryEnabled(true);
+    setIsCategoryModalOpen(true);
   };
 
-  // Category handlers
-  const handleOpenCategoryModal = (cat?: TestBatchQuestionCategory) => {
-    if (cat) {
-      setEditingCategory(cat);
-      setCategoryName(cat.name);
-      setCategorySyllabus(cat.syllabus || '');
-      setCategoryOrder(String(cat.order));
-      setCategoryEnabled(cat.isEnabled);
-    } else {
-      setEditingCategory(null);
-      setCategoryName('');
-      setCategorySyllabus('');
-      setCategoryOrder(String((batch?.categories?.length || 0) + 1));
-      setCategoryEnabled(true);
-    }
+  const handleOpenEditCategory = (cat: TestBatchQuestionCategory) => {
+    setEditingCategory(cat);
+    setCategoryName(cat.name);
+    setCategorySyllabus(cat.syllabus || '');
+    setCategoryEnabled(cat.isEnabled);
     setIsCategoryModalOpen(true);
   };
 
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!categoryName.trim()) {
-      toast.error('Category name is required');
+      toast.error('Please enter a category name');
       return;
     }
 
@@ -142,45 +194,26 @@ export default function TestBatchDetailPage() {
           batchId: id,
           name: categoryName.trim(),
           syllabus: categorySyllabus.trim() || undefined,
-          order: parseInt(categoryOrder, 10) || 0,
           isEnabled: categoryEnabled,
         });
-        toast.success('Category updated successfully!');
+        toast.success('Category updated successfully');
       } else {
         await createCategoryMutation.mutateAsync({
           batchId: id,
           name: categoryName.trim(),
           syllabus: categorySyllabus.trim() || undefined,
-          order: parseInt(categoryOrder, 10) || 0,
           isEnabled: categoryEnabled,
         });
-        toast.success('Category created successfully!');
+        toast.success('Category created successfully');
       }
       setIsCategoryModalOpen(false);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to save category');
+    } catch {
+      toast.error('Failed to save category');
     }
   };
 
-  const handleToggleCategory = async (categoryId: string) => {
-    try {
-      await toggleCategoryStatusMutation.mutateAsync({ categoryId, batchId: id });
-      toast.success('Category status updated!');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to toggle category');
-    }
-  };
-
-  const toggleCategoryExpand = (categoryId: string) => {
-    setExpandedCategories((prev) => ({
-      ...prev,
-      [categoryId]: !prev[categoryId],
-    }));
-  };
-
-  // Question paper handlers
-  const handleOpenPaperModal = (categoryId: string) => {
-    setTargetCategoryId(categoryId);
+  const handleOpenUploadPaper = (categoryId: string) => {
+    setSelectedCategoryIdForPaper(categoryId);
     setPaperTitle('');
     setPaperFile(null);
     setIsPaperModalOpen(true);
@@ -188,426 +221,487 @@ export default function TestBatchDetailPage() {
 
   const handlePaperSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetCategoryId || !paperFile) {
+    if (!selectedCategoryIdForPaper) return;
+    if (!paperTitle.trim()) {
+      toast.error('Please enter a paper title');
+      return;
+    }
+    if (!paperFile) {
       toast.error('Please select a PDF file');
       return;
     }
 
     try {
       await uploadPaperMutation.mutateAsync({
-        categoryId: targetCategoryId,
         batchId: id,
+        categoryId: selectedCategoryIdForPaper,
+        title: paperTitle.trim(),
         file: paperFile,
-        title: paperTitle.trim() || paperFile.name,
       });
-      toast.success('Question paper PDF uploaded successfully!');
+      toast.success('Question paper uploaded successfully');
       setIsPaperModalOpen(false);
-      setExpandedCategories((prev) => ({ ...prev, [targetCategoryId]: true }));
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to upload question paper');
+    } catch {
+      toast.error('Failed to upload question paper');
     }
   };
 
+  const handleAnswerKeyUpload = async (paperId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      await uploadAnswerKeyMutation.mutateAsync({ paperId, batchId: id, file });
+      toast.success('Answer key uploaded successfully');
+    } catch {
+      toast.error('Failed to upload answer key');
+    }
+  };
+
+  const handleRemoveAnswerKey = async (paperId: string) => {
+    try {
+      await removeAnswerKeyMutation.mutateAsync({ paperId, batchId: id });
+      toast.success('Answer key removed');
+    } catch {
+      toast.error('Failed to remove answer key');
+    }
+  };
+
+  const handleUnlocksAtChange = async (paper: TestBatchQuestionPaper, dateValue: string) => {
+    try {
+      await updatePaperMutation.mutateAsync({
+        paperId: paper.id,
+        batchId: id,
+        unlocksAt: dateValue ? new Date(dateValue).toISOString() : null,
+      });
+      toast.success(dateValue ? 'Unlock schedule updated' : 'Unlock schedule cleared (immediately visible)');
+    } catch {
+      toast.error('Failed to update unlock schedule');
+    }
+  };
+
+  const handleEnrollSingleStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudentId) {
+      toast.error('Please select a student to enroll');
+      return;
+    }
+
+    try {
+      await enrollStudentMutation.mutateAsync({ batchId: id, studentId: selectedStudentId });
+      toast.success('Student enrolled successfully');
+      setSelectedStudentId('');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to enroll student');
+    }
+  };
+
+  const handleStudentCleanupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudentForOmrCleanup) {
+      toast.error('Please select a student');
+      return;
+    }
+    if (cleanupConfirmText.trim().toUpperCase() !== 'CONFIRM') {
+      toast.error('Please type CONFIRM to execute cleanup');
+      return;
+    }
+
+    try {
+      const res = await deleteStudentBatchOmrMutation.mutateAsync({
+        batchId: id,
+        studentId: selectedStudentForOmrCleanup,
+      });
+      setIsStudentCleanupModalOpen(false);
+      setCleanupConfirmText('');
+      setSelectedStudentForOmrCleanup('');
+      toast.success(`Deleted ${res.deleted} OMR submissions for student`);
+      if (res.warnings && res.warnings.length > 0) {
+        toast.error(`Some files could not be removed from S3 (${res.warnings.length})`);
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to cleanup student OMR submissions');
+    }
+  };
+
+  const filteredStudents = useMemo(() => {
+    if (!studentSearchTerm.trim()) return students;
+    const q = studentSearchTerm.toLowerCase();
+    return students.filter(
+      (s) =>
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.fullName && s.fullName.toLowerCase().includes(q)) ||
+        (s.email && s.email.toLowerCase().includes(q))
+    );
+  }, [students, studentSearchTerm]);
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
 
-  if (!batch) {
+  if (isError || !batch) {
     return (
-      <div className="bg-cardBg border border-border/80 rounded-2xl p-12 text-center">
-        <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-3" />
-        <h3 className="text-lg font-bold text-text-primary">Test Batch Not Found</h3>
-        <p className="text-sm text-text-secondary mt-1 mb-6">
-          The requested test batch could not be found or has been deleted.
+      <div className="p-8 max-w-2xl mx-auto text-center space-y-4">
+        <div className="p-4 bg-red-500/10 text-red-500 rounded-2xl inline-block">
+          <BookOpen className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-text-primary">Test Batch Not Found</h2>
+        <p className="text-text-secondary text-sm">
+          The requested test batch could not be found or you do not have permission to view it.
         </p>
         <button
           onClick={() => navigate('/test-batches')}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl font-semibold shadow-md cursor-pointer"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition-colors cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Test Batches</span>
+          <ArrowLeft className="w-4 h-4" /> Back to Test Batches
         </button>
       </div>
     );
   }
 
   return (
-    <div className="p-6 md:p-8 space-y-8 pb-16">
-      {/* Top Navigation & Info Header */}
-      <div className="bg-cardBg border border-border/80 rounded-2xl p-6 shadow-sm">
+    <div className="p-6 lg:p-8 space-y-6 w-full">
+      {/* Breadcrumb Navigation */}
+      <div className="flex items-center gap-1.5 text-xs text-text-secondary font-medium">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="hover:text-primary transition-colors flex items-center gap-1 cursor-pointer"
+        >
+          <Home className="w-3.5 h-3.5" />
+          <span>Home</span>
+        </button>
+        <ChevronRight className="w-3.5 h-3.5 opacity-50" />
         <button
           onClick={() => navigate('/test-batches')}
-          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-primary transition-colors mb-4 cursor-pointer"
+          className="hover:text-primary transition-colors cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Test Batches</span>
+          Test Batches
         </button>
-
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-primary to-accent flex items-center justify-center shadow-md shadow-accent/20">
-              <Calendar className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-2xl font-bold text-text-primary">{batch.title}</h1>
-                <span className="px-2.5 py-0.5 text-xs font-bold rounded-md bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
-                  {batch.targetCategory}
-                </span>
-                {batch.isAvailableForGuest ? (
-                  <span className="px-2.5 py-0.5 text-xs font-semibold rounded-md bg-teal-500/10 text-teal-600 border border-teal-500/20">
-                    Guest Accessible
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-0.5 text-xs font-medium rounded-md bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
-                    TNPSC Only
-                  </span>
-                )}
-                {batch.isEnabled ? (
-                  <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Active
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-rose-500/10 text-rose-600 border border-rose-500/20 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> Inactive
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-text-secondary mt-0.5">
-                {batch.description || 'Test Batch resource workspace'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <RefreshButton onRefresh={() => refetch()} isRefetching={isRefetching} />
-          </div>
-        </div>
-
-        {/* 3 Main Management Tabs */}
-        <div className="flex border-b border-border/80 mt-6 gap-2">
-          <button
-            onClick={() => setActiveTab('schedule')}
-            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
-              activeTab === 'schedule'
-                ? 'border-primary text-primary bg-primary/5 rounded-t-xl'
-                : 'border-transparent text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            <span>1. Schedule PDF</span>
-            {batch.schedulePdfUrl && (
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('questions')}
-            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
-              activeTab === 'questions'
-                ? 'border-primary text-primary bg-primary/5 rounded-t-xl'
-                : 'border-transparent text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>2. Question Papers ({batch.categories?.length || 0} Categories)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('omr')}
-            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
-              activeTab === 'omr'
-                ? 'border-primary text-primary bg-primary/5 rounded-t-xl'
-                : 'border-transparent text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>3. Sample OMR Sheet</span>
-            {batch.omrPdfUrl && (
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            )}
-          </button>
-        </div>
+        <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+        <span className="text-text-primary font-bold truncate max-w-md">{batch.title}</span>
       </div>
 
-      {/* ================= TAB 1: SCHEDULE PDF ================= */}
-      {activeTab === 'schedule' && (
-        <div className="bg-cardBg border border-border/80 rounded-2xl p-6 shadow-sm space-y-6">
-          <div>
-            <h2 className="text-lg font-bold text-text-primary">Master Test Schedule</h2>
-            <p className="text-xs text-text-secondary mt-1">
-              Upload the official batch schedule PDF containing test dates, timings, and topics.
-            </p>
+      {/* Header & Back Action */}
+      <div className="flex flex-col gap-4 pb-4 border-b border-border/80 w-full">
+        <div className="flex items-center justify-between gap-4 w-full">
+          <div className="flex items-center gap-3.5">
+            <button
+              onClick={() => navigate('/test-batches')}
+              className="p-2.5 rounded-xl border border-border hover:bg-secondary text-text-secondary hover:text-text-primary transition-colors cursor-pointer flex-shrink-0"
+              title="Back to Test Batches"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-2xl font-bold text-text-primary">{batch.title}</h1>
+              <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-primary/10 text-primary border border-primary/20">
+                {batch.targetCategory}
+              </span>
+              <span
+                className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full border ${
+                  batch.isEnabled
+                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                }`}
+              >
+                {batch.isEnabled ? 'Active' : 'Disabled'}
+              </span>
+              {batch.isAvailableForGuest && (
+                <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-teal-500/10 text-teal-600 border border-teal-500/20">
+                  Open Preview
+                </span>
+              )}
+            </div>
           </div>
 
-          {batch.schedulePdfUrl ? (
-            <div className="border border-border/80 rounded-2xl p-6 bg-secondary/30 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                  <Calendar className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-text-primary">
-                    {batch.schedulePdfName || 'Batch_Schedule.pdf'}
-                  </h4>
-                  <p className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Uploaded & Active for students
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <a
-                  href={batch.schedulePdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 text-text-primary rounded-xl text-xs font-semibold border border-border/80 transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Preview PDF</span>
-                </a>
-
-                <label className="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-xs font-semibold transition-colors cursor-pointer">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Replace Schedule</span>
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    onChange={handleScheduleFileUpload}
-                    className="hidden"
-                  />
-                </label>
-
-                <button
-                  onClick={() => setIsDeletingSchedule(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Remove</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="border-2 border-dashed border-border rounded-2xl p-12 text-center bg-secondary/20">
-              <Calendar className="w-12 h-12 text-text-secondary opacity-40 mx-auto mb-3" />
-              <h3 className="text-sm font-bold text-text-primary">No Schedule PDF Uploaded</h3>
-              <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1 mb-5">
-                Upload the official schedule document so students can plan their test preparation.
-              </p>
-              <label className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-xs font-semibold rounded-xl shadow-md shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer">
-                <Upload className="w-4 h-4" />
-                <span>Upload Schedule PDF</span>
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleScheduleFileUpload}
-                  className="hidden"
-                />
-              </label>
-            </div>
-          )}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <RefreshButton
+              onRefresh={handleRefreshAll}
+              isRefetching={isRefetching}
+              title="Refresh Test Batch Data"
+            />
+          </div>
         </div>
-      )}
 
-      {/* ================= TAB 2: QUESTION PAPERS (CATEGORIES & SYLLABUS) ================= */}
-      {activeTab === 'questions' && (
+        {/* Full-width description block */}
+        {batch.description && (
+          <div className="w-full bg-cardBg/70 border border-border/70 rounded-xl p-4 text-sm text-text-secondary whitespace-pre-line leading-relaxed shadow-xs">
+            {batch.description}
+          </div>
+        )}
+      </div>
+
+      {/* Tabs Bar */}
+      <div className="flex items-center gap-2 p-1.5 bg-cardBg border border-border/80 rounded-2xl max-w-fit shadow-xs">
+        <button
+          onClick={() => setActiveTab('papers')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+            activeTab === 'papers'
+              ? 'bg-primary text-white shadow-md shadow-primary/25'
+              : 'text-text-secondary hover:text-text-primary hover:bg-secondary/80'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          Question Papers ({batch.categories?.reduce((acc, c) => acc + (c.questionPapers?.length || 0), 0) || 0})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('enrollments')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+            activeTab === 'enrollments'
+              ? 'bg-primary text-white shadow-md shadow-primary/25'
+              : 'text-text-secondary hover:text-text-primary hover:bg-secondary/80'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Enrolled Students ({enrollments.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('omr')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+            activeTab === 'omr'
+              ? 'bg-primary text-white shadow-md shadow-primary/25'
+              : 'text-text-secondary hover:text-text-primary hover:bg-secondary/80'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          OMR Submissions ({omrSubmissions.length})
+        </button>
+      </div>
+
+      {/* ================= TAB 1: QUESTION PAPERS ================= */}
+      {activeTab === 'papers' && (
         <div className="space-y-6">
-          <div className="bg-cardBg border border-border/80 rounded-2xl p-6 shadow-sm">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold text-text-primary">Question Paper Categories</h2>
-                <p className="text-xs text-text-secondary mt-1">
-                  Create categories with syllabus descriptions, active toggles, and upload multiple question PDFs per category.
-                </p>
-              </div>
-
-              <button
-                onClick={() => handleOpenCategoryModal()}
-                className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-xs font-semibold shadow-md shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Create Category</span>
-              </button>
+          {/* Top Actions for Papers */}
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-text-primary">Categories & Question Papers</h2>
+              <p className="text-xs text-text-secondary">
+                Organize tests into units/modules, set schedule unlock timers, and upload answer keys.
+              </p>
             </div>
+
+            <button
+              onClick={handleOpenCreateCategory}
+              className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl shadow-md shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer"
+            >
+              <FolderPlus className="w-4 h-4" />
+              Add Category
+            </button>
           </div>
 
+          {/* Categories Accordion List */}
           {(!batch.categories || batch.categories.length === 0) ? (
-            <div className="bg-cardBg border border-border/80 rounded-2xl p-12 text-center">
-              <FileText className="w-12 h-12 text-text-secondary opacity-40 mx-auto mb-3" />
-              <h3 className="text-sm font-bold text-text-primary">No Categories Created Yet</h3>
-              <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1 mb-5">
-                Start by creating your first subject or unit category (e.g. Unit 8: History & Culture) with its syllabus.
+            <div className="p-12 text-center bg-cardBg border border-border/80 rounded-2xl space-y-3">
+              <BookOpen className="w-10 h-10 text-text-secondary/40 mx-auto" />
+              <h3 className="text-base font-bold text-text-primary">No Categories Added Yet</h3>
+              <p className="text-xs text-text-secondary max-w-md mx-auto">
+                Create unit categories (e.g. "Unit 1: Tamil Society", "General Science") to start uploading scheduled mock test papers.
               </p>
               <button
-                onClick={() => handleOpenCategoryModal()}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-xs font-semibold rounded-xl shadow-md shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer"
+                onClick={handleOpenCreateCategory}
+                className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold rounded-xl transition-colors cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
-                <span>Add Category</span>
+                <Plus className="w-4 h-4" /> Create First Category
               </button>
             </div>
           ) : (
             <div className="space-y-4">
-              {batch.categories.map((category) => {
-                const isExpanded = expandedCategories[category.id] ?? true;
+              {batch.categories.map((cat, idx) => {
+                const isExpanded = Boolean(expandedCategories[cat.id]);
                 return (
                   <div
-                    key={category.id}
-                    className="bg-cardBg border border-border/80 rounded-2xl overflow-hidden shadow-sm transition-all"
+                    key={cat.id}
+                    className="bg-cardBg border border-border/80 rounded-2xl overflow-hidden shadow-xs transition-all"
                   >
-                    {/* Category Header Bar */}
-                    <div className="p-5 flex items-center justify-between gap-4 bg-secondary/30">
+                    {/* Category Header */}
+                    <div className="p-5 flex items-center justify-between gap-4 hover:bg-secondary/40 transition-colors">
                       <div
-                        onClick={() => toggleCategoryExpand(category.id)}
-                        className="flex items-center gap-3 flex-1 cursor-pointer select-none"
+                        onClick={() => toggleCategory(cat.id)}
+                        className="flex items-center gap-3.5 flex-1 cursor-pointer select-none"
                       >
-                        <div className="p-1 text-text-secondary hover:text-primary transition-colors">
-                          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">
+                          {idx + 1}
                         </div>
                         <div>
                           <div className="flex items-center gap-2.5">
-                            <h3 className="text-base font-bold text-text-primary">{category.name}</h3>
-                            <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-accent/10 text-accent border border-accent/20">
-                              {category.questionPapers?.length || 0} {category.questionPapers?.length === 1 ? 'Paper' : 'Papers'}
-                            </span>
-                            {category.isEnabled ? (
-                              <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                                Enabled
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                            <h3 className="text-base font-bold text-text-primary">{cat.name}</h3>
+                            {!cat.isEnabled && (
+                              <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
                                 Disabled
                               </span>
                             )}
                           </div>
+                          <p className="text-xs text-text-secondary mt-0.5">
+                            {cat.questionPapers?.length || 0} Question {cat.questionPapers?.length === 1 ? 'Paper' : 'Papers'}
+                          </p>
                         </div>
                       </div>
 
+                      {/* Category Action buttons */}
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleOpenPaperModal(category.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                          onClick={() => handleOpenUploadPaper(cat.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors cursor-pointer"
                         >
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Upload PDF</span>
+                          <Plus className="w-3.5 h-3.5" />
+                          Add Paper
                         </button>
-
                         <button
-                          onClick={() => handleOpenCategoryModal(category)}
-                          className="p-2 rounded-xl text-text-secondary hover:text-primary hover:bg-secondary transition-colors cursor-pointer"
+                          onClick={() => handleOpenEditCategory(cat)}
+                          className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-secondary transition-colors cursor-pointer"
                           title="Edit Category"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
-
                         <button
-                          onClick={() => handleToggleCategory(category.id)}
-                          className={`p-2 rounded-xl transition-colors cursor-pointer ${
-                            category.isEnabled
-                              ? 'text-emerald-600 hover:bg-emerald-500/10'
-                              : 'text-text-secondary hover:bg-secondary'
-                          }`}
-                          title={category.isEnabled ? 'Disable Category' : 'Enable Category'}
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                        </button>
-
-                        <button
-                          onClick={() => setCategoryToDelete(category.id)}
-                          className="p-2 text-text-secondary hover:text-rose-600 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
+                          onClick={() => setCategoryToDelete(cat.id)}
+                          className="p-1.5 text-text-secondary hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
                           title="Delete Category"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                        <button
+                          onClick={() => toggleCategory(cat.id)}
+                          className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-secondary transition-colors cursor-pointer"
+                        >
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
                       </div>
                     </div>
 
-                    {/* Category Details & Papers List */}
+                    {/* Category Details & Question Papers */}
                     {isExpanded && (
-                      <div className="p-6 border-t border-border/80 space-y-6">
-                        {/* Syllabus Box */}
-                        {category.syllabus && (
-                          <div className="bg-secondary/50 border border-border/80 rounded-xl p-4">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2">
-                              <BookOpen className="w-3.5 h-3.5 text-primary" />
-                              <span>Category Syllabus</span>
-                            </div>
-                            <p className="text-xs text-text-secondary whitespace-pre-line leading-relaxed">
-                              {category.syllabus}
-                            </p>
+                      <div className="px-6 pb-6 pt-2 border-t border-border/80 space-y-4">
+                        {/* Syllabus section */}
+                        {cat.syllabus && (
+                          <div className="p-4 bg-secondary/50 rounded-xl border border-border/60 text-xs text-text-secondary space-y-1">
+                            <span className="font-bold text-text-primary block">Syllabus Covered:</span>
+                            <p className="whitespace-pre-line">{cat.syllabus}</p>
                           </div>
                         )}
 
-                        {/* Question Paper PDFs List */}
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">
-                              Uploaded Question Papers ({category.questionPapers?.length || 0})
-                            </h4>
+                        {/* Papers list */}
+                        {(!cat.questionPapers || cat.questionPapers.length === 0) ? (
+                          <div className="p-6 text-center text-xs text-text-secondary border border-dashed border-border/80 rounded-xl">
+                            No question papers uploaded in this category.
                           </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {cat.questionPapers.map((paper) => {
+                              const isLocked = paper.unlocksAt && new Date(paper.unlocksAt) > new Date();
+                              const formattedDate = paper.unlocksAt
+                                ? new Date(paper.unlocksAt).toISOString().slice(0, 16)
+                                : '';
 
-                          {(!category.questionPapers || category.questionPapers.length === 0) ? (
-                            <div className="border border-dashed border-border rounded-xl p-6 text-center bg-secondary/20">
-                              <p className="text-xs text-text-secondary">
-                                No question papers uploaded for this category yet.
-                              </p>
-                              <button
-                                onClick={() => handleOpenPaperModal(category.id)}
-                                className="mt-2 inline-flex items-center gap-1 text-xs text-primary font-semibold hover:underline cursor-pointer"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>Upload first PDF paper</span>
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {category.questionPapers.map((paper) => (
+                              return (
                                 <div
                                   key={paper.id}
-                                  className="p-3.5 bg-secondary/40 border border-border/80 rounded-xl flex items-center justify-between gap-3 group hover:border-primary/50 transition-colors"
+                                  className="p-4 bg-cardBg border border-border/70 rounded-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:border-border transition-all"
                                 >
-                                  <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className="w-9 h-9 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center flex-shrink-0">
+                                  {/* Left: Info & Lock Status */}
+                                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                                    <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
                                       <FileText className="w-4 h-4" />
                                     </div>
-                                    <div className="overflow-hidden">
-                                      <h5 className="text-xs font-bold text-text-primary truncate">
-                                        {paper.title}
-                                      </h5>
-                                      <p className="text-[11px] text-text-secondary truncate">
-                                        {paper.fileName}
-                                      </p>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="text-sm font-bold text-text-primary truncate">
+                                          {paper.title}
+                                        </h4>
+                                        {isLocked ? (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/30">
+                                            <Lock className="w-3 h-3" />
+                                            Scheduled Lock
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
+                                            <Unlock className="w-3 h-3" />
+                                            Unlocked
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-3 text-xs text-text-secondary mt-1">
+                                        <span className="truncate">{paper.fileName}</span>
+                                        {paper.fileSize && (
+                                          <span>• {(paper.fileSize / 1024 / 1024).toFixed(2)} MB</span>
+                                        )}
+                                        <a
+                                          href={paper.fileUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="text-primary hover:underline inline-flex items-center gap-1"
+                                        >
+                                          View PDF <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                      </div>
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-1 flex-shrink-0">
-                                    <a
-                                      href={paper.fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="p-1.5 text-text-secondary hover:text-primary hover:bg-secondary rounded-lg transition-colors cursor-pointer"
-                                      title="View PDF"
-                                    >
-                                      <ExternalLink className="w-4 h-4" />
-                                    </a>
+                                  {/* Right: Schedule & Answer Key Actions */}
+                                  <div className="flex items-center gap-3 flex-wrap md:flex-nowrap">
+                                    {/* Schedule UnlocksAt Input */}
+                                    <div className="flex items-center gap-1.5">
+                                      <Clock className="w-3.5 h-3.5 text-text-secondary" />
+                                      <input
+                                        type="datetime-local"
+                                        defaultValue={formattedDate}
+                                        onBlur={(e) => handleUnlocksAtChange(paper, e.target.value)}
+                                        className="px-2.5 py-1.5 text-xs bg-secondary border border-border/80 rounded-lg text-text-primary focus:outline-none focus:border-accent"
+                                        title="Set scheduled unlock time for students"
+                                      />
+                                    </div>
+
+                                    {/* Answer Key Upload / View / Delete */}
+                                    {paper.answerKeyUrl ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <a
+                                          href={paper.answerKeyUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-colors"
+                                        >
+                                          <Key className="w-3.5 h-3.5" /> Key
+                                        </a>
+                                        <button
+                                          onClick={() => handleRemoveAnswerKey(paper.id)}
+                                          className="p-1.5 text-text-secondary hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                                          title="Remove Answer Key"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <label className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-border/80 bg-secondary hover:bg-secondary/80 text-text-primary cursor-pointer transition-colors">
+                                        <Key className="w-3.5 h-3.5 text-accent" />
+                                        Upload Key
+                                        <input
+                                          type="file"
+                                          accept="application/pdf"
+                                          onChange={(e) => handleAnswerKeyUpload(paper.id, e)}
+                                          className="hidden"
+                                        />
+                                      </label>
+                                    )}
+
+                                    {/* Delete Paper button */}
                                     <button
                                       onClick={() => setPaperToDelete(paper.id)}
-                                      className="p-1.5 text-text-secondary hover:text-rose-600 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
-                                      title="Delete Paper"
+                                      className="p-1.5 text-text-secondary hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                                      title="Delete Question Paper"
                                     >
                                       <Trash2 className="w-4 h-4" />
                                     </button>
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -618,118 +712,359 @@ export default function TestBatchDetailPage() {
         </div>
       )}
 
-      {/* ================= TAB 3: OMR SAMPLE SHEET ================= */}
-      {activeTab === 'omr' && (
-        <div className="bg-cardBg border border-border/80 rounded-2xl p-6 shadow-sm space-y-6">
-          <div>
-            <h2 className="text-lg font-bold text-text-primary">Sample Practice OMR Sheet</h2>
-            <p className="text-xs text-text-secondary mt-1">
-              Upload the sample OMR sheet template for students to download, print, and practice offline test bubbling.
-            </p>
+      {/* ================= TAB 2: ENROLLED STUDENTS ================= */}
+      {activeTab === 'enrollments' && (
+        <div className="space-y-6 w-full">
+          {/* Single Student Enrollment (Full Width) */}
+          <div className="p-6 bg-cardBg border border-border/80 rounded-2xl shadow-xs space-y-4 w-full">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <Users className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-bold text-text-primary">Enroll Individual Student</h3>
+            </div>
+
+            <form onSubmit={handleEnrollSingleStudent} className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-text-secondary absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    placeholder="Search student by name or email..."
+                    value={studentSearchTerm}
+                    onChange={(e) => setStudentSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 text-xs bg-secondary rounded-xl border border-border/80 focus:outline-none focus:border-accent"
+                  />
+                </div>
+
+                <select
+                  value={selectedStudentId}
+                  onChange={(e) => setSelectedStudentId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-secondary rounded-xl border border-border/80 focus:outline-none focus:border-accent"
+                >
+                  <option value="">-- Select Student to Enroll --</option>
+                  {filteredStudents.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.fullName || s.name || 'Unnamed Student'} ({s.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                disabled={enrollStudentMutation.isPending || !selectedStudentId}
+                className="w-full py-2.5 bg-primary text-white text-xs font-bold rounded-xl shadow-md shadow-primary/20 hover:bg-primary/90 disabled:opacity-50 transition-all cursor-pointer"
+              >
+                {enrollStudentMutation.isPending ? 'Enrolling...' : 'Enroll Student'}
+              </button>
+            </form>
           </div>
 
-          {batch.omrPdfUrl ? (
-            <div className="border border-border/80 rounded-2xl p-6 bg-secondary/30 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
-                  <FileSpreadsheet className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-text-primary">
-                    {batch.omrPdfName || 'Sample_OMR_Sheet.pdf'}
-                  </h4>
-                  <p className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    OMR template uploaded & ready for download
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <a
-                  href={batch.omrPdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 text-text-primary rounded-xl text-xs font-semibold border border-border/80 transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Preview OMR</span>
-                </a>
-
-                <label className="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-xs font-semibold transition-colors cursor-pointer">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Replace OMR</span>
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    onChange={handleOmrFileUpload}
-                    className="hidden"
-                  />
-                </label>
-
-                <button
-                  onClick={() => setIsDeletingOmr(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Remove</span>
-                </button>
-              </div>
+          {/* Enrolled Students Table */}
+          <div className="bg-cardBg border border-border/80 rounded-2xl overflow-hidden shadow-xs w-full">
+            <div className="p-5 border-b border-border/80 flex items-center justify-between">
+              <h3 className="text-base font-bold text-text-primary">
+                Enrolled Students ({enrollments.length})
+              </h3>
             </div>
-          ) : (
-            <div className="border-2 border-dashed border-border rounded-2xl p-12 text-center bg-secondary/20">
-              <FileSpreadsheet className="w-12 h-12 text-text-secondary opacity-40 mx-auto mb-3" />
-              <h3 className="text-sm font-bold text-text-primary">No Sample OMR Sheet Uploaded</h3>
-              <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1 mb-5">
-                Upload a printable OMR practice sheet template so students can simulate the exam hall environment.
+
+            {isEnrollmentsLoading ? (
+              <div className="p-8 text-center text-xs text-text-secondary">Loading enrollments...</div>
+            ) : enrollments.length === 0 ? (
+              <div className="p-12 text-center space-y-2">
+                <Users className="w-8 h-8 text-text-secondary/40 mx-auto" />
+                <p className="text-sm font-bold text-text-primary">No Students Enrolled</p>
+                <p className="text-xs text-text-secondary">
+                  Enroll students individually to grant access to this test batch.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-secondary/60 text-text-secondary uppercase font-semibold">
+                    <tr>
+                      <th className="px-6 py-3.5">Student Name</th>
+                      <th className="px-6 py-3.5">Email</th>
+                      <th className="px-6 py-3.5">Enrolled Date</th>
+                      <th className="px-6 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {enrollments.map((enr) => (
+                      <tr key={enr.id} className="hover:bg-secondary/30 transition-colors">
+                        <td className="px-6 py-4 font-bold text-text-primary">
+                          {enr.name || enr.student?.fullName || enr.student?.name || 'Unnamed Student'}
+                        </td>
+                        <td className="px-6 py-4 text-text-secondary">{enr.email || enr.student?.email || '-'}</td>
+                        <td className="px-6 py-4 text-text-secondary">
+                          {new Date(enr.enrolledAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={async () => {
+                              await removeEnrollmentMutation.mutateAsync({
+                                batchId: id,
+                                studentId: enr.studentId,
+                              });
+                              toast.success('Student removed from batch');
+                            }}
+                            className="p-1.5 text-text-secondary hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                            title="Remove Enrollment"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= TAB 3: OMR SUBMISSIONS ================= */}
+      {activeTab === 'omr' && (
+        <div className="space-y-6 w-full">
+          {/* Header & Student-Specific Cleanup */}
+          <div className="p-6 bg-cardBg border border-border/80 rounded-2xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-xs">
+            <div>
+              <h2 className="text-lg font-bold text-text-primary">Student OMR Practice Submissions</h2>
+              <p className="text-xs text-text-secondary">
+                View student uploaded answer sheets, recorded marks, or cleanup submissions for a particular student.
               </p>
-              <label className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-xs font-semibold rounded-xl shadow-md shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer">
-                <Upload className="w-4 h-4" />
-                <span>Upload Sample OMR PDF</span>
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleOmrFileUpload}
-                  className="hidden"
-                />
-              </label>
             </div>
-          )}
+
+            <button
+              onClick={() => {
+                setSelectedStudentForOmrCleanup('');
+                setCleanupConfirmText('');
+                setIsStudentCleanupModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-600 hover:bg-red-500/20 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+              Cleanup Student's OMRs
+            </button>
+          </div>
+
+          {/* Submissions Table */}
+          <div className="bg-cardBg border border-border/80 rounded-2xl overflow-hidden shadow-xs w-full">
+            {isOmrLoading ? (
+              <div className="p-8 text-center text-xs text-text-secondary">Loading submissions...</div>
+            ) : omrSubmissions.length === 0 ? (
+              <div className="p-12 text-center space-y-2">
+                <FileSpreadsheet className="w-8 h-8 text-text-secondary/40 mx-auto" />
+                <p className="text-sm font-bold text-text-primary">No OMR Sheets Submitted Yet</p>
+                <p className="text-xs text-text-secondary">
+                  When enrolled students submit their shaded OMR practice sheets, they will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-secondary/60 text-text-secondary uppercase font-semibold">
+                    <tr>
+                      <th className="px-6 py-3.5">Student</th>
+                      <th className="px-6 py-3.5">Question Paper</th>
+                      <th className="px-6 py-3.5">Submitted OMR PDF</th>
+                      <th className="px-6 py-3.5">Marks Obtained</th>
+                      <th className="px-6 py-3.5">Submitted At</th>
+                      <th className="px-6 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {omrSubmissions.map((sub) => (
+                      <tr key={sub.id} className="hover:bg-secondary/30 transition-colors">
+                        <td className="px-6 py-4 font-bold text-text-primary">
+                          {sub.studentName || sub.student?.fullName || sub.student?.name || 'Student'}
+                          <span className="block font-normal text-[11px] text-text-secondary">
+                            {sub.studentEmail || sub.student?.email || ''}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-text-primary font-medium">
+                          {sub.paperTitle || sub.paper?.title || 'Unknown Paper'}
+                          {sub.categoryName && (
+                            <span className="block text-[11px] text-text-secondary">
+                              {sub.categoryName}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <a
+                            href={sub.omrFileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 text-primary hover:underline font-semibold"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            {sub.omrFileName || 'View OMR PDF'}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-text-primary">
+                          {sub.totalMarks !== null && sub.totalMarks !== undefined ? (
+                            <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 font-bold">
+                              {sub.totalMarks} Marks
+                            </span>
+                          ) : (
+                            <span className="text-text-secondary italic">Not recorded</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-text-secondary">
+                          {new Date(sub.submittedAt).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => setSubmissionToDelete(sub)}
+                            className="p-1.5 text-text-secondary hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                            title="Delete this OMR Submission"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* ================= MODALS ================= */}
 
-      {/* Add / Edit Category Modal */}
+      {/* Student-Specific OMR Cleanup Modal */}
+      {isStudentCleanupModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-cardBg border border-border/80 rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-scale-up">
+            <div className="px-6 py-4 border-b border-border/80 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-red-500">
+                <AlertTriangle className="w-5 h-5" />
+                <h3 className="text-base font-bold text-text-primary">Cleanup Student's OMRs</h3>
+              </div>
+              <button
+                onClick={() => setIsStudentCleanupModalOpen(false)}
+                className="text-text-secondary hover:text-text-primary p-1 rounded-lg hover:bg-secondary cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleStudentCleanupSubmit} className="p-6 space-y-4">
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Select a student to <strong className="text-red-500">permanently delete all their OMR submissions</strong> from AWS S3 and the database for this test batch.
+              </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary uppercase mb-1.5">
+                  Select Enrolled Student *
+                </label>
+                <select
+                  required
+                  value={selectedStudentForOmrCleanup}
+                  onChange={(e) => setSelectedStudentForOmrCleanup(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-secondary rounded-xl border border-border/80 focus:outline-none focus:border-red-500"
+                >
+                  <option value="">-- Select Student --</option>
+                  {enrollments.map((enr) => (
+                    <option key={enr.studentId} value={enr.studentId}>
+                      {enr.name || enr.student?.fullName || enr.student?.name || 'Student'} ({enr.email || enr.student?.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="p-3 bg-red-500/5 rounded-xl border border-red-500/20 text-xs text-red-600">
+                Please type <strong className="underline">CONFIRM</strong> below to authorize deletion:
+              </div>
+
+              <input
+                type="text"
+                required
+                placeholder="Type CONFIRM"
+                value={cleanupConfirmText}
+                onChange={(e) => setCleanupConfirmText(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-sm bg-secondary rounded-xl border border-border/80 focus:border-red-500 focus:outline-none uppercase font-bold tracking-wider text-center"
+              />
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/80">
+                <button
+                  type="button"
+                  onClick={() => setIsStudentCleanupModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text-primary rounded-xl hover:bg-secondary cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    deleteStudentBatchOmrMutation.isPending ||
+                    !selectedStudentForOmrCleanup ||
+                    cleanupConfirmText.trim().toUpperCase() !== 'CONFIRM'
+                  }
+                  className="px-5 py-2.5 bg-red-600 text-white text-xs font-bold rounded-xl shadow-md shadow-red-600/20 hover:bg-red-700 disabled:opacity-40 cursor-pointer transition-all"
+                >
+                  {deleteStudentBatchOmrMutation.isPending ? 'Cleaning up...' : 'Delete Student Submissions'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Single OMR Submission Modal */}
+      {submissionToDelete && (
+        <ConfirmModal
+          isOpen={Boolean(submissionToDelete)}
+          title="Delete OMR Submission"
+          message={`Are you sure you want to permanently delete the OMR submission for ${
+            submissionToDelete.studentName || submissionToDelete.student?.name || 'this student'
+          } on "${submissionToDelete.paperTitle || submissionToDelete.paper?.title || 'this paper'}"?`}
+          confirmText="Delete Submission"
+          cancelText="Cancel"
+          type="danger"
+          onConfirm={async () => {
+            await deleteOmrSubmissionMutation.mutateAsync({
+              submissionId: submissionToDelete.id,
+              batchId: id,
+            });
+            setSubmissionToDelete(null);
+            toast.success('OMR submission deleted permanently');
+          }}
+          onClose={() => setSubmissionToDelete(null)}
+          isLoading={deleteOmrSubmissionMutation.isPending}
+        />
+      )}
+
+      {/* Create / Edit Category Modal */}
       {isCategoryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-cardBg border border-border/80 rounded-2xl w-full max-w-lg shadow-xl overflow-hidden animate-scale-up">
+          <div className="bg-cardBg border border-border/80 rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-scale-up">
             <div className="px-6 py-4 border-b border-border/80 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <h3 className="text-lg font-bold text-text-primary">
-                  {editingCategory ? 'Edit Question Category' : 'Create Question Category'}
-                </h3>
-              </div>
+              <h3 className="text-base font-bold text-text-primary">
+                {editingCategory ? 'Edit Question Category' : 'Create Question Category'}
+              </h3>
               <button
                 onClick={() => setIsCategoryModalOpen(false)}
                 className="text-text-secondary hover:text-text-primary p-1 rounded-lg hover:bg-secondary cursor-pointer"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleCategorySubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-text-secondary uppercase mb-1.5">
-                  Category Name *
+                  Category / Unit Name *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Unit 8: History, Culture & Socio-Political Movements"
+                  placeholder="e.g. Unit 1: Tamil Society & History"
                   value={categoryName}
                   onChange={(e) => setCategoryName(e.target.value)}
                   className="w-full px-3.5 py-2.5 text-sm bg-secondary rounded-xl border border-border/80 focus:border-accent focus:outline-none"
@@ -738,26 +1073,14 @@ export default function TestBatchDetailPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-text-secondary uppercase mb-1.5">
-                  Sort Order
-                </label>
-                <input
-                  type="number"
-                  value={categoryOrder}
-                  onChange={(e) => setCategoryOrder(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-secondary rounded-xl border border-border/80 focus:border-accent focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary uppercase mb-1.5">
-                  Syllabus Details
+                  Syllabus Covered (Optional)
                 </label>
                 <textarea
-                  rows={4}
-                  placeholder="Enter detailed syllabus units, key topics, reference books..."
+                  rows={3}
+                  placeholder="e.g. Topics covering Sangam literature, architecture, and political movements..."
                   value={categorySyllabus}
                   onChange={(e) => setCategorySyllabus(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-secondary rounded-xl border border-border/80 focus:border-accent focus:outline-none resize-none"
+                  className="w-full px-3.5 py-2.5 text-sm bg-secondary rounded-xl border border-border/80 focus:border-accent focus:outline-none"
                 />
               </div>
 
@@ -816,7 +1139,7 @@ export default function TestBatchDetailPage() {
                 onClick={() => setIsPaperModalOpen(false)}
                 className="text-text-secondary hover:text-text-primary p-1 rounded-lg hover:bg-secondary cursor-pointer"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
@@ -904,44 +1227,6 @@ export default function TestBatchDetailPage() {
           }}
           onClose={() => setPaperToDelete(null)}
           isLoading={deletePaperMutation.isPending}
-        />
-      )}
-
-      {/* Delete Schedule Modal */}
-      {isDeletingSchedule && (
-        <ConfirmModal
-          isOpen={isDeletingSchedule}
-          title="Remove Schedule PDF"
-          message="Are you sure you want to remove the schedule PDF for this test batch?"
-          confirmText="Remove Schedule"
-          cancelText="Cancel"
-          type="danger"
-          onConfirm={async () => {
-            await removeScheduleMutation.mutateAsync(id);
-            setIsDeletingSchedule(false);
-            toast.success('Schedule PDF removed');
-          }}
-          onClose={() => setIsDeletingSchedule(false)}
-          isLoading={removeScheduleMutation.isPending}
-        />
-      )}
-
-      {/* Delete OMR Modal */}
-      {isDeletingOmr && (
-        <ConfirmModal
-          isOpen={isDeletingOmr}
-          title="Remove Sample OMR PDF"
-          message="Are you sure you want to remove the sample OMR sheet PDF for this test batch?"
-          confirmText="Remove OMR"
-          cancelText="Cancel"
-          type="danger"
-          onConfirm={async () => {
-            await removeOmrMutation.mutateAsync(id);
-            setIsDeletingOmr(false);
-            toast.success('Sample OMR PDF removed');
-          }}
-          onClose={() => setIsDeletingOmr(false)}
-          isLoading={removeOmrMutation.isPending}
         />
       )}
     </div>

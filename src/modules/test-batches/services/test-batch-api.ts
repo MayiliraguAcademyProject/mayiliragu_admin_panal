@@ -1,11 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../core/api/client';
-import type { TestBatch, TestBatchQuestionCategory, TestBatchQuestionPaper } from '../types';
+import type {
+  TestBatch,
+  TestBatchQuestionCategory,
+  TestBatchQuestionPaper,
+  TestBatchEnrollment,
+  TestBatchOmrSubmissionItem,
+  BulkCleanupOmrResult,
+} from '../types';
 
 export const testBatchKeys = {
   all: ['test-batches'] as const,
   lists: () => [...testBatchKeys.all, 'list'] as const,
   detail: (id: string) => [...testBatchKeys.all, 'detail', id] as const,
+  enrollments: (id: string) => [...testBatchKeys.all, 'enrollments', id] as const,
+  omrSubmissions: (id: string) => [...testBatchKeys.all, 'omrSubmissions', id] as const,
 };
 
 // ================= FETCH BATCHES ================= //
@@ -278,6 +287,34 @@ export function useUploadQuestionPaper() {
   });
 }
 
+export function useUpdateQuestionPaper() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      paperId,
+      batchId,
+      ...data
+    }: {
+      paperId: string;
+      batchId: string;
+      title?: string;
+      order?: number;
+      isEnabled?: boolean;
+      unlocksAt?: string | null;
+      answerKeyUrl?: string | null;
+    }) => {
+      const response = await apiClient.put<{ status: string; data: TestBatchQuestionPaper }>(
+        `/test-batches/question-papers/${paperId}`,
+        data
+      );
+      return response.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.detail(variables.batchId) });
+    },
+  });
+}
+
 export function useDeleteQuestionPaper() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -286,6 +323,175 @@ export function useDeleteQuestionPaper() {
       return response.data;
     },
     onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.detail(variables.batchId) });
+    },
+  });
+}
+
+// ================= ANSWER KEYS ================= //
+
+export function useUploadAnswerKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      paperId,
+      file,
+    }: {
+      paperId: string;
+      batchId: string;
+      file: File;
+    }) => {
+      const formData = new FormData();
+      formData.append('pdf', file);
+      const response = await apiClient.post<{ status: string; data: TestBatchQuestionPaper }>(
+        `/test-batches/question-papers/${paperId}/answer-key`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      return response.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.detail(variables.batchId) });
+    },
+  });
+}
+
+export function useRemoveAnswerKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ paperId }: { paperId: string; batchId: string }) => {
+      const response = await apiClient.delete<{ status: string; data: TestBatchQuestionPaper }>(
+        `/test-batches/question-papers/${paperId}/answer-key`
+      );
+      return response.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.detail(variables.batchId) });
+    },
+  });
+}
+
+// ================= BATCH ENROLLMENTS ================= //
+
+export function useBatchEnrollments(batchId: string) {
+  return useQuery({
+    queryKey: testBatchKeys.enrollments(batchId),
+    queryFn: async () => {
+      const response = await apiClient.get<{ status: string; data: TestBatchEnrollment[] }>(
+        `/test-batches/${batchId}/enrollments`
+      );
+      return response.data.data;
+    },
+    enabled: Boolean(batchId),
+  });
+}
+
+export function useEnrollStudent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ batchId, studentId }: { batchId: string; studentId: string }) => {
+      const response = await apiClient.post<{ status: string; data: TestBatchEnrollment }>(
+        `/test-batches/${batchId}/enrollments`,
+        { studentId }
+      );
+      return response.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.enrollments(variables.batchId) });
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.detail(variables.batchId) });
+    },
+  });
+}
+
+export function useBulkEnrollFromCourse() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ batchId, courseId }: { batchId: string; courseId: string }) => {
+      const response = await apiClient.post<{
+        status: string;
+        data: { enrolledCount: number; totalCourseStudents: number };
+      }>(`/test-batches/${batchId}/enrollments/bulk`, { courseId });
+      return response.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.enrollments(variables.batchId) });
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.detail(variables.batchId) });
+    },
+  });
+}
+
+export function useRemoveEnrollment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ batchId, studentId }: { batchId: string; studentId: string }) => {
+      const response = await apiClient.delete(`/test-batches/${batchId}/enrollments/${studentId}`);
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.enrollments(variables.batchId) });
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.detail(variables.batchId) });
+    },
+  });
+}
+
+// ================= BATCH OMR SUBMISSIONS & BULK CLEANUP ================= //
+
+export function useBatchOmrSubmissions(batchId: string) {
+  return useQuery({
+    queryKey: testBatchKeys.omrSubmissions(batchId),
+    queryFn: async () => {
+      const response = await apiClient.get<{ status: string; data: TestBatchOmrSubmissionItem[] }>(
+        `/test-batches/${batchId}/omr-submissions`
+      );
+      return response.data.data;
+    },
+    enabled: Boolean(batchId),
+  });
+}
+
+export function useBulkDeleteOmrSubmissions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (batchId: string) => {
+      const response = await apiClient.delete<{ status: string; data: BulkCleanupOmrResult }>(
+        `/test-batches/${batchId}/omr-submissions/bulk`
+      );
+      return response.data.data;
+    },
+    onSuccess: (_, batchId) => {
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.omrSubmissions(batchId) });
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.detail(batchId) });
+    },
+  });
+}
+
+export function useDeleteOmrSubmission() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ submissionId }: { submissionId: string; batchId: string }) => {
+      const response = await apiClient.delete<{ status: string; message: string }>(
+        `/test-batches/omr-submissions/${submissionId}`
+      );
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.omrSubmissions(variables.batchId) });
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.detail(variables.batchId) });
+    },
+  });
+}
+
+export function useDeleteStudentBatchOmrSubmissions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ batchId, studentId }: { batchId: string; studentId: string }) => {
+      const response = await apiClient.delete<{ status: string; data: BulkCleanupOmrResult }>(
+        `/test-batches/${batchId}/students/${studentId}/omr-submissions`
+      );
+      return response.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: testBatchKeys.omrSubmissions(variables.batchId) });
       queryClient.invalidateQueries({ queryKey: testBatchKeys.detail(variables.batchId) });
     },
   });

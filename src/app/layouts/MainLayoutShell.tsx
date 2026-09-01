@@ -86,7 +86,12 @@ export default function MainLayoutShell() {
         {paths.map((p, idx) => {
           const routeTo = `/${paths.slice(0, idx + 1).join('/')}`;
           const isLast = idx === paths.length - 1;
-          const displayLabel = p.charAt(0).toUpperCase() + p.slice(1).replace('-', ' ');
+          const isUuidOrId =
+            /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(p) ||
+            p.length > 20;
+          const displayLabel = isUuidOrId
+            ? 'Detail'
+            : p.charAt(0).toUpperCase() + p.slice(1).replace(/-/g, ' ');
           return (
             <React.Fragment key={p}>
               <ChevronRight className="w-3.5 h-3.5 opacity-60" />
