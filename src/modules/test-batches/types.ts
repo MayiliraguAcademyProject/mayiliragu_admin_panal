@@ -5,6 +5,8 @@ export interface TestBatchQuestionPaper {
   fileUrl: string;
   fileName: string;
   fileSize?: number;
+  unlocksAt?: string | null;
+  answerKeyUrl?: string | null;
   order: number;
   isEnabled: boolean;
   createdAt: string;
@@ -21,6 +23,52 @@ export interface TestBatchQuestionCategory {
   createdAt: string;
   updatedAt: string;
   questionPapers: TestBatchQuestionPaper[];
+}
+
+export interface TestBatchEnrollment {
+  id: string;
+  batchId: string;
+  studentId: string;
+  name?: string;
+  email?: string;
+  student?: {
+    id: string;
+    name?: string;
+    fullName?: string;
+    email: string;
+  };
+  enrolledAt: string;
+}
+
+export interface TestBatchOmrSubmissionItem {
+  id: string;
+  paperId: string;
+  studentId: string;
+  studentName?: string;
+  studentEmail?: string;
+  paperTitle?: string;
+  categoryName?: string;
+  student?: {
+    id: string;
+    name?: string;
+    fullName?: string;
+    email: string;
+  };
+  paper?: {
+    id: string;
+    title: string;
+  };
+  omrFileUrl: string;
+  omrFileName: string;
+  totalMarks?: number | null;
+  submittedAt: string;
+  updatedAt: string;
+}
+
+export interface BulkCleanupOmrResult {
+  deleted: number;
+  message?: string;
+  warnings?: string[];
 }
 
 export interface TestBatch {
