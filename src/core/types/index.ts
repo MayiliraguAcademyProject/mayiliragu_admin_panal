@@ -97,6 +97,7 @@ export interface Student {
   name: string;
   email: string;
   createdAt: string;
+  profile?: StudentProfile;
 }
 
 export interface StudentPayment {
@@ -185,6 +186,7 @@ export interface StudentProfile {
   admissionDate?: string;
   batchName?: string;
   batchTiming?: string;
+  batchType?: 'REGULAR' | 'WEEKEND' | 'EVENING';
   courseDuration?: string;
   facultyAssigned?: string;
   courseFee?: number;
