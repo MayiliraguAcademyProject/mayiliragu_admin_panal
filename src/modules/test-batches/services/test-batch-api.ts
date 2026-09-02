@@ -262,17 +262,20 @@ export function useUploadQuestionPaper() {
       file,
       title,
       order,
+      answerKeyFile,
     }: {
       categoryId: string;
       batchId: string;
       file: File;
       title: string;
       order?: number;
+      answerKeyFile?: File | null;
     }) => {
       const formData = new FormData();
       formData.append('pdf', file);
       formData.append('title', title);
       if (order !== undefined) formData.append('order', String(order));
+      if (answerKeyFile) formData.append('answerKeyPdf', answerKeyFile);
 
       const response = await apiClient.post<{ status: string; data: TestBatchQuestionPaper }>(
         `/test-batches/categories/${categoryId}/question-papers`,

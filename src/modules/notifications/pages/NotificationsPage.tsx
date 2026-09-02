@@ -54,13 +54,19 @@ interface Student {
   email: string;
 }
 
+const BATCH_TYPE_OPTIONS = [
+  { value: 'REGULAR', label: 'Regular Batch (Weekday Full-Time)' },
+  { value: 'WEEKEND', label: 'Weekend Batch (Saturday & Sunday)' },
+  { value: 'EVENING', label: 'Evening Batch (Weekday Evenings)' },
+];
+
 export default function NotificationsPage() {
   const toast = useToast();
   // Form State
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [targetGroup, setTargetGroup] = useState<'ALL' | 'COURSE' | 'INDIVIDUAL'>('ALL');
+  const [targetGroup, setTargetGroup] = useState<'ALL' | 'COURSE' | 'BATCH' | 'INDIVIDUAL'>('ALL');
   const [targetValue, setTargetValue] = useState('');
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
@@ -79,7 +85,7 @@ export default function NotificationsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editBody, setEditBody] = useState('');
-  const [editTargetGroup, setEditTargetGroup] = useState<'ALL' | 'COURSE' | 'INDIVIDUAL'>('ALL');
+  const [editTargetGroup, setEditTargetGroup] = useState<'ALL' | 'COURSE' | 'BATCH' | 'INDIVIDUAL'>('ALL');
   const [editTargetValue, setEditTargetValue] = useState('');
   const [editScheduledAt, setEditScheduledAt] = useState('');
   const [editSubmitLoading, setEditSubmitLoading] = useState(false);
@@ -273,7 +279,9 @@ export default function NotificationsPage() {
     }
 
     if (editingCampaign.status === 'PENDING' && editTargetGroup !== 'ALL' && !editTargetValue) {
-      toast.error(editTargetGroup === 'COURSE' ? 'Please select a target course.' : 'Please select a target student.');
+      if (editTargetGroup === 'COURSE') toast.error('Please select a target course.');
+      else if (editTargetGroup === 'BATCH') toast.error('Please select a target batch.');
+      else toast.error('Please select a target student.');
       return;
     }
 
@@ -462,8 +470,8 @@ export default function NotificationsPage() {
               <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider mb-2">
                 Target Audience Group
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['ALL', 'COURSE', 'INDIVIDUAL'] as const).map((group) => (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(['ALL', 'COURSE', 'BATCH', 'INDIVIDUAL'] as const).map((group) => (
                   <button
                     key={group}
                     type="button"
@@ -478,12 +486,34 @@ export default function NotificationsPage() {
                   >
                     {group === 'ALL' && <Users className="w-4 h-4" />}
                     {group === 'COURSE' && <GraduationCap className="w-4 h-4" />}
+                    {group === 'BATCH' && <Calendar className="w-4 h-4" />}
                     {group === 'INDIVIDUAL' && <User className="w-4 h-4" />}
-                    <span>{group === 'ALL' ? 'All Students' : group === 'COURSE' ? 'Course-wise' : 'Individual'}</span>
+                    <span>{group === 'ALL' ? 'All Students' : group === 'COURSE' ? 'Course-wise' : group === 'BATCH' ? 'Batch-wise' : 'Individual'}</span>
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* Target Value Input Dropdowns */}
+            {targetGroup === 'BATCH' && (
+              <div>
+                <label className="block text-xs font-extrabold text-text-primary uppercase tracking-wider mb-1.5">
+                  Select Target Batch *
+                </label>
+                <select
+                  value={targetValue}
+                  onChange={(e) => setTargetValue(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-border/90 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent text-sm bg-cardBg text-text-primary font-semibold"
+                >
+                  <option value="">-- Choose Batch --</option>
+                  {BATCH_TYPE_OPTIONS.map((b) => (
+                    <option key={b.value} value={b.value}>
+                      {b.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Target Value Input Dropdowns */}
             {targetGroup === 'COURSE' && (
@@ -617,7 +647,11 @@ export default function NotificationsPage() {
                       </td>
                       <td className="py-3.5 px-2 whitespace-nowrap">
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-secondary-container text-text-primary capitalize">
-                          {camp.targetGroup === 'COURSE' || camp.targetGroup === 'BATCH' ? 'Course' : camp.targetGroup.toLowerCase()}
+                          {camp.targetGroup === 'BATCH'
+                            ? `Batch: ${camp.targetValue || 'All'}`
+                            : camp.targetGroup === 'COURSE'
+                            ? 'Course'
+                            : camp.targetGroup.toLowerCase()}
                         </span>
                       </td>
                       <td className="py-3.5 px-2 text-xs text-text-secondary font-medium whitespace-nowrap">
@@ -761,7 +795,7 @@ export default function NotificationsPage() {
                     <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
                       Target Audience
                     </label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <button
                         type="button"
                         onClick={() => {
@@ -795,6 +829,21 @@ export default function NotificationsPage() {
                       <button
                         type="button"
                         onClick={() => {
+                          setEditTargetGroup('BATCH');
+                          setEditTargetValue('');
+                        }}
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center space-y-1 transition-all ${editTargetGroup === 'BATCH'
+                            ? 'bg-accent/10 border-accent text-accent'
+                            : 'border-border/80 text-text-secondary hover:border-border'
+                          }`}
+                      >
+                        <Calendar className="w-4 h-4" />
+                        <span>Batch</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
                           setEditTargetGroup('INDIVIDUAL');
                           setEditTargetValue('');
                         }}
@@ -808,6 +857,26 @@ export default function NotificationsPage() {
                       </button>
                     </div>
                   </div>
+
+                  {editTargetGroup === 'BATCH' && (
+                    <div className="animate-fade-in">
+                      <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+                        Select Batch
+                      </label>
+                      <select
+                        value={editTargetValue}
+                        onChange={(e) => setEditTargetValue(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-background-end rounded-xl border border-border/80 text-sm focus:outline-none focus:border-accent text-text-primary font-semibold"
+                      >
+                        <option value="">-- Choose a batch --</option>
+                        {BATCH_TYPE_OPTIONS.map((b) => (
+                          <option key={b.value} value={b.value}>
+                            {b.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {editTargetGroup === 'COURSE' && (
                     <div className="animate-fade-in">

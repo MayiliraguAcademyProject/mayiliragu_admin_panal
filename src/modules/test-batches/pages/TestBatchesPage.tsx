@@ -69,6 +69,7 @@ export default function TestBatchesPage() {
   const [targetCategoryId, setTargetCategoryId] = useState<string | null>(null);
   const [paperTitle, setPaperTitle] = useState('');
   const [paperFile, setPaperFile] = useState<File | null>(null);
+  const [answerKeyFile, setAnswerKeyFile] = useState<File | null>(null);
 
   // Delete Modals inside Side Screen
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
@@ -282,9 +283,11 @@ export default function TestBatchesPage() {
         batchId: selectedBatchId,
         file: paperFile,
         title: paperTitle.trim() || paperFile.name,
+        answerKeyFile,
       });
       toast.success('Question paper PDF uploaded successfully!');
       setIsPaperModalOpen(false);
+      setAnswerKeyFile(null);
       setExpandedCategories((prev) => ({ ...prev, [targetCategoryId]: true }));
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to upload question paper');
@@ -1216,7 +1219,7 @@ export default function TestBatchesPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-text-secondary uppercase mb-1.5">
-                  PDF File *
+                  Question Paper PDF *
                 </label>
                 <input
                   type="file"
@@ -1225,6 +1228,32 @@ export default function TestBatchesPage() {
                   onChange={(e) => setPaperFile(e.target.files?.[0] || null)}
                   className="w-full text-xs text-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 cursor-pointer"
                 />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-text-secondary uppercase">
+                    Answer Key PDF (Optional)
+                  </label>
+                  {answerKeyFile && (
+                    <button
+                      type="button"
+                      onClick={() => setAnswerKeyFile(null)}
+                      className="text-[11px] text-red-500 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" /> Remove Key
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => setAnswerKeyFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
+                />
+                <p className="text-[11px] text-text-secondary/70 mt-1">
+                  Optionally attach the answer key. It will automatically unlock for students after they submit their test score or OMR.
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/80">
