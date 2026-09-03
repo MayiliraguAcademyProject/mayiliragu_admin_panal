@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  Clock,
   FileSpreadsheet,
   FileText,
   Plus,
@@ -16,22 +15,23 @@ import {
   Users,
   Key,
   AlertTriangle,
-  Lock,
-  Unlock,
   X,
   Search,
   Home,
   ChevronRight,
+  Upload,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import RefreshButton from '../../../shared/components/RefreshButton';
 import {
   useTestBatchDetail,
   useCreateCategory,
   useUpdateCategory,
+  useToggleCategoryStatus,
   useDeleteCategory,
   useUploadQuestionPaper,
   useDeleteQuestionPaper,
-  useUpdateQuestionPaper,
   useUploadAnswerKey,
   useRemoveAnswerKey,
   useBatchEnrollments,
@@ -45,7 +45,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../../core/api/client';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
 import { useToast } from '../../../shared/context';
-import type { TestBatchQuestionCategory, TestBatchQuestionPaper, TestBatchOmrSubmissionItem } from '../types';
+import type { TestBatchQuestionCategory, TestBatchOmrSubmissionItem } from '../types';
 
 export default function TestBatchDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -121,6 +121,7 @@ export default function TestBatchDetailPage() {
   const [selectedCategoryIdForPaper, setSelectedCategoryIdForPaper] = useState<string | null>(null);
   const [paperTitle, setPaperTitle] = useState('');
   const [paperFile, setPaperFile] = useState<File | null>(null);
+  const [answerKeyFile, setAnswerKeyFile] = useState<File | null>(null);
 
   // Expanded Categories Map
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
@@ -148,7 +149,7 @@ export default function TestBatchDetailPage() {
 
   const uploadPaperMutation = useUploadQuestionPaper();
   const deletePaperMutation = useDeleteQuestionPaper();
-  const updatePaperMutation = useUpdateQuestionPaper();
+  const toggleCategoryStatusMutation = useToggleCategoryStatus();
   const uploadAnswerKeyMutation = useUploadAnswerKey();
   const removeAnswerKeyMutation = useRemoveAnswerKey();
 
@@ -162,6 +163,18 @@ export default function TestBatchDetailPage() {
       ...prev,
       [categoryId]: !prev[categoryId],
     }));
+  };
+
+  const handleToggleCategory = async (cat: TestBatchQuestionCategory) => {
+    try {
+      await toggleCategoryStatusMutation.mutateAsync({
+        categoryId: cat.id,
+        batchId: id,
+      });
+      toast.success(`Category ${!cat.isEnabled ? 'enabled' : 'disabled'} successfully`);
+    } catch {
+      toast.error('Failed to update category status');
+    }
   };
 
   const handleOpenCreateCategory = () => {
@@ -216,6 +229,7 @@ export default function TestBatchDetailPage() {
     setSelectedCategoryIdForPaper(categoryId);
     setPaperTitle('');
     setPaperFile(null);
+    setAnswerKeyFile(null);
     setIsPaperModalOpen(true);
   };
 
@@ -237,6 +251,7 @@ export default function TestBatchDetailPage() {
         categoryId: selectedCategoryIdForPaper,
         title: paperTitle.trim(),
         file: paperFile,
+        answerKeyFile,
       });
       toast.success('Question paper uploaded successfully');
       setIsPaperModalOpen(false);
@@ -263,19 +278,6 @@ export default function TestBatchDetailPage() {
       toast.success('Answer key removed');
     } catch {
       toast.error('Failed to remove answer key');
-    }
-  };
-
-  const handleUnlocksAtChange = async (paper: TestBatchQuestionPaper, dateValue: string) => {
-    try {
-      await updatePaperMutation.mutateAsync({
-        paperId: paper.id,
-        batchId: id,
-        unlocksAt: dateValue ? new Date(dateValue).toISOString() : null,
-      });
-      toast.success(dateValue ? 'Unlock schedule updated' : 'Unlock schedule cleared (immediately visible)');
-    } catch {
-      toast.error('Failed to update unlock schedule');
     }
   };
 
@@ -481,7 +483,7 @@ export default function TestBatchDetailPage() {
             <div>
               <h2 className="text-lg font-bold text-text-primary">Categories & Question Papers</h2>
               <p className="text-xs text-text-secondary">
-                Organize tests into units/modules, set schedule unlock timers, and upload answer keys.
+                Organize tests into units/modules, manage sequential order, and upload answer keys.
               </p>
             </div>
 
@@ -500,7 +502,7 @@ export default function TestBatchDetailPage() {
               <BookOpen className="w-10 h-10 text-text-secondary/40 mx-auto" />
               <h3 className="text-base font-bold text-text-primary">No Categories Added Yet</h3>
               <p className="text-xs text-text-secondary max-w-md mx-auto">
-                Create unit categories (e.g. "Unit 1: Tamil Society", "General Science") to start uploading scheduled mock test papers.
+                Create unit categories (e.g. "Unit 1: Tamil Society", "General Science") to start uploading sequential mock test papers.
               </p>
               <button
                 onClick={handleOpenCreateCategory}
@@ -531,43 +533,53 @@ export default function TestBatchDetailPage() {
                           <div className="flex items-center gap-2.5">
                             <h3 className="text-base font-bold text-text-primary">{cat.name}</h3>
                             {!cat.isEnabled && (
-                              <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                              <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-500/10 text-red-500 border border-red-500/20">
                                 Disabled
                               </span>
                             )}
                           </div>
                           <p className="text-xs text-text-secondary mt-0.5">
-                            {cat.questionPapers?.length || 0} Question {cat.questionPapers?.length === 1 ? 'Paper' : 'Papers'}
+                            {cat.questionPapers?.length || 0} Test Papers • Order: #{cat.order}
                           </p>
                         </div>
                       </div>
 
-                      {/* Category Action buttons */}
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleOpenUploadPaper(cat.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors cursor-pointer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary hover:bg-secondary/80 text-text-primary text-xs font-semibold rounded-lg border border-border/80 transition-colors cursor-pointer"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          Add Paper
+                          <Upload className="w-3.5 h-3.5 text-primary" />
+                          <span className="hidden sm:inline">Upload Test PDF</span>
+                        </button>
+                        <button
+                          onClick={() => handleToggleCategory(cat)}
+                          className="p-2 text-text-secondary hover:text-text-primary rounded-lg hover:bg-secondary transition-colors cursor-pointer"
+                          title={cat.isEnabled ? 'Disable Category' : 'Enable Category'}
+                        >
+                          {cat.isEnabled ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-amber-500" />
+                          )}
                         </button>
                         <button
                           onClick={() => handleOpenEditCategory(cat)}
-                          className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-secondary transition-colors cursor-pointer"
+                          className="p-2 text-text-secondary hover:text-primary rounded-lg hover:bg-secondary transition-colors cursor-pointer"
                           title="Edit Category"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setCategoryToDelete(cat.id)}
-                          className="p-1.5 text-text-secondary hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                          className="p-2 text-text-secondary hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
                           title="Delete Category"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => toggleCategory(cat.id)}
-                          className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-secondary transition-colors cursor-pointer"
+                          className="p-2 text-text-secondary hover:text-text-primary rounded-lg hover:bg-secondary transition-colors cursor-pointer ml-1"
                         >
                           {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </button>
@@ -576,7 +588,7 @@ export default function TestBatchDetailPage() {
 
                     {/* Category Details & Question Papers */}
                     {isExpanded && (
-                      <div className="px-6 pb-6 pt-2 border-t border-border/80 space-y-4">
+                      <div className="p-5 border-t border-border/80 bg-secondary/20 space-y-4">
                         {/* Syllabus section */}
                         {cat.syllabus && (
                           <div className="p-4 bg-secondary/50 rounded-xl border border-border/60 text-xs text-text-secondary space-y-1">
@@ -592,18 +604,13 @@ export default function TestBatchDetailPage() {
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            {cat.questionPapers.map((paper) => {
-                              const isLocked = paper.unlocksAt && new Date(paper.unlocksAt) > new Date();
-                              const formattedDate = paper.unlocksAt
-                                ? new Date(paper.unlocksAt).toISOString().slice(0, 16)
-                                : '';
-
+                            {cat.questionPapers.map((paper, paperIdx) => {
                               return (
                                 <div
                                   key={paper.id}
                                   className="p-4 bg-cardBg border border-border/70 rounded-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:border-border transition-all"
                                 >
-                                  {/* Left: Info & Lock Status */}
+                                  {/* Left: Info */}
                                   <div className="flex items-start gap-3 flex-1 min-w-0">
                                     <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
                                       <FileText className="w-4 h-4" />
@@ -613,17 +620,9 @@ export default function TestBatchDetailPage() {
                                         <h4 className="text-sm font-bold text-text-primary truncate">
                                           {paper.title}
                                         </h4>
-                                        {isLocked ? (
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/30">
-                                            <Lock className="w-3 h-3" />
-                                            Scheduled Lock
-                                          </span>
-                                        ) : (
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
-                                            <Unlock className="w-3 h-3" />
-                                            Unlocked
-                                          </span>
-                                        )}
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary/10 text-primary border border-primary/20">
+                                          Test #{paperIdx + 1}
+                                        </span>
                                       </div>
                                       <div className="flex items-center gap-3 text-xs text-text-secondary mt-1">
                                         <span className="truncate">{paper.fileName}</span>
@@ -642,20 +641,8 @@ export default function TestBatchDetailPage() {
                                     </div>
                                   </div>
 
-                                  {/* Right: Schedule & Answer Key Actions */}
+                                  {/* Right: Answer Key Actions */}
                                   <div className="flex items-center gap-3 flex-wrap md:flex-nowrap">
-                                    {/* Schedule UnlocksAt Input */}
-                                    <div className="flex items-center gap-1.5">
-                                      <Clock className="w-3.5 h-3.5 text-text-secondary" />
-                                      <input
-                                        type="datetime-local"
-                                        defaultValue={formattedDate}
-                                        onBlur={(e) => handleUnlocksAtChange(paper, e.target.value)}
-                                        className="px-2.5 py-1.5 text-xs bg-secondary border border-border/80 rounded-lg text-text-primary focus:outline-none focus:border-accent"
-                                        title="Set scheduled unlock time for students"
-                                      />
-                                    </div>
-
                                     {/* Answer Key Upload / View / Delete */}
                                     {paper.answerKeyUrl ? (
                                       <div className="flex items-center gap-1.5">
@@ -1160,7 +1147,7 @@ export default function TestBatchDetailPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-text-secondary uppercase mb-1.5">
-                  PDF File *
+                  Question Paper PDF *
                 </label>
                 <input
                   type="file"
@@ -1169,6 +1156,32 @@ export default function TestBatchDetailPage() {
                   onChange={(e) => setPaperFile(e.target.files?.[0] || null)}
                   className="w-full text-xs text-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 cursor-pointer"
                 />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-text-secondary uppercase">
+                    Answer Key PDF (Optional)
+                  </label>
+                  {answerKeyFile && (
+                    <button
+                      type="button"
+                      onClick={() => setAnswerKeyFile(null)}
+                      className="text-[11px] text-red-500 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" /> Remove Key
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => setAnswerKeyFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
+                />
+                <p className="text-[11px] text-text-secondary/70 mt-1">
+                  Optionally attach the answer key. It will automatically unlock for students after they submit their test score or OMR.
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/80">

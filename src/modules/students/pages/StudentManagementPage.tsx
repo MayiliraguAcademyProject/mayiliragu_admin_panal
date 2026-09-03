@@ -72,6 +72,7 @@ export default function StudentManagementPage() {
   const toast = useToast();
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [batchTypeFilter, setBatchTypeFilter] = useState<string>('ALL');
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   
   // Course Enroll dialog states
@@ -169,6 +170,7 @@ export default function StudentManagementPage() {
         preparationLevel: profile.preparationLevel || 'Beginner',
         attemptNumber: profile.attemptNumber || 'First Attempt',
         admissionDate: profile.admissionDate ? profile.admissionDate.split('T')[0] : '',
+        batchType: profile.batchType || 'REGULAR',
         batchName: profile.batchName || '',
         batchTiming: profile.batchTiming || '',
         courseDuration: profile.courseDuration || '',
@@ -193,14 +195,18 @@ export default function StudentManagementPage() {
     }
   }, [profile]);
 
-  // Filter students based on search query
+  // Filter students based on search query and batch type
   const filteredStudents = useMemo(() => {
-    return students.filter(
-      (student: Student) =>
+    return students.filter((student: Student) => {
+      const matchesSearch =
         student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.email.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [students, searchQuery]);
+        student.email.toLowerCase().includes(searchQuery.toLowerCase());
+      const studentBatchType = student.profile?.batchType || 'REGULAR';
+      const matchesBatchType =
+        batchTypeFilter === 'ALL' || studentBatchType === batchTypeFilter;
+      return matchesSearch && matchesBatchType;
+    });
+  }, [students, searchQuery, batchTypeFilter]);
 
   // Enrolled course IDs for filtering
   const enrolledCourseIds = useMemo(() => {
@@ -564,6 +570,24 @@ export default function StudentManagementPage() {
               className="w-full bg-transparent text-sm text-text-primary placeholder-gray-400 outline-none"
             />
           </div>
+
+          {/* Batch Type Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {(['ALL', 'REGULAR', 'WEEKEND', 'EVENING'] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setBatchTypeFilter(type)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase whitespace-nowrap transition-all cursor-pointer ${
+                  batchTypeFilter === type
+                    ? 'bg-accent text-white shadow-xs'
+                    : 'bg-slate-100 text-text-secondary hover:bg-slate-200'
+                }`}
+              >
+                {type === 'ALL' ? 'All Batches' : `${type.charAt(0) + type.slice(1).toLowerCase()}`}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Student list */}
@@ -603,6 +627,19 @@ export default function StudentManagementPage() {
                       <p className="text-[11px] text-text-secondary truncate mt-0.5 font-medium">
                         {student.email}
                       </p>
+                      {student.profile?.batchType && (
+                        <span
+                          className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md mt-1 inline-block ${
+                            student.profile.batchType === 'REGULAR'
+                              ? 'bg-blue-100 text-blue-800'
+                              : student.profile.batchType === 'WEEKEND'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-orange-100 text-orange-800'
+                          }`}
+                        >
+                          {student.profile.batchType}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -635,6 +672,19 @@ export default function StudentManagementPage() {
                     {profile?.studentId && (
                       <span className="bg-slate-100 text-slate-700 text-[10px] font-extrabold px-2 py-0.5 rounded-md tracking-wider">
                         {profile.studentId}
+                      </span>
+                    )}
+                    {profile?.batchType && (
+                      <span
+                        className={`text-[10px] font-black px-2.5 py-0.5 rounded-lg uppercase tracking-wider ${
+                          profile.batchType === 'REGULAR'
+                            ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                            : profile.batchType === 'WEEKEND'
+                            ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                            : 'bg-orange-100 text-orange-800 border border-orange-200'
+                        }`}
+                      >
+                        {profile.batchType} BATCH
                       </span>
                     )}
                   </div>
@@ -1179,6 +1229,18 @@ export default function StudentManagementPage() {
                             />
                           </div>
                           <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-text-secondary uppercase">Batch Type *</label>
+                            <select
+                              value={editForm.batchType || 'REGULAR'}
+                              onChange={(e) => setEditForm((prev: any) => ({ ...prev, batchType: e.target.value }))}
+                              className="w-full bg-slate-50 border border-border/60 rounded-xl px-4.5 py-3 text-sm text-text-primary focus:border-accent outline-none font-semibold"
+                            >
+                              <option value="REGULAR">Regular Batch (Weekday Full-time)</option>
+                              <option value="WEEKEND">Weekend Batch (Sat & Sun)</option>
+                              <option value="EVENING">Evening Batch (Weekday Evenings)</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1.5">
                             <label className="text-xs font-bold text-text-secondary uppercase">Batch Name</label>
                             <input
                               type="text"
@@ -1188,6 +1250,9 @@ export default function StudentManagementPage() {
                               className="w-full bg-slate-50 border border-border/60 rounded-xl px-4.5 py-3 text-sm text-text-primary focus:border-accent outline-none"
                             />
                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                           <div className="space-y-1.5">
                             <label className="text-xs font-bold text-text-secondary uppercase">Batch Timing</label>
                             <input
@@ -1198,9 +1263,6 @@ export default function StudentManagementPage() {
                               className="w-full bg-slate-50 border border-border/60 rounded-xl px-4.5 py-3 text-sm text-text-primary focus:border-accent outline-none"
                             />
                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                           <div className="space-y-1.5">
                             <label className="text-xs font-bold text-text-secondary uppercase">Course Duration</label>
                             <input
@@ -1221,6 +1283,9 @@ export default function StudentManagementPage() {
                               className="w-full bg-slate-50 border border-border/60 rounded-xl px-4.5 py-3 text-sm text-text-primary focus:border-accent outline-none"
                             />
                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                           <div className="space-y-1.5">
                             <label className="text-xs font-bold text-text-secondary uppercase">Enrollment Status</label>
                             <select

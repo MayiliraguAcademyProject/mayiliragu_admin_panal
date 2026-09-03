@@ -11,9 +11,21 @@ import {
 } from 'lucide-react';
 import RefreshButton from '../../../shared/components/RefreshButton';
 
+const BATCH_TYPE_LABELS: Record<string, string> = {
+  REGULAR: 'Regular Batch (Weekday Full-time)',
+  WEEKEND: 'Weekend Batch (Sat & Sun)',
+  EVENING: 'Evening Batch (Weekday Evenings)',
+};
+
+const batchesList = [
+  { value: 'REGULAR', label: 'Regular Batch' },
+  { value: 'WEEKEND', label: 'Weekend Batch' },
+  { value: 'EVENING', label: 'Evening Batch' },
+];
+
 export default function PerformanceAnalyticsPage() {
   const [activeTab, setActiveTab] = useState<'faculty' | 'admin'>('faculty');
-  const [selectedBatch, setSelectedBatch] = useState<string>('Morning Batch 2026');
+  const [selectedBatch, setSelectedBatch] = useState<string>('REGULAR');
 
   // API hooks
   const { data: facultyData, isLoading: isFacultyLoading, refetch: refetchFaculty, isRefetching: isRefetchingFaculty } = useFacultyClassAnalytics(selectedBatch);
@@ -31,7 +43,6 @@ export default function PerformanceAnalyticsPage() {
   const weakTopics = facultyData?.data?.weakTopics ?? [];
   const students = facultyData?.data?.students ?? [];
 
-  const batchesList = ['Morning Batch 2026', 'Evening Batch 2026', 'Hybrid Batch 2026'];
   const batchComparisons = adminData?.data ?? [];
 
   return (
@@ -86,8 +97,8 @@ export default function PerformanceAnalyticsPage() {
               className="px-4 py-2 border rounded-xl text-xs font-bold bg-white border-border focus:ring-accent outline-none text-text-primary"
             >
               {batchesList.map((b) => (
-                <option key={b} value={b}>
-                  {b}
+                <option key={b.value} value={b.value}>
+                  {b.label}
                 </option>
               ))}
             </select>
@@ -252,7 +263,9 @@ export default function PerformanceAnalyticsPage() {
               {batchComparisons.map((bc: any) => (
                 <div key={bc.batch} className="bg-cardBg border border-border p-6 rounded-2xl space-y-4 shadow-sm">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-extrabold text-sm text-text-primary">{bc.batch}</h3>
+                    <h3 className="font-extrabold text-sm text-text-primary">
+                      {BATCH_TYPE_LABELS[bc.batch] || bc.batch}
+                    </h3>
                     <span className="text-[10px] text-text-secondary font-bold">
                       {bc.studentCount} Active Students
                     </span>
