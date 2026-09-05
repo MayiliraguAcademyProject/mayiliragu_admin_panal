@@ -6,6 +6,7 @@ interface TopicModalProps {
   onSubmit: (e: React.FormEvent) => Promise<void>;
   newTopName: string;
   setNewTopName: (name: string) => void;
+  mode?: 'create' | 'edit';
 }
 
 export default function TopicModal({
@@ -14,8 +15,11 @@ export default function TopicModal({
   onSubmit,
   newTopName,
   setNewTopName,
+  mode = 'create',
 }: TopicModalProps) {
   if (!isOpen) return null;
+
+  const isEdit = mode === 'edit';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
@@ -25,8 +29,12 @@ export default function TopicModal({
       >
         <div className="p-5 border-b border-border/45 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-extrabold text-text-primary tracking-tight">Add Exam Topic</h3>
-            <p className="text-[11px] text-text-secondary mt-0.5">Define a study topic within the subject.</p>
+            <h3 className="text-sm font-extrabold text-text-primary tracking-tight">
+              {isEdit ? 'Edit Exam Topic' : 'Add Exam Topic'}
+            </h3>
+            <p className="text-[11px] text-text-secondary mt-0.5">
+              {isEdit ? 'Update topic name.' : 'Define a study topic within the subject.'}
+            </p>
           </div>
           <button 
             type="button"
@@ -46,6 +54,7 @@ export default function TopicModal({
               value={newTopName}
               onChange={(e) => setNewTopName(e.target.value)}
               required
+              autoFocus
               className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
             />
           </div>
@@ -63,7 +72,7 @@ export default function TopicModal({
             type="submit"
             className="px-3.5 py-2 bg-accent hover:bg-accent-onContainer text-[11px] font-bold rounded-xl text-white shadow-md shadow-accent/15 transition-all"
           >
-            Add Topic
+            {isEdit ? 'Save Changes' : 'Add Topic'}
           </button>
         </div>
       </form>
