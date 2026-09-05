@@ -524,13 +524,11 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
 
     const questionRegex = isBanking
       ? /^Q(\d+)\.\s*(.*)$/
-      : /^(\d{1,3})\.\s+(\S.*)$/;
+      : /^(\d{1,3})\.(?:\s+(.+)|([^\d\s].*)|(\d+\s*[\+\-\*\/÷×=−].*|\d+.*=\s*\?.*))$/;
 
     const sectionMarkerRegex = /^Q\.\d+\s*\(/i;
 
-    const optionStartRegex = isBanking
-      ? /^\(([a-eA-E])\)\s*(.*)$/
-      : /^(?:([A-E])\)|\(([a-eA-E])\))\s*(.*)$/;
+    const optionStartRegex = /^(?:([A-Ea-e])[\.\)]|\(([a-eA-E])\)|\[([a-eA-E])\])\s*(.*)$/;
 
     const directionsRegex = /^\s*Direc\s*tion\s*s?\s*\(\s*(\d+)\s*-\s*(\d+)\s*\):?\s*(.*)$/i;
     const solutionsBoundary = /^(S1\.\s*Ans\.|Answers\s*&\s*Explanations|Detailed\s*Solutions|Solutions\s*\(|^Solutions$|Answer\s*Key|விடை\s+வட்டங்கள்|விடைகள்|Ans\.?\s*$)/i;
@@ -621,10 +619,11 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       if (qMatch) {
         const qNum = parseInt(qMatch[1]);
         if (qNum >= 1 && qNum <= 300) {
+          const qText = (qMatch[2] || qMatch[3] || qMatch[4] || '').trim();
           if (currentQuestion) {
             const lastText = currentQuestion.text.trim();
             if (lastText.endsWith(' ' + qNum) || lastText.endsWith(' ' + qNum + '.')) {
-              currentQuestion.text = (currentQuestion.text + ' ' + qMatch[2]).trim();
+              currentQuestion.text = (currentQuestion.text + ' ' + qText).trim();
               continue;
             }
             questions.push(currentQuestion);
@@ -645,7 +644,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
           currentQuestion = {
             rawNumber: qNum,
             sectionName: currentSectionName,
-            text: qMatch[2].trim(),
+            text: qText,
             sharedContext,
             options: {} as Record<string, string>,
             lastActiveOption: null as string | null,
@@ -657,27 +656,23 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       if (currentQuestion) {
         const singleOpt = line.match(optionStartRegex);
         if (singleOpt) {
-          const label = isBanking ? singleOpt[1].toUpperCase() : (singleOpt[1] || singleOpt[2]).toUpperCase();
-          let optText = isBanking ? singleOpt[2].trim() : singleOpt[3].trim();
+          const label = (singleOpt[1] || singleOpt[2] || singleOpt[3]).toUpperCase();
+          let optText = (singleOpt[4] || '').trim();
 
           const isLineCheck = line.includes('✓') || line.includes('✔') || line.includes('☑');
           if (isLineCheck) {
             currentQuestion.correctOption = label;
           }
 
-          const moreOptMatch = isBanking
-            ? optText.match(/\s+([B-E])\)\s/)
-            : optText.match(/\s+(?:([B-E])\)|\(([b-eA-E])\))\s/);
+          const moreOptMatch = optText.match(/\s+(?:([B-Ea-e])[\.\)]|\(([b-eA-E])\)|\[([b-eA-E])\])\s/);
           if (moreOptMatch) {
             const fullOptLine = line; 
-            const optParts = isBanking
-              ? fullOptLine.split(/\s+(?=[A-E]\))/)
-              : fullOptLine.split(/\s+(?=(?:[A-E]\)|\([a-eA-E]\)))/);
+            const optParts = fullOptLine.split(/\s+(?=(?:[A-Ea-e][\.\)]|\([a-eA-E]\)|\[[a-eA-E]\])\s)/);
             for (const part of optParts) {
               const m = part.trim().match(optionStartRegex);
               if (m) {
-                const lbl = isBanking ? m[1].toUpperCase() : (m[1] || m[2]).toUpperCase();
-                const val = isBanking ? m[2].trim() : m[3].trim();
+                const lbl = (m[1] || m[2] || m[3]).toUpperCase();
+                const val = (m[4] || '').trim();
                 const isPartCheck = part.includes('✓') || part.includes('✔') || part.includes('☑');
                 if (isPartCheck) {
                   currentQuestion.correctOption = lbl;
@@ -705,21 +700,24 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     if (currentQuestion) questions.push(currentQuestion);
 
     const extractInlineOptions = (text: string): { questionBody: string, options: Record<string, string> } | null => {
-      const matchA = text.match(/\([aA]\)/);
+      const matchA = text.match(/(?:^|\s)(?:([a-eA-E])[\.\)]|\(([a-eA-E])\)|\[([a-eA-E])\])\s/);
       if (!matchA || matchA.index === undefined) return null;
 
-      const firstOptIndex = matchA.index;
+      const firstLabel = (matchA[1] || matchA[2] || matchA[3]).toUpperCase();
+      if (firstLabel !== 'A') return null;
+
+      const firstOptIndex = matchA.index + (matchA[0].startsWith(' ') ? 1 : 0);
       const questionBody = text.substring(0, firstOptIndex).trim();
       const optionsText = text.substring(firstOptIndex);
 
-      const optionRegex = /\(([a-eA-E])\)\s*((?:(?!\([a-eA-E]\)).)+)/g;
+      const optionRegex = /(?:([a-eA-E])[\.\)]|\(([a-eA-E])\)|\[([a-eA-E])\])\s*((?:(?!(?:[a-eA-E][\.\)]|\([a-eA-E]\)|\[[a-eA-E]\])\s).)+)/g;
       const options: Record<string, string> = {};
       let match;
       let count = 0;
 
       while ((match = optionRegex.exec(optionsText)) !== null) {
-        const label = match[1].toUpperCase();
-        const val = match[2].trim();
+        const label = (match[1] || match[2] || match[3]).toUpperCase();
+        const val = match[4].trim();
         options[label] = val;
         count++;
       }
