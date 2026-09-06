@@ -338,7 +338,7 @@ export interface Banner {
   title: string;
   imageUrl: string;
   linkUrl?: string | null;
-  linkType?: 'COURSE' | 'TEST' | 'NONE';
+  linkType?: 'COURSE' | 'TEST' | 'TEST_BATCH' | 'NONE';
   linkId?: string | null;
   price?: number | null;
   offerPrice?: number | null;

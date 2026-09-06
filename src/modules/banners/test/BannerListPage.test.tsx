@@ -20,6 +20,8 @@ const state = vi.hoisted(() => {
     bannersError: null as any,
     courses: { data: [] } as any,
     tests: [] as any[],
+    examCategories: [] as any[],
+    testBatches: [] as any[],
     createBanner: mutation(),
     updateBanner: mutation(),
     deleteBanner: mutation(),
@@ -35,6 +37,11 @@ vi.mock('../../../core/api/endpoints', () => ({
   useDeleteBanner: vi.fn(() => state.deleteBanner),
   useCoursesList: vi.fn(() => ({ data: state.courses })),
   useTestsList: vi.fn(() => ({ data: state.tests })),
+  useExamCategories: vi.fn(() => ({ data: state.examCategories, isLoading: false })),
+}));
+
+vi.mock('../../../modules/test-batches/services/test-batch-api', () => ({
+  useTestBatchesList: vi.fn(() => ({ data: state.testBatches, isLoading: false })),
 }));
 
 const sampleBanner = {
@@ -67,6 +74,8 @@ beforeEach(() => {
   state.bannersError = null;
   state.courses = { data: [] };
   state.tests = [];
+  state.examCategories = [];
+  state.testBatches = [];
   vi.clearAllMocks();
 });
 
@@ -213,5 +222,41 @@ describe('BannerListPage', () => {
 
     expect(screen.getByText('Title must be at least 3 characters')).toBeTruthy();
     expect(state.createBanner.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('populates test categories when linkType is TEST', async () => {
+    const user = userEvent.setup();
+    state.examCategories = [
+      { id: 'cat-1', name: 'TNPSC Group 4', description: '', iconName: '' },
+      { id: 'cat-2', name: 'UPSC Prelims', description: '', iconName: '' },
+    ];
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Add Banner' }));
+
+    const selects = screen.getAllByRole('combobox');
+    const linkTypeSelect = selects[0];
+    await user.selectOptions(linkTypeSelect, 'TEST');
+
+    expect(screen.getByText('TNPSC Group 4')).toBeTruthy();
+    expect(screen.getByText('UPSC Prelims')).toBeTruthy();
+  });
+
+  it('populates test batches when linkType is TEST_BATCH', async () => {
+    const user = userEvent.setup();
+    state.testBatches = [
+      { id: 'tb-1', title: 'SCHOOL WISE BOOK TEST' },
+      { id: 'tb-2', title: 'PARITHI TEST' },
+    ];
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Add Banner' }));
+
+    const selects = screen.getAllByRole('combobox');
+    const linkTypeSelect = selects[0];
+    await user.selectOptions(linkTypeSelect, 'TEST_BATCH');
+
+    expect(screen.getByText('SCHOOL WISE BOOK TEST')).toBeTruthy();
+    expect(screen.getByText('PARITHI TEST')).toBeTruthy();
   });
 });

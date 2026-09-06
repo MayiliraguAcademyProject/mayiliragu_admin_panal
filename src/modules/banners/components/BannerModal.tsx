@@ -3,8 +3,10 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Image as ImageIcon, Loader2, Upload, FileText, ExternalLink, X, RefreshCw } from 'lucide-react';
-import type { Banner } from '../../../core/types';
-import { useCoursesList, useTestsList } from '../../../core/api/endpoints';
+import type { Banner, ExamCategory } from '../../../core/types';
+import { useCoursesList, useExamCategories } from '../../../core/api/endpoints';
+import { useTestBatchesList } from '../../../modules/test-batches/services/test-batch-api';
+import type { TestBatch } from '../../../modules/test-batches/types';
 
 // Helper to parse numbers safely without producing NaN validation errors in Zod
 const parseOptionalNumber = (val: unknown) => {
@@ -18,7 +20,7 @@ export const bannerSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100),
   imageUrl: z.string().optional(),
   linkUrl: z.string().nullable().optional(),
-  linkType: z.enum(['COURSE', 'TEST', 'NONE']).default('NONE'),
+  linkType: z.enum(['COURSE', 'TEST', 'TEST_BATCH', 'NONE']).default('NONE'),
   linkId: z.string().nullable().optional(),
   price: z.preprocess(parseOptionalNumber, z.number().min(0).nullable().optional()),
   offerPrice: z.preprocess(parseOptionalNumber, z.number().min(0).nullable().optional()),
@@ -74,7 +76,8 @@ export default function BannerModal({
 
   // Queries for linkId populating
   const { data: coursesData } = useCoursesList(1, 50);
-  const { data: testsData } = useTestsList();
+  const { data: examCategories, isLoading: isExamCategoriesLoading } = useExamCategories();
+  const { data: testBatches, isLoading: isTestBatchesLoading } = useTestBatchesList();
 
   const handleUploadZoneClick = () => {
     const input = fileInputRef.current;
@@ -369,7 +372,8 @@ export default function BannerModal({
                 >
                   <option value="NONE" className="bg-cardBg text-text-primary">None (No Action)</option>
                   <option value="COURSE" className="bg-cardBg text-text-primary">Course Detail</option>
-                  <option value="TEST" className="bg-cardBg text-text-primary">Test Batch Detail</option>
+                  <option value="TEST" className="bg-cardBg text-text-primary">Test Category</option>
+                  <option value="TEST_BATCH" className="bg-cardBg text-text-primary">Test Batch Detail</option>
                 </select>
               </div>
 
@@ -391,10 +395,28 @@ export default function BannerModal({
                         </option>
                       ))}
                     {watchLinkType === 'TEST' &&
-                      testsData?.map((test: any) => (
-                        <option key={test.id} value={test.id} className="bg-cardBg text-text-primary">
-                          {test.title}
+                      (isExamCategoriesLoading ? (
+                        <option value="" disabled className="bg-cardBg text-text-secondary">
+                          Loading test categories...
                         </option>
+                      ) : (
+                        examCategories?.map((category: ExamCategory) => (
+                          <option key={category.id} value={category.id} className="bg-cardBg text-text-primary">
+                            {category.name}
+                          </option>
+                        ))
+                      ))}
+                    {watchLinkType === 'TEST_BATCH' &&
+                      (isTestBatchesLoading ? (
+                        <option value="" disabled className="bg-cardBg text-text-secondary">
+                          Loading test batches...
+                        </option>
+                      ) : (
+                        testBatches?.map((batch: TestBatch) => (
+                          <option key={batch.id} value={batch.id} className="bg-cardBg text-text-primary">
+                            {batch.title}
+                          </option>
+                        ))
                       ))}
                   </select>
                 </div>
