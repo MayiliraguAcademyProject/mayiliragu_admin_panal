@@ -141,6 +141,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
         return (
           (q.questionEn || '').toLowerCase().includes(query) ||
           (q.questionTa || '').toLowerCase().includes(query) ||
+          (q.explanationEn || '').toLowerCase().includes(query) ||
+          (q.explanationTa || '').toLowerCase().includes(query) ||
           (q.sharedContext || '').toLowerCase().includes(query) ||
           (q.optionA || '').toLowerCase().includes(query) ||
           (q.optionB || '').toLowerCase().includes(query) ||
@@ -159,6 +161,10 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
 
   const hasQuestionTa = useMemo(() => {
     return parsedQuestions.some(q => q.questionTa && q.questionTa.trim().length > 0);
+  }, [parsedQuestions]);
+
+  const hasExplanation = useMemo(() => {
+    return parsedQuestions.some(q => (q.explanationEn && q.explanationEn.trim().length > 0) || (q.explanationTa && q.explanationTa.trim().length > 0));
   }, [parsedQuestions]);
 
   const hasOptionC = useMemo(() => {
@@ -196,6 +202,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
 
   // Answer Key storage map reference
   const answerKeyMapRef = useRef<Map<number, string>>(new Map());
+  // Explanation storage map reference
+  const explanationsMapRef = useRef<Map<number, { en: string; ta: string }>>(new Map());
 
   // 1. Text Extractor logic
   const extractPdfText = async (arrayBuffer: ArrayBuffer, isAnswerKey = false, onProgress?: (page: number, total: number) => void) => {
@@ -381,6 +389,142 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
 
     if (answerKeyMapRef.current.size > 0) {
       addLog(`Answer key parsing complete: mapped ${answerKeyMapRef.current.size} answers.`, 'success');
+    }
+  };
+
+  // 3. Parse Explanations
+  const parseExplanations = (rawText: string, currentSections: SectionRangeConfig[] = []) => {
+    explanationsMapRef.current.clear();
+
+    const explanationSectionRegex = /(?:^|\n)\s*(EXPLANATIONS?|Answers?\s*&\s*Explanations?|Detailed\s*Solutions?|Solutions?\s*\(|^Solutions$|விளக்கங்கள்|விடைகளும்\s+விளக்கங்களும்|விடையும்\s+விளக்கமும்)\b/i;
+    const match = rawText.match(explanationSectionRegex);
+    if (!match || match.index === undefined) {
+      addLog('No dedicated explanations section detected in document text.');
+      return;
+    }
+
+    const explanationContent = rawText.substring(match.index + match[0].length);
+    addLog('Explanations section detected! Parsing solution details...');
+
+    const rawLines = explanationContent.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const cleanLines = rawLines.filter(line => {
+      if (/^--\s*\d+\s+of\s+\d+\s*--$/i.test(line)) return false;
+      if (line.includes('www.Mayiliragu') || (line.includes('Mayiliragu') && line.length < 20)) return false;
+      if (line.includes('Adda247 App') || line.includes('Memory Based Paper')) return false;
+      if (line.includes('Join us TNPSC')) return false;
+      return true;
+    });
+
+    const sectionHeaderPattern = /^(?:SECTION|PART|PAPER|MODULE)\s+([A-Z0-9]+)(?:\s*[-–—:]\s*(.*))?$/i;
+    const normalizeSec = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    let currentSectionOffset = 0;
+    let lastLocalQNum = 0;
+    let fallbackSecIdx = 0;
+    const hasMultipleSections = currentSections.length > 1;
+
+    // Matches "1.", "1)", "1:", "1 -", "Q1.", "Q.1", "S1. Ans.(E)", "S1.", "1. Ans: (E)", "1. விடை: E", etc.
+    const itemHeaderRegex = /^(?:S|Q)?(\d{1,3})\s*[\.:\)\-–—]\s*(?:Ans(?:wer)?\.?\s*[\(\[]?[a-eA-E]?[\)\]]?\s*[:\-\.]?\s*|(?:விடை|விடைக்குறிப்பு)\s*[:\-\.]?\s*[\(\[]?[a-eA-E]?[\)\]]?\s*[:\-\.]?\s*)?(.*)$/i;
+
+    let currentQNum: number | null = null;
+    let currentBody: string[] = [];
+
+    const saveCurrentItem = () => {
+      if (currentQNum !== null && currentBody.length > 0) {
+        const fullText = currentBody.join('\n').trim();
+
+        // Also extract correct option if answer key was missing
+        if (!answerKeyMapRef.current.has(currentQNum)) {
+          const optMatch = fullText.match(/Hence,?\s*option\s*[\(\[]?([A-Ea-e])[\)\]]?\s*is\s*correct/i) ||
+                           fullText.match(/(?:Ans(?:wer)?|Correct\s*Option)\s*[:\-\.]?\s*[\(\[]?([A-Ea-e])[\)\]]?/i) ||
+                           fullText.match(/விடை\s*[:\-\.]?\s*[\(\[]?([A-Ea-e])[\)\]]?/i);
+          if (optMatch) {
+            answerKeyMapRef.current.set(currentQNum, optMatch[1].toUpperCase());
+          }
+        }
+
+        const hasTamil = [...fullText].some(c => {
+          const code = c.charCodeAt(0);
+          return code >= 0x0B80 && code <= 0x0BFF;
+        });
+
+        if (!hasTamil) {
+          explanationsMapRef.current.set(currentQNum, {
+            en: fullText,
+            ta: ''
+          });
+        } else {
+          const enLines: string[] = [];
+          const taLines: string[] = [];
+          for (const bl of currentBody) {
+            const split = splitBilingual(bl);
+            if (split.en) enLines.push(split.en);
+            if (split.ta) taLines.push(split.ta);
+          }
+          explanationsMapRef.current.set(currentQNum, {
+            en: enLines.join('\n').trim(),
+            ta: taLines.join('\n').trim()
+          });
+        }
+      }
+    };
+
+    for (let i = 0; i < cleanLines.length; i++) {
+      const line = cleanLines[i];
+
+      const secMatch = line.match(sectionHeaderPattern);
+      if (secMatch) {
+        saveCurrentItem();
+        currentQNum = null;
+        currentBody = [];
+
+        const secTag = secMatch[1].toUpperCase();
+        if (currentSections.length > 0) {
+          const matchedConfig = currentSections.find(s => {
+            const sMatch = s.name.match(sectionHeaderPattern);
+            if (sMatch && sMatch[1].toUpperCase() === secTag) return true;
+            return normalizeSec(s.name) === normalizeSec(line.trim());
+          });
+          if (matchedConfig) {
+            currentSectionOffset = matchedConfig.fromNumber - 1;
+          }
+        }
+        lastLocalQNum = 0;
+        continue;
+      }
+
+      const itemMatch = line.match(itemHeaderRegex);
+      if (itemMatch) {
+        const localNum = parseInt(itemMatch[1]);
+        if (localNum >= 1 && localNum <= 300) {
+          saveCurrentItem();
+
+          if (hasMultipleSections && localNum < lastLocalQNum && localNum === 1) {
+            fallbackSecIdx++;
+            if (fallbackSecIdx < currentSections.length) {
+              currentSectionOffset = currentSections[fallbackSecIdx].fromNumber - 1;
+            }
+          }
+          lastLocalQNum = localNum;
+          currentQNum = localNum + currentSectionOffset;
+          currentBody = [];
+
+          const remainder = (itemMatch[2] || '').trim();
+          if (remainder.length > 0) {
+            currentBody.push(remainder);
+          }
+          continue;
+        }
+      }
+
+      if (currentQNum !== null) {
+        currentBody.push(line);
+      }
+    }
+
+    saveCurrentItem();
+    if (explanationsMapRef.current.size > 0) {
+      addLog(`Explanations parsing complete: mapped ${explanationsMapRef.current.size} explanations.`, 'success');
     }
   };
 
@@ -777,6 +921,9 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     // Automatically parse answer keys from document with section awareness
     parseAnswerKey(rawText, newSectionsConfig);
 
+    // Automatically parse explanations from document
+    parseExplanations(rawText, newSectionsConfig);
+
     const answersMap: Record<number, string> = {};
     const answerRegex = /(?:S)?(\d+)\.\s*Ans\.\s*\(([a-eA-E])\)/gi;
     let ansMatch;
@@ -802,6 +949,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       const correct = q.correctOption || answerKeyMapRef.current.get(q.number) || answersMap[q.number] || '';
       const hasIssue = !optA || !optB;
       const missingAnswer = !correct;
+
+      const exp = explanationsMapRef.current.get(q.number) || { en: '', ta: '' };
 
       let cleanOptE = optE;
       const inlineCleanupIndex = cleanOptE.search(/Direc\s*tions?\s*\(\s*\d+\s*-\s*\d+\s*\)/i);
@@ -834,6 +983,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
         optionE: splitOptE.en,
         optionETa: splitOptE.ta,
         correctOption: correct,
+        explanationEn: exp.en,
+        explanationTa: exp.ta,
         sharedContext: splitCtx.en || splitCtx.ta,
         hasIssue,
         missingAnswer,
@@ -859,6 +1010,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     // Rich Console Output for Easy Debugging
     console.group('📄 [PDF PARSER RESULT]');
     console.log(`%cTotal questions detected: ${finalizedList.length}`, 'color: #10b981; font-weight: bold; font-size: 14px;');
+    console.log(`%cTotal explanations mapped: ${explanationsMapRef.current.size}`, 'color: #3b82f6; font-weight: bold;');
     console.table(finalizedList.map(q => ({
       '#': q.number,
       'Section': q.sectionName,
@@ -869,6 +1021,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
       'D': q.optionD,
       'E': q.optionE,
       'Answer': q.correctOption || '⚠ Missing',
+      'Explanation': q.explanationEn ? (q.explanationEn.length > 40 ? q.explanationEn.substring(0, 40) + '...' : q.explanationEn) : (q.explanationTa ? 'Tamil Exp' : 'None'),
       'Status': q.hasIssue ? '❌ Issue' : '✅ OK'
     })));
     console.log('Full Parsed Objects:', finalizedList);
@@ -879,6 +1032,13 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
     const ansObj: Record<string, string> = {};
     answerKeyMapRef.current.forEach((val, key) => { ansObj[`Q${key}`] = val; });
     console.log(ansObj);
+    console.groupEnd();
+
+    console.group('💡 [PARSED EXPLANATIONS]');
+    console.log(`Total explanations mapped: ${explanationsMapRef.current.size}`);
+    const expObj: Record<string, string> = {};
+    explanationsMapRef.current.forEach((val, key) => { expObj[`Q${key}`] = val.en || val.ta; });
+    console.log(expObj);
     console.groupEnd();
 
     setParsedQuestions(finalizedList);
@@ -975,8 +1135,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
           topic_id: q.topicId || selectedTopic || null,
           exam_category: q.examCategory || selectedCategory,
           difficulty: 'MEDIUM',
-          explanation_en: '',
-          explanation_ta: '',
+          explanation_en: q.explanationEn || '',
+          explanation_ta: q.explanationTa || '',
           marks: {
             correct: 1,
             wrong: q.negativeMarks || 0,
@@ -1036,8 +1196,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
           topic_id: q.topicId || selectedTopic || null,
           exam_category: q.examCategory || selectedCategory,
           difficulty: 'MEDIUM',
-          explanation_en: '',
-          explanation_ta: '',
+          explanation_en: q.explanationEn || '',
+          explanation_ta: q.explanationTa || '',
           marks: {
             correct: 1,
             wrong: q.negativeMarks || 0,
@@ -1103,8 +1263,8 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
         'Marks': 1,
         'Negative Marks': q.negativeMarks,
         'Negative Enabled': q.negativeEnabled,
-        'Explanation (EN)': '',
-        'Explanation (TA)': '',
+        'Explanation (EN)': q.explanationEn || '',
+        'Explanation (TA)': q.explanationTa || '',
         'Tags': '',
         'Correct Option Label': q.correctOption || 'A',
         'Option A (EN)': q.optionA,
@@ -1681,6 +1841,7 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
                     {hasOptionD && <th className="py-2.5 px-3 w-60 min-w-[220px] bg-slate-50 dark:bg-slate-900">Option D</th>}
                     {hasOptionE && <th className="py-2.5 px-3 w-60 min-w-[220px] bg-slate-50 dark:bg-slate-900">Option E</th>}
                     <th className="py-2.5 px-3 w-20 text-center bg-slate-50 dark:bg-slate-900">Answer</th>
+                    {hasExplanation && <th className="py-2.5 px-3 w-96 min-w-[380px] bg-slate-50 dark:bg-slate-900">Explanation</th>}
                     <th className="py-2.5 px-3 w-20 text-center bg-slate-50 dark:bg-slate-900">Actions</th>
                   </tr>
                 </thead>
@@ -1851,6 +2012,28 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
                             </span>
                           )}
                         </td>
+                        {hasExplanation && (
+                          <td className="py-5 px-3 w-96 min-w-[380px]" onClick={(e) => e.stopPropagation()}>
+                            <textarea
+                              value={q.explanationEn || ''}
+                              title={q.explanationEn || ''}
+                              rows={4}
+                              onChange={(e) => handleCellBlur(originalIdx, 'explanationEn', e.target.value)}
+                              className="bg-slate-50/70 dark:bg-slate-800/60 border border-border/40 rounded-lg p-2 outline-none w-full text-xs font-semibold text-slate-700 dark:text-slate-300 resize-none font-mono focus:border-accent"
+                              placeholder="No explanation (English)"
+                            />
+                            {q.explanationTa && (
+                              <textarea
+                                value={q.explanationTa || ''}
+                                title={q.explanationTa || ''}
+                                rows={2}
+                                onChange={(e) => handleCellBlur(originalIdx, 'explanationTa', e.target.value)}
+                                className="bg-slate-50/70 dark:bg-slate-800/60 border border-border/40 rounded-lg p-2 outline-none w-full text-xs font-bold text-emerald-600 resize-none font-sans mt-1.5 focus:border-accent"
+                                placeholder="No explanation (Tamil)"
+                              />
+                            )}
+                          </td>
+                        )}
                         <td className="py-5 px-3 w-20 text-center" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => handleDeleteRow(originalIdx)}
@@ -1916,6 +2099,25 @@ export default function LocalPDFParser({ onSuccess }: LocalPDFParserProps) {
                           );
                         })}
                       </div>
+
+                      {/* Explanation Card */}
+                      {(parsedQuestions[selectedQuestionIndex].explanationEn || parsedQuestions[selectedQuestionIndex].explanationTa) && (
+                        <div className="mt-3.5 p-3.5 bg-amber-500/10 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/60 rounded-xl space-y-2">
+                          <div className="flex items-center space-x-1.5 text-amber-700 dark:text-amber-400 font-black text-xs">
+                            <span>💡 Explanation / தீர்வு</span>
+                          </div>
+                          {parsedQuestions[selectedQuestionIndex].explanationEn && (
+                            <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-mono whitespace-pre-line">
+                              {parsedQuestions[selectedQuestionIndex].explanationEn}
+                            </p>
+                          )}
+                          {parsedQuestions[selectedQuestionIndex].explanationTa && (
+                            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 leading-relaxed font-sans whitespace-pre-line mt-1">
+                              {parsedQuestions[selectedQuestionIndex].explanationTa}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 

@@ -680,11 +680,36 @@ export default function AppConfigPage() {
                   type="text"
                   value={formRoute}
                   onChange={(e) => setFormRoute(e.target.value)}
-                  placeholder="e.g. /current-affairs"
+                  placeholder="e.g. /exam-updates"
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-border/80 rounded-xl text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-brandPurple/20 focus:border-brandPurple transition font-mono"
                 />
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[
+                    { label: 'Exam Updates', route: '/exam-updates' },
+                    { label: 'Current Affairs', route: '/current-affairs' },
+                    { label: 'Study Materials', route: '/study-materials' },
+                    { label: 'Demo Online Tests', route: '/tests' },
+                    { label: 'Courses', route: '/courses' },
+                    { label: 'Demo Class', route: '/demo-courses' },
+                    { label: 'Book Store', route: '/book-store' },
+                    { label: 'Testimonials', route: '/testimonials' },
+                    { label: 'Bookmarks', route: '/bookmarks' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.route}
+                      type="button"
+                      onClick={() => {
+                        setFormRoute(preset.route);
+                        if (!formTitle.trim()) setFormTitle(preset.label);
+                      }}
+                      className="px-2 py-0.5 text-[10px] bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20 text-slate-600 dark:text-slate-400 rounded-md transition font-medium"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                  Enter the Flutter app route path directly. E.g. `/current-affairs`, `/study-materials`, `/tests`, `/courses`.
+                  Select a preset above or enter the Flutter app route path directly (e.g. `/exam-updates`).
                 </p>
               </div>
 
