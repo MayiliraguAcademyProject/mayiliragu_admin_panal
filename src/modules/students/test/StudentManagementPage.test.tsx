@@ -6,9 +6,57 @@ import StudentManagementPage from '../pages/StudentManagementPage';
 
 const state = vi.hoisted(() => {
   const defaultStudents = [
-    { id: 'student_1', name: 'Priya Sharma', email: 'priya@mayiliragu.com', createdAt: '2026-01-10T00:00:00.000Z' },
-    { id: 'student_2', name: 'Rahul Verma', email: 'rahul@mayiliragu.com', createdAt: '2026-02-20T00:00:00.000Z' },
-    { id: 'student_3', name: 'Meena K', email: 'meena@mayiliragu.com', createdAt: '2026-03-05T00:00:00.000Z' },
+    {
+      id: 'student_1',
+      name: 'Priya Sharma',
+      email: 'priya@mayiliragu.com',
+      createdAt: '2026-01-10T00:00:00.000Z',
+      profile: {
+        id: 'prof_1',
+        studentId: 'ST-2026-0001',
+        batchType: 'REGULAR',
+        batchName: 'Morning Regular',
+        nationality: 'Indian',
+        state: 'Tamil Nadu',
+        targetExams: [],
+        enrollmentStatus: 'Active',
+        placementSelected: false,
+      },
+    },
+    {
+      id: 'student_2',
+      name: 'Rahul Verma',
+      email: 'rahul@mayiliragu.com',
+      createdAt: '2026-02-20T00:00:00.000Z',
+      profile: {
+        id: 'prof_2',
+        studentId: 'ST-2026-0002',
+        batchType: 'WEEKEND',
+        batchName: 'Weekend Batch',
+        nationality: 'Indian',
+        state: 'Tamil Nadu',
+        targetExams: [],
+        enrollmentStatus: 'Active',
+        placementSelected: false,
+      },
+    },
+    {
+      id: 'student_3',
+      name: 'Meena K',
+      email: 'meena@mayiliragu.com',
+      createdAt: '2026-03-05T00:00:00.000Z',
+      profile: {
+        id: 'prof_3',
+        studentId: 'ST-2026-0003',
+        batchType: 'EVENING',
+        batchName: 'Evening Batch',
+        nationality: 'Indian',
+        state: 'Tamil Nadu',
+        targetExams: [],
+        enrollmentStatus: 'Active',
+        placementSelected: false,
+      },
+    },
   ];
 
   const defaultEnrollments = [
@@ -186,7 +234,9 @@ vi.mock('../../../core/api/endpoints', () => ({
     refetch: state.refetchStudents,
   }),
   useStudentEnrollments: () => ({ data: state.enrollments, isLoading: state.enrollmentsLoading }),
+  useStudentTestBatchEnrollments: () => ({ data: [], isLoading: false }),
   useCoursesList: () => ({ data: state.coursesData }),
+  useAdminTestBatchesList: () => ({ data: [] }),
   useExamCategories: () => ({ data: state.examCategories, isLoading: false }),
   useStudentProfile: () => ({
     data: state.selectedProfile,
@@ -195,6 +245,8 @@ vi.mock('../../../core/api/endpoints', () => ({
   }),
   useEnrollStudent: () => ({ mutateAsync: state.mutations.enroll, isPending: false }),
   useRevokeEnrollment: () => ({ mutateAsync: state.mutations.revoke, isPending: false }),
+  useEnrollStudentTestBatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useRevokeTestBatchEnrollment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateStudent: () => ({ mutateAsync: state.mutations.createStudent, isPending: false }),
   useUpdateStudent: () => ({ mutateAsync: state.mutations.updateStudent, isPending: false }),
   useDeleteStudent: () => ({ mutateAsync: state.mutations.deleteStudent, isPending: false }),
@@ -260,6 +312,40 @@ describe('StudentManagementPage', () => {
     expect(screen.getByText('Rahul Verma')).toBeTruthy();
     expect(screen.queryByText('Priya Sharma')).toBeNull();
     expect(screen.queryByText('Meena K')).toBeNull();
+  });
+
+  it('filters students by batch type', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    // All 3 students are initially visible
+    expect(screen.getByText('Priya Sharma')).toBeTruthy();
+    expect(screen.getByText('Rahul Verma')).toBeTruthy();
+    expect(screen.getByText('Meena K')).toBeTruthy();
+
+    // Filter by Weekend
+    await user.click(screen.getByRole('button', { name: 'Weekend' }));
+    expect(screen.queryByText('Priya Sharma')).toBeNull();
+    expect(screen.getByText('Rahul Verma')).toBeTruthy();
+    expect(screen.queryByText('Meena K')).toBeNull();
+
+    // Filter by Evening
+    await user.click(screen.getByRole('button', { name: 'Evening' }));
+    expect(screen.queryByText('Priya Sharma')).toBeNull();
+    expect(screen.queryByText('Rahul Verma')).toBeNull();
+    expect(screen.getByText('Meena K')).toBeTruthy();
+
+    // Filter by Regular
+    await user.click(screen.getByRole('button', { name: 'Regular' }));
+    expect(screen.getByText('Priya Sharma')).toBeTruthy();
+    expect(screen.queryByText('Rahul Verma')).toBeNull();
+    expect(screen.queryByText('Meena K')).toBeNull();
+
+    // Reset to All Batches
+    await user.click(screen.getByRole('button', { name: 'All Batches' }));
+    expect(screen.getByText('Priya Sharma')).toBeTruthy();
+    expect(screen.getByText('Rahul Verma')).toBeTruthy();
+    expect(screen.getByText('Meena K')).toBeTruthy();
   });
 
   it('selects a student and shows the profile header and basic info', async () => {

@@ -972,7 +972,7 @@ export function useCreateBanner() {
       title: string;
       imageUrl?: string;
       linkUrl?: string | null;
-      linkType?: 'COURSE' | 'TEST' | 'NONE';
+      linkType?: 'COURSE' | 'TEST' | 'TEST_BATCH' | 'NONE';
       linkId?: string | null;
       price?: number | null;
       offerPrice?: number | null;
@@ -1135,11 +1135,37 @@ export function useCreateSubject() {
   });
 }
 
+export function useUpdateSubject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const response = await apiClient.put(`${ApiConstants.tests.subjects}/${id}`, { name });
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['examCategories'] });
+    },
+  });
+}
+
 export function useCreateTopic() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: { subjectId: string; name: string }) => {
       const response = await apiClient.post(ApiConstants.tests.topics, data);
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['examCategories'] });
+    },
+  });
+}
+
+export function useUpdateTopic() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const response = await apiClient.put(`${ApiConstants.tests.topics}/${id}`, { name });
       return response.data.data;
     },
     onSuccess: () => {

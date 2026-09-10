@@ -9,7 +9,8 @@ import {
   AlertCircle,
   ExternalLink,
   Download,
-  Bell
+  Bell,
+  Image as ImageIcon
 } from 'lucide-react';
 import RefreshButton from '../../../shared/components/RefreshButton';
 import ConfirmModal from '../../../shared/components/ConfirmModal';
@@ -27,17 +28,24 @@ export default function ExamUpdatesPage() {
   const [editingUpdate, setEditingUpdate] = useState<any | null>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formPdfFile, setFormPdfFile] = useState<File | null>(null);
+  const [formFile, setFormFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
   const [formIsEnabled, setFormIsEnabled] = useState(true);
   const [formSendNotification, setFormSendNotification] = useState(true);
 
   const [formValidationError, setFormValidationError] = useState<string | null>(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [updateToDelete, setUpdateToDelete] = useState<any | null>(null);
+  const [previewModalImage, setPreviewModalImage] = useState<{ url: string; title: string } | null>(null);
+
+  const isImageAttachment = (url?: string) => {
+    if (!url) return false;
+    return /\.(jpeg|jpg|png|webp|gif|svg)(\?.*)?$/i.test(url);
+  };
 
   // Prevent background scroll when modal is open
   useEffect(() => {
-    if (isFormModalOpen || !!updateToDelete) {
+    if (isFormModalOpen || !!updateToDelete || !!previewModalImage) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -45,7 +53,16 @@ export default function ExamUpdatesPage() {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isFormModalOpen, updateToDelete]);
+  }, [isFormModalOpen, updateToDelete, previewModalImage]);
+
+  // Revoke object URL on cleanup
+  useEffect(() => {
+    return () => {
+      if (filePreview && filePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(filePreview);
+      }
+    };
+  }, [filePreview]);
 
   const fetchUpdates = async () => {
     setLoading(true);
@@ -76,7 +93,8 @@ export default function ExamUpdatesPage() {
     setEditingUpdate(null);
     setFormTitle('');
     setFormDescription('');
-    setFormPdfFile(null);
+    setFormFile(null);
+    setFilePreview(null);
     setFormIsEnabled(true);
     setFormSendNotification(true);
     setFormValidationError(null);
@@ -87,7 +105,8 @@ export default function ExamUpdatesPage() {
     setEditingUpdate(u);
     setFormTitle(u.title || '');
     setFormDescription(u.description || '');
-    setFormPdfFile(null);
+    setFormFile(null);
+    setFilePreview(null);
     setFormIsEnabled(u.isEnabled !== undefined ? u.isEnabled : true);
     setFormSendNotification(false);
     setFormValidationError(null);
@@ -96,7 +115,23 @@ export default function ExamUpdatesPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFormPdfFile(e.target.files[0]);
+      const selected = e.target.files[0];
+      setFormFile(selected);
+      if (selected.type.startsWith('image/')) {
+        setFilePreview(URL.createObjectURL(selected));
+      } else {
+        setFilePreview(null);
+      }
+    }
+  };
+
+  const handleRemoveFile = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setFormFile(null);
+    if (filePreview) {
+      URL.revokeObjectURL(filePreview);
+      setFilePreview(null);
     }
   };
 
@@ -108,8 +143,8 @@ export default function ExamUpdatesPage() {
       setFormValidationError('Title is required');
       return;
     }
-    if (!editingUpdate && !formPdfFile) {
-      setFormValidationError('Please select a PDF document file to upload');
+    if (!editingUpdate && !formFile) {
+      setFormValidationError('Please select a PDF document or image file to upload');
       return;
     }
 
@@ -120,8 +155,9 @@ export default function ExamUpdatesPage() {
       formData.append('description', formDescription.trim());
       formData.append('isEnabled', String(formIsEnabled));
       formData.append('sendNotification', String(formSendNotification));
-      if (formPdfFile) {
-        formData.append('pdf', formPdfFile);
+      if (formFile) {
+        formData.append('pdf', formFile);
+        formData.append('file', formFile);
       }
 
       if (editingUpdate) {
@@ -177,7 +213,7 @@ export default function ExamUpdatesPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Exam Updates</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Post and broadcast official government notification PDFs</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Post and broadcast official government notification PDFs & images</p>
           </div>
         </div>
         <div className="flex items-center space-x-3">
@@ -203,7 +239,7 @@ export default function ExamUpdatesPage() {
             <FileText className="w-10 h-10" />
           </div>
           <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200 mb-1">No Updates Uploaded</h3>
-          <p className="text-sm text-slate-400 max-w-sm mb-6">Upload official recruitment PDF notifications to broadcast them to students.</p>
+          <p className="text-sm text-slate-400 max-w-sm mb-6">Upload official recruitment notifications (PDF or Image) to broadcast them to students.</p>
           <button
             onClick={openAddModal}
             className="px-5 py-2.5 bg-primary hover:bg-primary/95 text-white font-semibold text-sm rounded-xl transition"
@@ -213,61 +249,117 @@ export default function ExamUpdatesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {updates.map((u) => (
-            <div
-              key={u.id}
-              className={`bg-white dark:bg-cardBg border rounded-2xl p-5 shadow-sm hover:shadow-md transition duration-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
-                u.isEnabled ? 'border-slate-100 dark:border-border/60' : 'border-slate-200 bg-slate-50/50 dark:bg-slate-800/10 opacity-70'
-              }`}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2 mb-1">
-                  <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{u.title}</h4>
-                  <span className={`px-2 py-0.5 text-[9px] uppercase font-bold rounded-md ${u.isEnabled ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/20'}`}>
-                    {u.isEnabled ? 'Active' : 'Disabled'}
+          {updates.map((u) => {
+            const isImg = isImageAttachment(u.pdfUrl);
+            return (
+              <div
+                key={u.id}
+                className={`bg-white dark:bg-cardBg border rounded-2xl p-5 shadow-sm hover:shadow-md transition duration-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                  u.isEnabled ? 'border-slate-100 dark:border-border/60' : 'border-slate-200 bg-slate-50/50 dark:bg-slate-800/10 opacity-70'
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2 mb-1 flex-wrap gap-y-1">
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{u.title}</h4>
+                    <span className={`px-2 py-0.5 text-[9px] uppercase font-bold rounded-md ${
+                      isImg ? 'bg-sky-50 text-sky-600 dark:bg-sky-950/20' : 'bg-purple-50 text-purple-600 dark:bg-purple-950/20'
+                    }`}>
+                      {isImg ? 'Image' : 'PDF'}
+                    </span>
+                    <span className={`px-2 py-0.5 text-[9px] uppercase font-bold rounded-md ${u.isEnabled ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/20'}`}>
+                      {u.isEnabled ? 'Active' : 'Disabled'}
+                    </span>
+                  </div>
+                  {u.description && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed mb-2">
+                      {u.description}
+                    </p>
+                  )}
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    Published: {new Date(u.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                   </span>
                 </div>
-                {u.description && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed mb-2">
-                    {u.description}
-                  </p>
-                )}
-                <span className="text-[10px] text-slate-400 font-medium">
-                  Published: {new Date(u.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' })}
-                </span>
-              </div>
 
-              {/* Actions Footer */}
-              <div className="flex items-center space-x-3 self-stretch md:self-auto justify-between border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 dark:border-border/40">
-                <a
-                  href={u.pdfUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center space-x-1 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs rounded-lg transition"
-                >
-                  <span>Open PDF</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                {/* Actions Footer */}
+                <div className="flex items-center space-x-3 self-stretch md:self-auto justify-between border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 dark:border-border/40">
+                  {isImg ? (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewModalImage({ url: u.pdfUrl, title: u.title })}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-lg transition"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      <span>View Image</span>
+                    </button>
+                  ) : (
+                    <a
+                      href={u.pdfUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center space-x-1 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs rounded-lg transition"
+                    >
+                      <span>Open PDF</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
 
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => openEditModal(u)}
-                    className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
-                    title="Edit"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setUpdateToDelete(u)}
-                    className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => openEditModal(u)}
+                      className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                      title="Edit"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setUpdateToDelete(u)}
+                      className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {previewModalImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="relative max-w-3xl max-h-[90vh] bg-white dark:bg-cardBg rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-border/60">
+              <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate max-w-md">
+                {previewModalImage.title}
+              </h3>
+              <div className="flex items-center space-x-2">
+                <a
+                  href={previewModalImage.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  title="Open original"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+                <button
+                  onClick={() => setPreviewModalImage(null)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-          ))}
+            <div className="p-4 flex items-center justify-center overflow-auto bg-slate-50/50 dark:bg-slate-900/30">
+              <img
+                src={previewModalImage.url}
+                alt={previewModalImage.title}
+                className="max-h-[70vh] object-contain rounded-lg"
+              />
+            </div>
+          </div>
         </div>
       )}
 
@@ -289,7 +381,7 @@ export default function ExamUpdatesPage() {
           <div className="w-full max-w-md bg-white dark:bg-cardBg border border-slate-200 dark:border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up">
             <div className="p-6 border-b border-slate-100 dark:border-border/60 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">
-                {editingUpdate ? 'Edit Exam Update' : 'Upload Exam Update PDF'}
+                {editingUpdate ? 'Edit Exam Update' : 'Upload Exam Update (PDF or Image)'}
               </h3>
               <button
                 onClick={() => setIsFormModalOpen(false)}
@@ -335,28 +427,96 @@ export default function ExamUpdatesPage() {
                 />
               </div>
 
-              {/* PDF File Picker */}
+              {/* Attachment File Picker (PDF or Image) */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                  {editingUpdate ? 'Replace PDF Attachment (Optional)' : 'Select PDF Attachment'}
+                  {editingUpdate ? 'Replace Attachment (PDF or Image, Optional)' : 'Select Attachment (PDF or Image)'}
                 </label>
                 <div className="flex items-center justify-center w-full">
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/20 dark:border-border/60 dark:hover:bg-slate-800/40">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Download className="w-8 h-8 text-slate-400 mb-2" />
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {formPdfFile ? (
-                          <span className="font-semibold text-brandPurple text-center truncate max-w-[280px] block">
-                            {formPdfFile.name}
-                          </span>
+                  <label className="relative flex flex-col items-center justify-center w-full min-h-[140px] border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/20 dark:border-border/60 dark:hover:bg-slate-800/40 p-4 transition overflow-hidden">
+                    {filePreview ? (
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <div className="relative group">
+                          <img
+                            src={filePreview}
+                            alt="Preview"
+                            className="max-h-28 rounded-lg object-contain shadow-sm border border-slate-200 dark:border-border/60"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleRemoveFile}
+                            className="absolute -top-2 -right-2 p-1 bg-rose-500 hover:bg-rose-600 text-white rounded-full shadow transition"
+                            title="Remove file"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <span className="text-xs font-medium text-brandPurple truncate max-w-[280px]">
+                          {formFile?.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400">Click to change image</span>
+                      </div>
+                    ) : formFile ? (
+                      <div className="flex flex-col items-center justify-center pt-3 pb-3">
+                        <div className="p-3 bg-red-50 text-red-500 dark:bg-red-950/30 rounded-xl mb-2">
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <span className="font-semibold text-brandPurple text-center truncate max-w-[280px] text-xs">
+                          {formFile.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-1">
+                          {(formFile.size / (1024 * 1024)).toFixed(2)} MB • Click to change file
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleRemoveFile}
+                          className="mt-2 text-[11px] text-rose-500 hover:underline"
+                        >
+                          Remove file
+                        </button>
+                      </div>
+                    ) : editingUpdate?.pdfUrl ? (
+                      <div className="flex flex-col items-center justify-center text-center py-2">
+                        {isImageAttachment(editingUpdate.pdfUrl) ? (
+                          <div className="flex flex-col items-center space-y-2">
+                            <img
+                              src={editingUpdate.pdfUrl}
+                              alt="Current attachment"
+                              className="max-h-20 rounded-lg object-contain border border-slate-200 dark:border-border/60"
+                            />
+                            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                              Current image attached
+                            </p>
+                          </div>
                         ) : (
-                          <span>Click to upload notification PDF</span>
+                          <div className="flex flex-col items-center space-y-1">
+                            <FileText className="w-7 h-7 text-red-500 mb-1" />
+                            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                              Current PDF document attached
+                            </p>
+                          </div>
                         )}
-                      </p>
-                    </div>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          Click to select a new PDF or Image to replace
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center pt-3 pb-3 text-center">
+                        <div className="flex items-center space-x-2 text-slate-400 mb-2">
+                          <Download className="w-7 h-7" />
+                          <ImageIcon className="w-7 h-7" />
+                        </div>
+                        <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                          Click to upload PDF or Image
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Supports PDF, JPG, PNG, WEBP (Max 100MB)
+                        </p>
+                      </div>
+                    )}
                     <input
                       type="file"
-                      accept=".pdf"
+                      accept=".pdf,image/*,application/pdf"
                       onChange={handleFileChange}
                       className="hidden"
                     />
@@ -431,3 +591,4 @@ export default function ExamUpdatesPage() {
     </div>
   );
 }
+

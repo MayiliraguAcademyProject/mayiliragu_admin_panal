@@ -7,6 +7,7 @@ interface SubjectModalProps {
   categoryName: string;
   newSubName: string;
   setNewSubName: (name: string) => void;
+  mode?: 'create' | 'edit';
 }
 
 export default function SubjectModal({
@@ -16,8 +17,11 @@ export default function SubjectModal({
   categoryName,
   newSubName,
   setNewSubName,
+  mode = 'create',
 }: SubjectModalProps) {
   if (!isOpen) return null;
+
+  const isEdit = mode === 'edit';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
@@ -27,8 +31,12 @@ export default function SubjectModal({
       >
         <div className="p-5 border-b border-border/45 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-extrabold text-text-primary tracking-tight">Add Exam Subject</h3>
-            <p className="text-[11px] text-text-secondary mt-0.5">Define a subject directory inside {categoryName}.</p>
+            <h3 className="text-sm font-extrabold text-text-primary tracking-tight">
+              {isEdit ? 'Edit Exam Subject' : 'Add Exam Subject'}
+            </h3>
+            <p className="text-[11px] text-text-secondary mt-0.5">
+              {isEdit ? `Update subject name in ${categoryName}.` : `Define a subject directory inside ${categoryName}.`}
+            </p>
           </div>
           <button 
             type="button"
@@ -48,6 +56,7 @@ export default function SubjectModal({
               value={newSubName}
               onChange={(e) => setNewSubName(e.target.value)}
               required
+              autoFocus
               className="w-full px-4 py-2.5 rounded-xl border border-border focus:ring-2 focus:ring-accent outline-none text-xs font-bold text-text-primary bg-slate-50/20"
             />
           </div>
@@ -65,7 +74,7 @@ export default function SubjectModal({
             type="submit"
             className="px-3.5 py-2 bg-accent hover:bg-accent-onContainer text-[11px] font-bold rounded-xl text-white shadow-md shadow-accent/15 transition-all"
           >
-            Add Subject
+            {isEdit ? 'Save Changes' : 'Add Subject'}
           </button>
         </div>
       </form>

@@ -7,7 +7,11 @@ import {
   useDeleteQuestion,
   useExamCategories,
   useCreateSubject,
-  useCreateTopic
+  useUpdateSubject,
+  useDeleteSubject,
+  useCreateTopic,
+  useUpdateTopic,
+  useDeleteTopic
 } from '../../../core/api/endpoints';
 import { type Question, type ExamSubject, type ExamTopic } from '../../../core/types';
 import QuestionFormModal from '../components/QuestionFormModal';
@@ -23,7 +27,9 @@ import {
   Search, 
   ChevronDown, 
   ChevronRight, 
-  AlertCircle
+  AlertCircle,
+  Pen,
+  Trash2
 } from 'lucide-react';
 
 export default function CategoryDetailPage() {
@@ -34,6 +40,8 @@ export default function CategoryDetailPage() {
   // Zustand Store replaced with API queries/mutations
   const { data: categories = [] } = useExamCategories();
   const createSubjectMutation = useCreateSubject();
+  const updateSubjectMutation = useUpdateSubject();
+  const deleteSubjectMutation = useDeleteSubject();
   const createTopicMutation = useCreateTopic();
 
   const subjects = useMemo(() => {
@@ -58,11 +66,18 @@ export default function CategoryDetailPage() {
   const [difficultyFilter, setDifficultyFilter] = useState('Difficulty: All');
   const [typeFilter, setTypeFilter] = useState('All Types');
 
-  // Modals state
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<ExamSubject | null>(null);
+  const [subjectToDelete, setSubjectToDelete] = useState<ExamSubject | null>(null);
   const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
+  const [editingTopic, setEditingTopic] = useState<ExamTopic | null>(null);
+  const [topicToDelete, setTopicToDelete] = useState<ExamTopic | null>(null);
   const [newSubName, setNewSubName] = useState('');
   const [newTopName, setNewTopName] = useState('');
+
+  // Topic mutations
+  const updateTopicMutation = useUpdateTopic();
+  const deleteTopicMutation = useDeleteTopic();
 
   // Question CRUD Mutations & State
   const createQuestionMutation = useCreateQuestion();
@@ -182,29 +197,110 @@ export default function CategoryDetailPage() {
     });
   }, [allQuestions, currentCategory, selectedSub, selectedTop]);
 
-  const handleCreateSubject = async (e: React.FormEvent) => {
+  const handleOpenCreateSubject = () => {
+    setEditingSubject(null);
+    setNewSubName('');
+    setIsSubjectModalOpen(true);
+  };
+
+  const handleOpenEditSubject = (sub: ExamSubject) => {
+    setEditingSubject(sub);
+    setNewSubName(sub.name);
+    setIsSubjectModalOpen(true);
+  };
+
+  const handleSubjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSubName || !categoryId) return;
+    if (!newSubName.trim()) return;
+
     try {
-      const res = await createSubjectMutation.mutateAsync({ categoryId, name: newSubName });
-      toast.success(res?.message || 'Subject created successfully!');
+      if (editingSubject) {
+        await updateSubjectMutation.mutateAsync({ id: editingSubject.id, name: newSubName.trim() });
+        toast.success('Subject updated successfully!');
+        if (selectedSub?.id === editingSubject.id) {
+          setSelectedSub({ ...selectedSub, name: newSubName.trim() });
+        }
+      } else {
+        if (!categoryId) return;
+        const res = await createSubjectMutation.mutateAsync({ categoryId, name: newSubName.trim() });
+        toast.success(res?.message || 'Subject created successfully!');
+      }
       setIsSubjectModalOpen(false);
+      setEditingSubject(null);
       setNewSubName('');
     } catch (err) {
       toast.error(extractErrorMessage(err));
     }
   };
 
-  const handleCreateTopic = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTopName || !expandedSubId) return;
+  const handleConfirmDeleteSubject = async () => {
+    if (!subjectToDelete) return;
     try {
-      const res = await createTopicMutation.mutateAsync({ subjectId: expandedSubId, name: newTopName });
-      toast.success(res?.message || 'Topic created successfully!');
+      await deleteSubjectMutation.mutateAsync(subjectToDelete.id);
+      toast.success('Subject deleted successfully!');
+      if (selectedSub?.id === subjectToDelete.id) {
+        setSelectedSub(null);
+        setSelectedTop(null);
+      }
+      if (expandedSubId === subjectToDelete.id) {
+        setExpandedSubId(null);
+      }
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
+    } finally {
+      setSubjectToDelete(null);
+    }
+  };
+
+  const handleOpenCreateTopic = (subId: string) => {
+    setExpandedSubId(subId);
+    setEditingTopic(null);
+    setNewTopName('');
+    setIsTopicModalOpen(true);
+  };
+
+  const handleOpenEditTopic = (top: ExamTopic) => {
+    setEditingTopic(top);
+    setNewTopName(top.name);
+    setIsTopicModalOpen(true);
+  };
+
+  const handleTopicSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTopName.trim()) return;
+
+    try {
+      if (editingTopic) {
+        await updateTopicMutation.mutateAsync({ id: editingTopic.id, name: newTopName.trim() });
+        toast.success('Topic updated successfully!');
+        if (selectedTop?.id === editingTopic.id) {
+          setSelectedTop({ ...selectedTop, name: newTopName.trim() });
+        }
+      } else {
+        if (!expandedSubId) return;
+        const res = await createTopicMutation.mutateAsync({ subjectId: expandedSubId, name: newTopName.trim() });
+        toast.success(res?.message || 'Topic created successfully!');
+      }
       setIsTopicModalOpen(false);
+      setEditingTopic(null);
       setNewTopName('');
     } catch (err) {
       toast.error(extractErrorMessage(err));
+    }
+  };
+
+  const handleConfirmDeleteTopic = async () => {
+    if (!topicToDelete) return;
+    try {
+      await deleteTopicMutation.mutateAsync(topicToDelete.id);
+      toast.success('Topic deleted successfully!');
+      if (selectedTop?.id === topicToDelete.id) {
+        setSelectedTop(null);
+      }
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
+    } finally {
+      setTopicToDelete(null);
     }
   };
 
@@ -259,7 +355,7 @@ export default function CategoryDetailPage() {
                 Subjects Index
               </span>
               <button
-                onClick={() => setIsSubjectModalOpen(true)}
+                onClick={handleOpenCreateSubject}
                 className="flex items-center space-x-1 text-accent hover:text-accent-onContainer text-xs font-extrabold"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -308,13 +404,32 @@ export default function CategoryDetailPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setExpandedSubId(sub.id);
-                            setIsTopicModalOpen(true);
+                            handleOpenCreateTopic(sub.id);
                           }}
                           className="p-1 rounded-md hover:bg-slate-200/50 text-gray-400 hover:text-accent transition-colors"
                           title="Add Topic"
                         >
                           <Plus className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditSubject(sub);
+                          }}
+                          className="p-1 rounded-md hover:bg-slate-200/50 text-gray-400 hover:text-accent transition-colors"
+                          title="Edit Subject"
+                        >
+                          <Pen className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSubjectToDelete(sub);
+                          }}
+                          className="p-1 rounded-md hover:bg-rose-100 text-gray-400 hover:text-rose-600 transition-colors"
+                          title="Delete Subject"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                         {isExpanded ? (
                           <ChevronDown className="w-4 h-4 text-gray-400" />
@@ -339,13 +454,35 @@ export default function CategoryDetailPage() {
                                   setSelectedSub(sub);
                                   setSelectedTop(top);
                                 }}
-                                className={`p-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer truncate border ${
+                                className={`group flex items-center justify-between p-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border ${
                                   isTopSelected
                                     ? 'bg-accent/20 dark:bg-accent/25 text-accent border-accent/30 font-extrabold'
                                     : 'text-text-secondary hover:bg-slate-50 border-transparent'
                                 }`}
                               >
-                                {top.name}
+                                <span className="truncate flex-1">{top.name}</span>
+                                <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 pl-1 flex-shrink-0 transition-opacity">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEditTopic(top);
+                                    }}
+                                    className="p-1 rounded hover:bg-slate-200/50 text-gray-400 hover:text-accent transition-colors"
+                                    title="Edit Topic"
+                                  >
+                                    <Pen className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setTopicToDelete(top);
+                                    }}
+                                    className="p-1 rounded hover:bg-rose-100 text-gray-400 hover:text-rose-600 transition-colors"
+                                    title="Delete Topic"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
                               </div>
                             );
                           })
@@ -503,23 +640,33 @@ export default function CategoryDetailPage() {
       {/* DIALOG MODALS */}
       {/* ========================================== */}
 
-      {/* Add Subject Modal */}
+      {/* Subject Modal (Add / Edit) */}
       <SubjectModal
         isOpen={isSubjectModalOpen}
-        onClose={() => setIsSubjectModalOpen(false)}
-        onSubmit={handleCreateSubject}
+        onClose={() => {
+          setIsSubjectModalOpen(false);
+          setEditingSubject(null);
+          setNewSubName('');
+        }}
+        onSubmit={handleSubjectSubmit}
         categoryName={currentCategory.name}
         newSubName={newSubName}
         setNewSubName={setNewSubName}
+        mode={editingSubject ? 'edit' : 'create'}
       />
 
-      {/* Add Topic Modal */}
+      {/* Topic Modal (Add / Edit) */}
       <TopicModal
         isOpen={isTopicModalOpen}
-        onClose={() => setIsTopicModalOpen(false)}
-        onSubmit={handleCreateTopic}
+        onClose={() => {
+          setIsTopicModalOpen(false);
+          setEditingTopic(null);
+          setNewTopName('');
+        }}
+        onSubmit={handleTopicSubmit}
         newTopName={newTopName}
         setNewTopName={setNewTopName}
+        mode={editingTopic ? 'edit' : 'create'}
       />
 
       <QuestionFormModal
@@ -538,6 +685,26 @@ export default function CategoryDetailPage() {
         title="Delete Question"
         message="Are you sure you want to delete this question? This action cannot be undone."
         isLoading={deleteQuestionMutation.isPending}
+      />
+
+      {/* Delete Subject Confirmation */}
+      <ConfirmModal
+        isOpen={subjectToDelete !== null}
+        onClose={() => setSubjectToDelete(null)}
+        onConfirm={handleConfirmDeleteSubject}
+        title="Delete Subject"
+        message={`Are you sure you want to delete "${subjectToDelete?.name}"? All topics under this subject will also be affected. This action cannot be undone.`}
+        isLoading={deleteSubjectMutation.isPending}
+      />
+
+      {/* Delete Topic Confirmation */}
+      <ConfirmModal
+        isOpen={topicToDelete !== null}
+        onClose={() => setTopicToDelete(null)}
+        onConfirm={handleConfirmDeleteTopic}
+        title="Delete Topic"
+        message={`Are you sure you want to delete "${topicToDelete?.name}"? Questions referencing this topic will lose their topic association. This action cannot be undone.`}
+        isLoading={deleteTopicMutation.isPending}
       />
 
     </div>

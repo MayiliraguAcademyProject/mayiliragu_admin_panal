@@ -627,19 +627,6 @@ export default function StudentManagementPage() {
                       <p className="text-[11px] text-text-secondary truncate mt-0.5 font-medium">
                         {student.email}
                       </p>
-                      {student.profile?.batchType && (
-                        <span
-                          className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md mt-1 inline-block ${
-                            student.profile.batchType === 'REGULAR'
-                              ? 'bg-blue-100 text-blue-800'
-                              : student.profile.batchType === 'WEEKEND'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-orange-100 text-orange-800'
-                          }`}
-                        >
-                          {student.profile.batchType}
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -2134,20 +2121,6 @@ export default function StudentManagementPage() {
         confirmText="Revoke"
         type="danger"
         isLoading={revokeMutation.isPending || isRevokingId !== null}
-      />
-
-      <EnrollModal
-        isOpen={isEnrollDialogOpen}
-        onClose={() => {
-          setIsEnrollDialogOpen(false);
-          setCourseSearchQuery('');
-        }}
-        selectedStudent={selectedStudent}
-        courseSearchQuery={courseSearchQuery}
-        setCourseSearchQuery={setCourseSearchQuery}
-        availableCourses={availableCourses}
-        onEnroll={handleEnroll}
-        isEnrollingId={isEnrollingId}
       />
 
       <EnrollTestBatchModal
