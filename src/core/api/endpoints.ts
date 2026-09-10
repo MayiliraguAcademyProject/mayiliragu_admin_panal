@@ -1223,11 +1223,42 @@ export function useTestAnalytics() {
   });
 }
 
-export function useAllTestAttempts() {
+export function useAllTestAttempts(batchType?: string) {
   return useQuery<StudentTestAttempt[]>({
-    queryKey: ['allTestAttempts'],
+    queryKey: ['allTestAttempts', batchType],
     queryFn: async () => {
-      const response = await apiClient.get(ApiConstants.tests.attemptsAll);
+      const response = await apiClient.get(ApiConstants.tests.attemptsAll, {
+        params: batchType ? { batchType } : undefined,
+      });
+      return response.data.data;
+    },
+  });
+}
+
+export function useTestAttemptDetails(attemptId: string | null) {
+  return useQuery({
+    queryKey: ['testAttemptDetails', attemptId],
+    queryFn: async () => {
+      if (!attemptId) return null;
+      const response = await apiClient.get(ApiConstants.tests.attemptDetails(attemptId));
+      return response.data.data;
+    },
+    enabled: Boolean(attemptId),
+  });
+}
+
+export interface BatchComparisonItem {
+  batch: string;
+  averageReadiness: number;
+  averageStudyHours: number;
+  studentCount: number;
+}
+
+export function useBatchComparisons() {
+  return useQuery<BatchComparisonItem[]>({
+    queryKey: ['batchComparisons'],
+    queryFn: async () => {
+      const response = await apiClient.get(ApiConstants.analytics.batchComparisons);
       return response.data.data;
     },
   });

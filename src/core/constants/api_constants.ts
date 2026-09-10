@@ -70,6 +70,16 @@ export const ApiConstants = {
     topics: '/tests/topics',
     analytics: '/tests/analytics/stats',
     attemptsAll: '/tests/attempts/all',
+    attemptDetails: (id: string) => `/tests/attempts/${id}`,
+  },
+  analytics: {
+    facultyClass: '/analytics/faculty/class',
+    facultyClassData: '/analytics/faculty/class',
+    adminBatches: '/analytics/admin/batches',
+    batchComparisons: '/analytics/admin/batches',
+    student: '/analytics/student',
+    subjects: '/analytics/subjects',
+    trends: '/analytics/trends',
   },
   banners: {
     base: '/banners',
@@ -95,10 +105,6 @@ export const ApiConstants = {
     categories: '/study-materials/categories',
     categoryDetail: (id: string) => `/study-materials/categories/${id}`,
     detail: (id: string) => `/study-materials/${id}`,
-  },
-  analytics: {
-    facultyClass: '/analytics/faculty/class',
-    adminBatches: '/analytics/admin/batches',
   },
   books: {
     base: '/books',

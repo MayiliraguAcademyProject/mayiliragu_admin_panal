@@ -15,7 +15,6 @@ import {
   Image,
   Newspaper,
   Library,
-  TrendingUp,
   ShoppingBag,
   Download,
   Bell,
@@ -29,7 +28,8 @@ import {
   Video,
   MessageSquare,
   FileText,
-  Layers
+  Layers,
+  Award
 } from 'lucide-react';
 import { useThemeStore } from '../../store/theme-store';
 
@@ -60,7 +60,7 @@ export default function MainLayoutShell() {
     { name: 'Live Streams', path: '/live-streams', icon: Video },
     { name: 'Payment Requests', path: '/payment-requests', icon: DollarSign },
     { name: 'Payment Settings', path: '/payment-settings', icon: CreditCard },
-    { name: 'Performance Analytics', path: '/performance-analytics', icon: TrendingUp },
+    { name: 'Test Results & Marks', path: '/performance-analytics', icon: Award },
     { name: 'Push Notifications', path: '/notifications', icon: Bell },
     { name: 'Students', path: '/student-management', icon: Users },
     { name: 'Study Library', path: '/study-materials', icon: Library },
