@@ -61,6 +61,8 @@ export interface TestBatchOmrSubmissionItem {
   omrFileUrl: string;
   omrFileName: string;
   totalMarks?: number | null;
+  batchId?: string;
+  batchTitle?: string;
   submittedAt: string;
   updatedAt: string;
 }

@@ -1,204 +1,338 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../../test/test-utils';
 import PerformanceAnalyticsPage from '../pages/PerformanceAnalyticsPage';
+import type { StudentTestAttempt } from '../../../core/types';
+
+const mockAttempts: StudentTestAttempt[] = [
+  {
+    id: 'att-1',
+    testId: 'test-1',
+    testTitle: 'Polity Prelims Mock 1',
+    studentId: 'stud-1',
+    studentName: 'Arun Kumar',
+    studentEmail: 'arun@test.com',
+    totalScore: 85,
+    totalMarks: 100,
+    accuracy: 85,
+    timeTaken: 1800,
+    passed: true,
+    correct: 85,
+    wrong: 10,
+    skipped: 5,
+    rank: 1,
+    createdAt: '2026-09-01T10:00:00Z',
+  },
+  {
+    id: 'att-2',
+    testId: 'test-1',
+    testTitle: 'Polity Prelims Mock 1',
+    studentId: 'stud-2',
+    studentName: 'Divya R',
+    studentEmail: 'divya@test.com',
+    totalScore: 40,
+    totalMarks: 100,
+    accuracy: 40,
+    timeTaken: 2100,
+    passed: false,
+    correct: 40,
+    wrong: 50,
+    skipped: 10,
+    rank: 2,
+    createdAt: '2026-09-01T11:30:00Z',
+  },
+  {
+    id: 'att-3',
+    testId: 'test-2',
+    testTitle: 'History Mock Test',
+    studentId: 'stud-3',
+    studentName: 'Sathish Student',
+    studentEmail: 'sathish@test.com',
+    totalScore: 90,
+    totalMarks: 100,
+    accuracy: 90,
+    timeTaken: 1500,
+    passed: true,
+    correct: 90,
+    wrong: 5,
+    skipped: 5,
+    rank: 1,
+    createdAt: '2026-09-02T12:00:00Z',
+  },
+];
 
 const state = vi.hoisted(() => {
-  const defaultFaculty = {
-    data: {
-      classAverage: 64,
-      atRiskCount: 1,
-      weakTopics: [
-        { name: 'Trigonometry', count: 5 },
-        { name: 'Current Affairs', count: 3 },
-      ],
-      students: [
-        {
-          id: 's1',
-          name: 'Arun Kumar',
-          email: 'arun@test.com',
-          readinessScore: 38,
-          performanceScore: 55,
-          streak: 3,
-          studyHours: 12,
-        },
-        {
-          id: 's2',
-          name: 'Divya R',
-          email: 'divya@test.com',
-          readinessScore: 82,
-          performanceScore: 90,
-          streak: 9,
-          studyHours: 30,
-        },
-      ],
-    },
-  };
+  let attemptsData: StudentTestAttempt[] = [];
+  let isLoading = false;
+  let isRefetching = false;
+  const refetchSpy = vi.fn();
 
-  const defaultAdmin = {
-    data: [
-      {
-        batch: 'Morning Batch 2026',
-        studentCount: 120,
-        averageReadiness: 64,
-        averageStudyHours: 20,
-      },
-      {
-        batch: 'Evening Batch 2026',
-        studentCount: 85,
-        averageReadiness: 48,
-        averageStudyHours: 14,
-      },
-    ],
-  };
-
-  let facultyData: unknown = defaultFaculty;
-  let facultyLoading = false;
-  let adminData: unknown = defaultAdmin;
-  let adminLoading = false;
-
-  const facultyAnalyticsSpy = vi.fn(() => ({
-    data: facultyData,
-    isLoading: facultyLoading,
-    refetch: vi.fn(),
+  const allTestAttemptsSpy = vi.fn(() => ({
+    data: attemptsData,
+    isLoading,
+    refetch: refetchSpy,
+    isRefetching,
   }));
-  const adminComparisonsSpy = vi.fn(() => ({
-    data: adminData,
-    isLoading: adminLoading,
-    refetch: vi.fn(),
-  }));
-
-  function reset() {
-    facultyData = defaultFaculty;
-    facultyLoading = false;
-    adminData = defaultAdmin;
-    adminLoading = false;
-    vi.clearAllMocks();
-  }
 
   return {
-    facultyAnalyticsSpy,
-    adminComparisonsSpy,
-    reset,
-    setFacultyData: (d: unknown) => {
-      facultyData = d;
+    allTestAttemptsSpy,
+    refetchSpy,
+    setAttemptsData: (data: StudentTestAttempt[]) => {
+      attemptsData = data;
     },
-    setFacultyLoading: (v: boolean) => {
-      facultyLoading = v;
+    setIsLoading: (val: boolean) => {
+      isLoading = val;
     },
-    setAdminData: (d: unknown) => {
-      adminData = d;
+    setIsRefetching: (val: boolean) => {
+      isRefetching = val;
     },
-    setAdminLoading: (v: boolean) => {
-      adminLoading = v;
+    reset: () => {
+      attemptsData = [];
+      isLoading = false;
+      isRefetching = false;
+      vi.clearAllMocks();
     },
   };
 });
 
 vi.mock('../../../core/api/endpoints', () => ({
-  useFacultyClassAnalytics: state.facultyAnalyticsSpy,
-  useAdminBatchComparisons: state.adminComparisonsSpy,
+  useAllTestAttempts: state.allTestAttemptsSpy,
+  useTestAttemptDetails: vi.fn(() => ({
+    data: {
+      questions: [],
+      sections: [],
+    },
+    isLoading: false,
+  })),
+  useBatchComparisons: vi.fn(() => ({
+    data: [
+      { batch: 'REGULAR', averageReadiness: 75, averageStudyHours: 4.5, studentCount: 12 },
+      { batch: 'WEEKEND', averageReadiness: 68, averageStudyHours: 3.2, studentCount: 8 },
+    ],
+    isLoading: false,
+    refetch: vi.fn(),
+  })),
+}));
+
+vi.mock('../../test-batches/services/test-batch-api', () => ({
+  useTestBatchesList: vi.fn(() => ({
+    data: [
+      { id: 'tb-1', title: 'TNPSC Group 2 Test Series', targetCategory: 'TNPSC', description: 'Batch 1', totalQuestionPapers: 5 },
+    ],
+    isLoading: false,
+    refetch: vi.fn(),
+    isRefetching: false,
+  })),
+  useTestBatchDetail: vi.fn(() => ({
+    data: {
+      id: 'tb-1',
+      title: 'TNPSC Group 2 Test Series',
+      targetCategory: 'TNPSC',
+      categories: [
+        {
+          id: 'cat-1',
+          name: 'General Studies',
+          questionPapers: [{ id: 'p-1', title: 'General Studies Full Mock' }],
+        },
+      ],
+    },
+    isLoading: false,
+    refetch: vi.fn(),
+  })),
+  useBatchEnrollments: vi.fn(() => ({
+    data: [{ id: 'en-1', studentId: 'stud-1' }],
+    isLoading: false,
+    refetch: vi.fn(),
+  })),
+  useBatchOmrSubmissions: vi.fn(() => ({
+    data: [
+      {
+        id: 'omr-1',
+        paperId: 'p-1',
+        studentId: 'stud-1',
+        totalMarks: 92,
+        submittedAt: '2026-09-02T10:00:00Z',
+        student: { name: 'Arun Kumar', email: 'arun@test.com' },
+        paper: { title: 'General Studies Full Mock' },
+      },
+    ],
+    isLoading: false,
+    refetch: vi.fn(),
+    isRefetching: false,
+  })),
 }));
 
 function renderPage() {
   return renderWithProviders(<PerformanceAnalyticsPage />);
 }
 
-describe('PerformanceAnalyticsPage', () => {
+describe('PerformanceAnalyticsPage (Test Results & Student Marks)', () => {
   beforeEach(() => {
     state.reset();
+    state.setAttemptsData(mockAttempts);
   });
 
-  it('renders the page header and both tabs', () => {
+  it('renders the header, title, and export button', () => {
     renderPage();
-    expect(screen.getByRole('heading', { name: 'Performance Analytics' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Faculty: Class Analytics' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Admin: Batch Comparisons' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Test Results & Student Marks/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Export CSV/i })).toBeTruthy();
   });
 
-  it('renders faculty class analytics stats, weak areas, at-risk list and roster', () => {
+  it('calculates and renders the summary KPI cards correctly', () => {
+    renderPage();
+    expect(screen.getByText('Total Attempts')).toBeTruthy();
+    expect(screen.getAllByText('3').length).toBeGreaterThanOrEqual(1);
+
+    expect(screen.getByText('Average Accuracy')).toBeTruthy();
+    // Avg accuracy: (85 + 40 + 90) / 3 = 215 / 3 = 72%
+    expect(screen.getByText('72%')).toBeTruthy();
+
+    expect(screen.getByText('Pass Rate')).toBeTruthy();
+    // 2 passed out of 3 = 67%
+    expect(screen.getByText('67%')).toBeTruthy();
+
+    expect(screen.getByText('Active Test Takers')).toBeTruthy();
+  });
+
+  it('renders table rows for student test attempts with marks and ranks', () => {
     renderPage();
 
-    expect(screen.getByText('Class Average Readiness')).toBeTruthy();
-    expect(screen.getByText('64%')).toBeTruthy();
-    expect(screen.getByText('At-Risk Students (<50% Score)')).toBeTruthy();
-    expect(screen.getByText('1')).toBeTruthy();
-    expect(screen.getByText('Total Active Students')).toBeTruthy();
+    expect(screen.getByText('Arun Kumar')).toBeTruthy();
+    expect(screen.getByText('arun@test.com')).toBeTruthy();
+    expect(screen.getAllByText('85').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('85%')).toBeTruthy();
 
-    expect(screen.getByText('Classroom Weak Areas (Aggregated)')).toBeTruthy();
-    expect(screen.getByText('Trigonometry')).toBeTruthy();
-    expect(screen.getByText('5 students failing')).toBeTruthy();
+    expect(screen.getByText('Divya R')).toBeTruthy();
+    expect(screen.getByText('divya@test.com')).toBeTruthy();
+    expect(screen.getAllByText('40').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('40%')).toBeTruthy();
 
-    expect(screen.getByText('At-Risk Interventions Required')).toBeTruthy();
-    expect(screen.getAllByText('Arun Kumar').length).toBe(2);
-    expect(screen.getByText('38% Readiness')).toBeTruthy();
-    expect(screen.queryByText('Divya R')).toBeTruthy();
+    expect(screen.getByText('Sathish Student')).toBeTruthy();
+    expect(screen.getAllByText('90').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('90%')).toBeTruthy();
 
-    expect(screen.getByText('Classroom Performance Roster')).toBeTruthy();
-    expect(screen.getByText('Readiness (%)')).toBeTruthy();
-    expect(screen.getByText('55%')).toBeTruthy();
-    expect(screen.getByText('3 Days')).toBeTruthy();
-    expect(screen.getByText('12 hrs')).toBeTruthy();
-    expect(screen.getByText('9 Days')).toBeTruthy();
+    // Verify Pass / Fail badges
+    expect(screen.getAllByText('PASSED').length).toBe(2);
+    expect(screen.getByText('FAILED')).toBeTruthy();
   });
 
-  it('shows a spinner while faculty analytics are loading', () => {
-    state.setFacultyLoading(true);
+  it('filters rows by student search query', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const searchInput = screen.getByPlaceholderText(/Search by student name or email/i);
+    await user.type(searchInput, 'Arun');
+
+    expect(screen.getByText('Arun Kumar')).toBeTruthy();
+    expect(screen.queryByText('Divya R')).toBeNull();
+    expect(screen.queryByText('Sathish Student')).toBeNull();
+  });
+
+  it('filters rows by test title dropdown', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const testSelect = screen.getAllByRole('combobox')[0];
+    await user.selectOptions(testSelect, 'History Mock Test');
+
+    expect(screen.getByText('Sathish Student')).toBeTruthy();
+    expect(screen.queryByText('Arun Kumar')).toBeNull();
+    expect(screen.queryByText('Divya R')).toBeNull();
+  });
+
+  it('filters rows by status pills (Passed / Failed)', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const failedButton = screen.getByRole('button', { name: 'failed' });
+    await user.click(failedButton);
+
+    expect(screen.getByText('Divya R')).toBeTruthy();
+    expect(screen.queryByText('Arun Kumar')).toBeNull();
+    expect(screen.queryByText('Sathish Student')).toBeNull();
+
+    const passedButton = screen.getByRole('button', { name: 'passed' });
+    await user.click(passedButton);
+
+    expect(screen.getByText('Arun Kumar')).toBeTruthy();
+    expect(screen.getByText('Sathish Student')).toBeTruthy();
+    expect(screen.queryByText('Divya R')).toBeNull();
+  });
+
+  it('opens and closes the Attempt Details Modal', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const viewButtons = screen.getAllByTitle('View Detailed Breakdown');
+    await user.click(viewButtons[0]);
+
+    expect(screen.getByText('Passed Attempt')).toBeTruthy();
+    expect(screen.getByText('Question Breakdown')).toBeTruthy();
+    expect(screen.getAllByText('Marks Scored').length).toBeGreaterThanOrEqual(1);
+
+    const closeButton = screen.getByRole('button', { name: 'Close' });
+    await user.click(closeButton);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Question Breakdown')).toBeNull();
+    });
+  });
+
+  it('renders loading state when isLoading is true', () => {
+    state.setIsLoading(true);
+    state.setAttemptsData([]);
     const { container } = renderPage();
     expect(container.querySelector('.animate-spin')).toBeTruthy();
+    expect(screen.getByText(/Loading test attempts and marks/i)).toBeTruthy();
   });
 
-  it('selecting a different batch re-queries faculty analytics for that batch', async () => {
+  it('renders empty state when no attempts exist', () => {
+    state.setAttemptsData([]);
+    renderPage();
+    expect(screen.getByText(/No Test Attempts Found/i)).toBeTruthy();
+  });
+
+  it('switches to Test Batches tab and displays batch submissions and cohort comparisons', async () => {
     const user = userEvent.setup();
     renderPage();
 
-    expect(state.facultyAnalyticsSpy).toHaveBeenCalledWith('Morning Batch 2026');
+    const batchesTabButton = screen.getByRole('button', { name: /Test Batches/i });
+    await user.click(batchesTabButton);
 
-    await user.selectOptions(screen.getByRole('combobox'), 'Evening Batch 2026');
-
-    expect(state.facultyAnalyticsSpy).toHaveBeenCalledWith('Evening Batch 2026');
+    expect(screen.getByRole('heading', { name: /Test Batches & Cohort Performance/i })).toBeTruthy();
+    expect(screen.getByText('Selected Test Batch')).toBeTruthy();
+    expect(screen.getByText('TNPSC Group 2 Test Series (TNPSC)')).toBeTruthy();
+    expect(screen.getAllByText('General Studies Full Mock').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('92 Marks')).toBeTruthy();
   });
 
-  it('shows the no weak areas message when weakTopics is empty', () => {
-    state.setFacultyData({ data: { classAverage: 0, atRiskCount: 0, weakTopics: [], students: [] } });
-    renderPage();
-    expect(screen.getByText('No weak areas identified yet.')).toBeTruthy();
-    expect(screen.getByText('All students are above the 50% safety margin! 🎉')).toBeTruthy();
-  });
-
-  it('renders admin batch comparisons when switching tabs', async () => {
+  it('switches to Student Performance tab and opens student report card', async () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Admin: Batch Comparisons' }));
+    const studentsTabButton = screen.getByRole('button', { name: /Student Performance/i });
+    await user.click(studentsTabButton);
 
-    expect(screen.getByText('Batch Comparison Overview')).toBeTruthy();
-    expect(screen.getByText('120 Active Students')).toBeTruthy();
-    expect(screen.getByText('85 Active Students')).toBeTruthy();
-    expect(screen.getAllByText('Average Exam Readiness').length).toBe(2);
-    expect(screen.getAllByText('Average Study Time').length).toBe(2);
-    expect(screen.getByText('20 hrs / student')).toBeTruthy();
-    expect(screen.getByText('14 hrs / student')).toBeTruthy();
-  });
+    expect(screen.getByRole('heading', { name: /Student Performance & Dossiers/i })).toBeTruthy();
+    expect(screen.getByText('Total Students Tested')).toBeTruthy();
 
-  it('shows a spinner while admin comparisons are loading', async () => {
-    state.setAdminLoading(true);
-    const user = userEvent.setup();
-    const { container } = renderPage();
+    // Verify student row
+    expect(screen.getAllByText('Arun Kumar').length).toBeGreaterThanOrEqual(1);
 
-    await user.click(screen.getByRole('button', { name: 'Admin: Batch Comparisons' }));
+    // Click Dossier to open Student Report Card
+    const dossierButtons = screen.getAllByRole('button', { name: /Dossier/i });
+    await user.click(dossierButtons[0]);
 
-    expect(container.querySelector('.animate-spin')).toBeTruthy();
-  });
+    expect(screen.getByText('Student Performance Report Card')).toBeTruthy();
+    expect(screen.getByText('Score Progression Timeline')).toBeTruthy();
+    expect(screen.getByText('Complete Test Attempts History')).toBeTruthy();
 
-  it('shows the empty state when there are no batch aggregates', async () => {
-    state.setAdminData({ data: [] });
-    const user = userEvent.setup();
-    renderPage();
+    const closeReportCard = screen.getByRole('button', { name: /Close Report Card/i });
+    await user.click(closeReportCard);
 
-    await user.click(screen.getByRole('button', { name: 'Admin: Batch Comparisons' }));
-
-    expect(screen.getByText('No batch aggregates available.')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.queryByText('Student Performance Report Card')).toBeNull();
+    });
   });
 });
