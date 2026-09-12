@@ -98,6 +98,7 @@ export interface Student {
   email: string;
   createdAt: string;
   profile?: StudentProfile;
+  testBatchEnrollments?: Array<{ id: string; batchId: string }>;
 }
 
 export interface StudentPayment {
@@ -186,7 +187,7 @@ export interface StudentProfile {
   admissionDate?: string;
   batchName?: string;
   batchTiming?: string;
-  batchType?: 'REGULAR' | 'WEEKEND' | 'EVENING';
+  batchType?: 'REGULAR' | 'WEEKEND' | 'EVENING' | 'TESTBATCH';
   courseDuration?: string;
   facultyAssigned?: string;
   courseFee?: number;

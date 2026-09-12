@@ -576,6 +576,7 @@ export function useEnrollStudentTestBatch() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['studentTestBatchEnrollments', variables.studentId] });
       queryClient.invalidateQueries({ queryKey: ['test-batches', 'enrollments', variables.batchId] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
     },
   });
 }
@@ -600,6 +601,7 @@ export function useRevokeTestBatchEnrollment(studentId?: string) {
       if (variables.batchId) {
         queryClient.invalidateQueries({ queryKey: ['test-batches', 'enrollments', variables.batchId] });
       }
+      queryClient.invalidateQueries({ queryKey: ['students'] });
     },
   });
 }

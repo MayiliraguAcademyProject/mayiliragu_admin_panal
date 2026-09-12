@@ -201,10 +201,19 @@ export default function StudentManagementPage() {
       const matchesSearch =
         student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         student.email.toLowerCase().includes(searchQuery.toLowerCase());
+      if (!matchesSearch) return false;
+      if (batchTypeFilter === 'ALL') return true;
+
       const studentBatchType = student.profile?.batchType || 'REGULAR';
-      const matchesBatchType =
-        batchTypeFilter === 'ALL' || studentBatchType === batchTypeFilter;
-      return matchesSearch && matchesBatchType;
+      const hasTestBatchEnrollment = Boolean(
+        student.testBatchEnrollments && student.testBatchEnrollments.length > 0
+      );
+
+      if (batchTypeFilter === 'TESTBATCH') {
+        return studentBatchType === 'TESTBATCH' || hasTestBatchEnrollment;
+      }
+
+      return studentBatchType === batchTypeFilter;
     });
   }, [students, searchQuery, batchTypeFilter]);
 
@@ -573,7 +582,7 @@ export default function StudentManagementPage() {
 
           {/* Batch Type Filter Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            {(['ALL', 'REGULAR', 'WEEKEND', 'EVENING'] as const).map((type) => (
+            {(['ALL', 'REGULAR', 'WEEKEND', 'EVENING', 'TESTBATCH'] as const).map((type) => (
               <button
                 key={type}
                 type="button"
@@ -584,7 +593,11 @@ export default function StudentManagementPage() {
                     : 'bg-slate-100 text-text-secondary hover:bg-slate-200'
                 }`}
               >
-                {type === 'ALL' ? 'All Batches' : `${type.charAt(0) + type.slice(1).toLowerCase()}`}
+                {type === 'ALL'
+                  ? 'All Batches'
+                  : type === 'TESTBATCH'
+                  ? 'Test Batches'
+                  : `${type.charAt(0) + type.slice(1).toLowerCase()}`}
               </button>
             ))}
           </div>
@@ -668,10 +681,17 @@ export default function StudentManagementPage() {
                             ? 'bg-blue-100 text-blue-800 border border-blue-200'
                             : profile.batchType === 'WEEKEND'
                             ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                            : 'bg-orange-100 text-orange-800 border border-orange-200'
+                            : profile.batchType === 'EVENING'
+                            ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                            : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                         }`}
                       >
-                        {profile.batchType} BATCH
+                        {profile.batchType === 'TESTBATCH' ? 'TEST BATCH' : `${profile.batchType} BATCH`}
+                      </span>
+                    )}
+                    {profile?.batchType !== 'TESTBATCH' && ((selectedStudent.testBatchEnrollments && selectedStudent.testBatchEnrollments.length > 0) || batchEnrollments.length > 0) && (
+                      <span className="text-[10px] font-black px-2.5 py-0.5 rounded-lg uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        TEST BATCH ENROLLED
                       </span>
                     )}
                   </div>
@@ -1225,6 +1245,7 @@ export default function StudentManagementPage() {
                               <option value="REGULAR">Regular Batch (Weekday Full-time)</option>
                               <option value="WEEKEND">Weekend Batch (Sat & Sun)</option>
                               <option value="EVENING">Evening Batch (Weekday Evenings)</option>
+                              <option value="TESTBATCH">Test Batch (Test Series)</option>
                             </select>
                           </div>
                           <div className="space-y-1.5">
