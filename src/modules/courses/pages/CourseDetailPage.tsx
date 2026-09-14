@@ -569,6 +569,16 @@ export default function CourseDetailPage() {
             </div>
           </div>
 
+          {/* Sequential Mode Explanatory Notice */}
+          {course.lockMode === 'sequential' && (
+            <div className="flex items-center space-x-2 text-xs text-amber-800 bg-amber-50/90 border border-amber-200/80 px-3.5 py-2 rounded-xl font-medium">
+              <Lock className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+              <span>
+                <strong>Sequential Unlock Active:</strong> Students can access the 1st video of each module & topic. Remaining videos unlock sequentially upon completion.
+              </span>
+            </div>
+          )}
+
           {/* Availability Dates Banner if set */}
           {(course.startDate || course.endDate) && (
             <div className="flex items-center space-x-4 pt-1 text-xs text-text-secondary font-semibold">
